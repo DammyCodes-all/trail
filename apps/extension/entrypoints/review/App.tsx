@@ -1,12 +1,33 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { eventWithTime } from '@rrweb/types';
-import { REPO_KEY } from '@/lib/constants';
-import { getAllEvents, getReport, getSessionEvents } from '@/lib/db';
+import { REPLAY_SERVER_URL, REPO_KEY } from '@/lib/constants';
+import { getAllEvents, getReport, getSessionEvents, updateReportTitle } from '@/lib/db';
 import { buildIssueUrl } from '@/lib/github';
 import { buildMarkdownFromSections, buildSections, suggestTitle } from '@/lib/report';
+import { suggestRepo } from '@/lib/repo';
 import { fetchIssueTemplate, shapeSections, type IssueTemplate } from '@/lib/templates';
 import { buildTimeline, type TimelineStep } from '@/lib/timeline';
 import type { StoredEvent, TrailCounts, TrailReport } from '@/lib/types';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Toaster, toast } from '@/components/ui/toast';
+import {
+  CheckCircle2,
+  Clapperboard,
+  Copy,
+  ExternalLink,
+  FileDown,
+  Loader2,
+  MousePointerClick,
+  Share2,
+  TriangleAlert,
+  WifiOff,
+} from 'lucide-react';
 import { ReplayPlayer } from './ReplayPlayer';
 
 const fmtTime = (t: number) => {
@@ -25,7 +46,10 @@ function App() {
   const [repo, setRepo] = useState('');
   const [template, setTemplate] = useState<IssueTemplate | null>(null);
   const [templateState, setTemplateState] = useState<'idle' | 'checking' | 'found' | 'none'>('idle');
-  const [toast, setToast] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
+  const [labels, setLabels] = useState('');
+  const [sharing, setSharing] = useState<'idle' | 'uploading'>('idle');
+  const [replayLink, setReplayLink] = useState('');
 
   useEffect(() => {
     void (async () => {
@@ -45,6 +69,23 @@ function App() {
       setLoading(false);
     })();
   }, [reportId]);
+
+  // Editable title, seeded from the loaded report.
+  useEffect(() => {
+    setTitle(report?.title ?? '');
+  }, [report]);
+
+  // Phase 5: suggest a repo from the recorded pages when the field is empty.
+  // Prefill only — not persisted — so the user can dismiss it by typing.
+  const repoSuggestedOnce = useRef(false);
+  useEffect(() => {
+    if (repo || repoSuggestedOnce.current || !events.length) return;
+    const s = suggestRepo(events.map((e) => e.url));
+    if (s) {
+      repoSuggestedOnce.current = true;
+      setRepo(s);
+    }
+  }, [events, repo]);
 
   const timeline = useMemo(() => buildTimeline(events, redact), [events, redact]);
   const rrwebEvents = useMemo(
@@ -90,18 +131,31 @@ function App() {
     };
   }, [repo]);
 
+  // Template frontmatter labels prefill the labels field — but only while the
+  // user hasn't typed their own.
+  useEffect(() => {
+    if (template?.labels?.length && !labels.trim()) {
+      setLabels(template.labels.join(', '));
+    }
+  }, [template, labels]);
+
   const base = report ?? { title: 'Bug report' };
+  const displayTitle = title || base.title;
+  const labelsList = labels
+    .split(',')
+    .map((l) => l.trim())
+    .filter(Boolean);
   const sections = useMemo(() => {
     const baseSections = buildSections(base, events, { repo, redact });
     return template ? shapeSections(template, baseSections).sections : baseSections;
   }, [base, events, repo, redact, template]);
   const markdown = useMemo(
-    () => buildMarkdownFromSections(base.title, sections),
-    [base.title, sections],
+    () => buildMarkdownFromSections(displayTitle, sections),
+    [displayTitle, sections],
   );
   const issue = useMemo(
-    () => (repo ? buildIssueUrl(repo, base.title, sections) : null),
-    [repo, base.title, sections],
+    () => (repo ? buildIssueUrl(repo, displayTitle, sections, labelsList) : null),
+    [repo, displayTitle, sections, labelsList],
   );
 
   // Test hooks for spike/verify.mjs.
@@ -114,7 +168,10 @@ function App() {
     w.__trailDropped = issue?.dropped ?? [];
     w.__trailTemplate = template?.name ?? null;
     w.__trailTemplateState = templateState;
-  }, [timeline, rrwebEvents, markdown, issue, template, templateState]);
+    w.__trailTitle = displayTitle;
+    w.__trailReplayLink = replayLink;
+    w.__trailSuggestedRepo = repoSuggestedOnce.current ? repo : null;
+  }, [timeline, rrwebEvents, markdown, issue, template, templateState, displayTitle, replayLink, repo]);
 
   const setRepoAndSave = (value: string) => {
     setRepo(value);
@@ -134,14 +191,14 @@ function App() {
       document.execCommand('copy');
       ta.remove();
     }
-    setToast('Markdown copied to clipboard');
+    toast.add({ type: 'success', title: 'Markdown copied to clipboard' });
   };
 
   const download = async (filename: string, blob: Blob) => {
     const url = URL.createObjectURL(blob);
     try {
       await browser.downloads.download({ url, filename });
-      setToast(`Downloaded ${filename}`);
+      toast.add({ type: 'success', title: `Downloaded ${filename}` });
     } finally {
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     }
@@ -164,83 +221,229 @@ function App() {
     void browser.tabs.create({ url: issue.url });
   };
 
-  if (loading) return <div className="page"><p className="muted">Loading…</p></div>;
+  const persistTitle = () => {
+    if (reportId && title && title !== report?.title) {
+      void updateReportTitle(reportId, title);
+    }
+  };
+
+  // Upload the session to the replay server and hand back the share link.
+  // Clipboard failures never block the link from being generated.
+  const copyReplayLink = async () => {
+    if (sharing === 'uploading') return;
+    setSharing('uploading');
+    try {
+      const res = await fetch(`${REPLAY_SERVER_URL}/api/replays`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: displayTitle, exportedAt: Date.now(), events }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { id?: string };
+      if (!data.id) throw new Error('no id');
+      const link = `${REPLAY_SERVER_URL}/r/${data.id}`;
+      setReplayLink(link);
+      try {
+        await navigator.clipboard.writeText(link);
+        toast.add({ type: 'success', title: 'Replay link copied to clipboard' });
+      } catch {
+        toast.add({ type: 'info', title: `Replay link ready: ${link}` });
+      }
+    } catch {
+      toast.add({ type: 'error', title: `Replay server unreachable at ${REPLAY_SERVER_URL}` });
+    } finally {
+      setSharing('idle');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-3.5 w-16" />
+            <Skeleton className="h-7 w-72" />
+          </div>
+          <div className="flex gap-1.5">
+            <Skeleton className="h-5 w-16" />
+            <Skeleton className="h-5 w-16" />
+            <Skeleton className="h-5 w-16" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-9 w-56" />
+          <Skeleton className="h-9 w-36" />
+          <Skeleton className="h-9 w-44" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Skeleton className="h-[480px] rounded-xl" />
+          <Skeleton className="h-[480px] rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="page">
-      <header className="head">
-        <div>
-          <span className="brand">TRAIL</span>
-          <h1>{base.title}</h1>
+    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 p-5">
+      <header className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <span className="font-heading text-xs font-semibold tracking-[0.18em] text-muted-foreground">
+            TRAIL
+          </span>
+          <input
+            className="w-full max-w-[560px] rounded-md border border-transparent bg-transparent p-1 font-heading text-xl font-medium text-foreground outline-none transition-colors hover:border-border focus:border-border focus:bg-background"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={persistTitle}
+            placeholder="Bug report title"
+            spellCheck={false}
+            aria-label="Report title"
+          />
         </div>
-        <div className="counts">
-          <span>clicks {counts.click}</span>
-          <span>errors {counts.console}</span>
-          <span>failures {counts.net}</span>
+        <div className="flex shrink-0 gap-1.5">
+          <Badge variant="outline" className="gap-1">
+            <MousePointerClick aria-hidden="true" />
+            {counts.click}
+          </Badge>
+          <Badge variant="destructive" className="gap-1">
+            <TriangleAlert aria-hidden="true" />
+            {counts.console}
+          </Badge>
+          <Badge className="gap-1 border-transparent bg-primary/10 text-primary">
+            <WifiOff aria-hidden="true" />
+            {counts.net}
+          </Badge>
         </div>
       </header>
 
-      <section className="exportbar">
-        <input
-          className="repo"
+      <section className="flex flex-wrap items-center gap-2">
+        <Input
+          className="repo h-9 flex-1 min-w-[220px] font-mono text-sm"
           placeholder="owner/repo — e.g. acme/widget"
           value={repo}
           onChange={(e) => setRepoAndSave(e.target.value)}
           spellCheck={false}
         />
-        <button className="btn primary" onClick={openIssue} disabled={!issue}>
+        <Input
+          className="h-9 w-auto min-w-[140px] flex-[0.4] text-sm"
+          placeholder="labels — e.g. bug, ui"
+          value={labels}
+          onChange={(e) => setLabels(e.target.value)}
+          spellCheck={false}
+        />
+        <Button className="h-9" onClick={openIssue} disabled={!issue}>
+          <ExternalLink data-icon="inline-start" aria-hidden="true" />
           Open GitHub Issue
-        </button>
-        <button className="btn" onClick={() => void copyMarkdown()}>
+        </Button>
+        <Button variant="secondary" className="h-9" onClick={() => void copyMarkdown()}>
+          <Copy data-icon="inline-start" aria-hidden="true" />
           Copy Markdown
-        </button>
-        <button className="btn" onClick={() => void downloadReport()}>
+        </Button>
+        <Button variant="outline" className="h-9" onClick={() => void downloadReport()}>
+          <FileDown data-icon="inline-start" aria-hidden="true" />
           Download .md
-        </button>
-        <button className="btn" onClick={() => void downloadReplay()}>
+        </Button>
+        <Button variant="outline" className="h-9" onClick={() => void downloadReplay()}>
+          <Clapperboard data-icon="inline-start" aria-hidden="true" />
           Download Replay
-        </button>
-        <label className="toggle">
-          <input type="checkbox" checked={redact} onChange={(e) => setRedact(e.target.checked)} />
-          <span>Redact values</span>
+        </Button>
+        <Button
+          variant="outline"
+          className="h-9"
+          onClick={() => void copyReplayLink()}
+          disabled={sharing === 'uploading'}
+        >
+          {sharing === 'uploading' ? (
+            <Loader2 className="animate-spin" aria-hidden="true" />
+          ) : (
+            <Share2 data-icon="inline-start" aria-hidden="true" />
+          )}
+          {sharing === 'uploading' ? 'Sharing…' : 'Copy Replay Link'}
+        </Button>
+        <label className="flex cursor-pointer items-center gap-2 pl-1">
+          <Switch
+            checked={redact}
+            onCheckedChange={(v) => setRedact(v)}
+            aria-label="Redact values"
+          />
+          <Label className="text-[13px] font-medium">Redact values</Label>
         </label>
         {templateState === 'found' && template && (
-          <p className="template-note">
+          <p className="flex w-full basis-full items-center gap-1.5 font-mono text-xs text-muted-foreground">
+            <CheckCircle2 className="size-3.5 text-success" aria-hidden="true" />
             Shaped for {template.filename} — {template.name}
           </p>
         )}
       </section>
 
-      {toast && <div className="toast">{toast}</div>}
-
-      <main className="layout">
-        <section className="panel replay-panel">
+      <main className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className="min-h-[480px] overflow-hidden">
           {rrwebEvents.length ? (
             <ReplayPlayer events={rrwebEvents} />
           ) : (
-            <p className="muted">No replay frames captured.</p>
+            <div className="flex h-full min-h-[480px] flex-col items-center justify-center gap-2 p-8 text-center">
+              <h4 className="font-heading text-h4 font-medium">No replay frames captured</h4>
+              <p className="max-w-xs text-body-sm text-muted-foreground">
+                The session has clicks, console and network events — but no rrweb frames
+                made it into this report.
+              </p>
+            </div>
           )}
-        </section>
+        </Card>
 
-        <section className="panel timeline-panel">
-          <h2>Timeline</h2>
-          <ol className="timeline">
+        <Card className="flex max-h-[640px] flex-col overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+            <h2 className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+              Timeline
+            </h2>
+            <Badge variant="ghost" className="font-mono text-[11px] text-muted-foreground">
+              {timeline.length} events
+            </Badge>
+          </div>
+          <ol className="flex-1 divide-y divide-border overflow-y-auto px-4 py-1">
             {timeline.map((s, i) => (
               <TimelineRow key={i} step={s} />
             ))}
           </ol>
-          {timeline.length === 0 && <p className="muted">No events captured.</p>}
-        </section>
+          {timeline.length === 0 && (
+            <p className="p-4 text-body-sm text-muted-foreground">No events captured.</p>
+          )}
+        </Card>
       </main>
+
+      <Toaster />
     </div>
   );
 }
 
 function TimelineRow({ step }: { step: TimelineStep }) {
+  const textClass =
+    step.kind === 'console'
+      ? 'text-destructive'
+      : step.kind === 'net'
+        ? 'text-primary'
+        : step.kind === 'nav'
+          ? 'font-medium text-foreground/70'
+          : 'text-foreground/85';
+  const prefix =
+    step.kind === 'click' ? (
+      <span className="text-primary" aria-hidden="true">
+        ▸
+      </span>
+    ) : step.kind === 'input' ? (
+      <span className="text-muted-foreground" aria-hidden="true">
+        ✎
+      </span>
+    ) : null;
   return (
-    <li className={`step ${step.kind}`}>
-      <span className="t">{fmtTime(step.t)}</span>
-      <span className="text">{step.text}</span>
+    <li className="flex items-baseline gap-2 py-2">
+      <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
+        {fmtTime(step.t)}
+      </span>
+      {prefix}
+      <span className={`min-w-0 text-[13px] leading-relaxed break-words ${textClass}`}>
+        {step.text}
+      </span>
     </li>
   );
 }
