@@ -37,7 +37,10 @@ export function buildIssueUrl(
   const budget = URL_LIMIT - overhead;
 
   const ordered = [...sections].sort((a, b) => a.priority - b.priority);
-  const blocks = ordered.map((s) => ({ name: s.name, block: `## ${s.name}\n\n${s.text}\n\n` }));
+  const blocks = ordered.map((s) => ({
+    name: s.name,
+    block: `${(s.render ?? defaultSectionRender)(s.name, s.text)}\n\n`,
+  }));
 
   let body = '';
   const dropped: string[] = [];
