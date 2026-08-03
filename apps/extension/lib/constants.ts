@@ -10,6 +10,7 @@ export const MSG_BATCH = 'trail:batch';
 export const MSG_START = 'trail:start';
 export const MSG_STOP = 'trail:stop';
 export const MSG_STATUS = 'trail:status';
+export const MSG_OVERLAY_STATUS = 'trail:overlay-status';
 export const MSG_REDACT = 'trail:redact';
 export const MSG_STOP_RECORDER = 'trail:stop-recorder';
 export const MSG_START_RECORDER = 'trail:start-recorder';
