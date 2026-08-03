@@ -64,7 +64,7 @@ async function getExtensionId(browser) {
 async function openPopup(browser, extId) {
   const page = await browser.newPage();
   await page.goto(`chrome-extension://${extId}/popup.html`);
-  await page.waitForSelector('.btn', { timeout: 8000, polling: 100 });
+  await page.waitForSelector('#start', { timeout: 8000, polling: 100 });
   await page.evaluate(() => {
     window.alert = (m) => {
       window.__lastAlert = m;
@@ -96,7 +96,7 @@ async function clickStop(popup) {
   await popup.evaluate(() => {
     window.__trailEvents = undefined;
   });
-  await popup.evaluate(() => document.querySelector('.btn.stop')?.click());
+  await popup.evaluate(() => document.querySelector('#stop')?.click());
   await popup.waitForFunction(() => Array.isArray(window.__trailEvents), { timeout: 10000, polling: 100 });
   return popup.evaluate(() => window.__trailEvents);
 }
