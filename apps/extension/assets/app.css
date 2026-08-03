@@ -1,0 +1,128 @@
+/*
+ * TRAIL — shared global stylesheet (popup + review).
+ * Import order: tailwind → animate → tokens (raw) → theme (tailwind mapping) → fonts.
+ */
+
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@import '@trail/tokens/tokens.css';
+@import '@trail/tokens/theme.css';
+
+/* Self-hosted fonts — bundled with the extension, CSP-safe, offline-safe. */
+@import '@fontsource/outfit/500.css';
+@import '@fontsource/outfit/600.css';
+@import '@fontsource/outfit/700.css';
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+/*
+ * TRAIL is dark-only; tokens in :root already carry the dark values. The
+ * variant exists so components that ship `dark:` overrides compile and apply
+ * (html.dark is set in each entrypoint's index.html).
+ */
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+
+  ::selection {
+    background: rgb(245 158 11 / 0.28);
+    color: #f5f5f4;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #232c3a;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2a3442;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+/*
+ * rrweb-player ships a light controller (indigo on white). Override to the
+ * TRAIL dark/amber theme so the replay panel matches the rest of the UI.
+ */
+.rr-controller {
+  background: var(--trail-surface);
+  border-top: 1px solid var(--trail-border);
+  border-radius: 0 0 calc(var(--radius) - 2px) calc(var(--radius) - 2px);
+}
+
+.rr-timeline__time {
+  color: var(--trail-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.rr-progress {
+  background: var(--trail-border);
+  border-top-color: var(--trail-surface);
+  border-bottom-color: var(--trail-surface);
+}
+
+.rr-progress__step {
+  background: rgb(245 158 11 / 0.35);
+}
+
+.rr-progress__handler {
+  background: var(--trail-primary);
+}
+
+.rr-controller__btns button {
+  color: var(--trail-text-muted);
+}
+
+.rr-controller__btns button:active {
+  background: rgb(245 158 11 / 0.18);
+}
+
+.rr-controller__btns button.active {
+  color: var(--trail-primary-foreground);
+  background: var(--trail-primary);
+}
+
+.rr-controller__btns button:disabled {
+  opacity: 0.4;
+}
+
+.switch {
+  color: var(--trail-text);
+}
+
+.switch label::before {
+  background: rgb(245 158 11 / 0.45);
+}
+
+.switch input:checked + label::before {
+  background: var(--trail-primary);
+}
