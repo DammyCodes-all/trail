@@ -1,0 +1,53 @@
+import { openDB, type IDBPDatabase } from 'idb';
+import { DB_NAME, EVENTS_STORE, REPORTS_STORE } from '@/lib/constants';
+import type { StoredEvent, TrailReport } from '@/lib/types';
+
+let dbPromise: Promise<IDBPDatabase> | null = null;
+
+export function getDb(): Promise<IDBPDatabase> {
+  dbPromise ??= openDB(DB_NAME, 2, {
+    upgrade(d, oldVersion) {
+      if (oldVersion < 1) {
+        d.createObjectStore(EVENTS_STORE, { keyPath: 'seq', autoIncrement: true });
+      }
+      if (oldVersion < 2) {
+        d.createObjectStore(REPORTS_STORE, { keyPath: 'seq', autoIncrement: true });
+      }
+    },
+  });
+  return dbPromise;
+}
+
+export async function addEvents(events: unknown[]): Promise<void> {
+  if (!events.length) return;
+  const db = await getDb();
+  const tx = db.transaction(EVENTS_STORE, 'readwrite');
+  for (const e of events) void tx.store.add(e);
+  await tx.done;
+}
+
+export async function getAllEvents(): Promise<StoredEvent[]> {
+  const db = await getDb();
+  return db.getAll(EVENTS_STORE);
+}
+
+export async function clearEvents(): Promise<void> {
+  const db = await getDb();
+  await db.clear(EVENTS_STORE);
+}
+
+export async function saveReport(report: Omit<TrailReport, 'seq'>): Promise<number> {
+  const db = await getDb();
+  return db.add(REPORTS_STORE, report) as Promise<number>;
+}
+
+export async function getReports(): Promise<TrailReport[]> {
+  const db = await getDb();
+  const all = await db.getAll(REPORTS_STORE);
+  return all.sort((a, b) => b.endedAt - a.endedAt);
+}
+
+export async function getReport(seq: number): Promise<TrailReport | undefined> {
+  const db = await getDb();
+  return db.get(REPORTS_STORE, seq);
+}
