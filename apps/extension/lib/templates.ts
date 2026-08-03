@@ -16,6 +16,8 @@ export interface IssueTemplate {
   filename: string;
   name: string;
   about?: string;
+  // Frontmatter labels (e.g. `labels: ['bug']`) — prefilled into the issue URL.
+  labels?: string[];
   fields: IssueTemplateField[];
 }
 
@@ -40,22 +42,36 @@ const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').repla
 
 const FRONTMATTER_RE = /^---\s*\n([\s\S]*?)\n---\s*\n?/;
 
-function parseFrontmatter(raw: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const line of raw.split('\n')) {
-    const m = line.match(/^(name|about|description|title):\s*(.*)$/i);
-    if (m && m[1] && m[2] !== undefined) {
-      out[m[1].toLowerCase()] = m[2].trim().replace(/^['"]|['"]$/g, '');
-    }
+function applyMetaLine(line: string, meta: Record<string, string>, labels: string[]): void {
+  const m = line.match(/^(name|about|description|title|labels):\s*(.*)$/i);
+  if (!m || m[1] === undefined || m[2] === undefined) return;
+  const key = m[1].toLowerCase();
+  if (key === 'labels') {
+    labels.push(
+      ...m[2]
+        .trim()
+        .replace(/^\[|\]$/g, '')
+        .split(',')
+        .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
+        .filter(Boolean),
+    );
+  } else {
+    meta[key] = m[2].trim().replace(/^['"]|['"]$/g, '');
   }
-  return out;
+}
+
+function parseFrontmatter(raw: string): { meta: Record<string, string>; labels: string[] } {
+  const meta: Record<string, string> = {};
+  const labels: string[] = [];
+  for (const line of raw.split('\n')) applyMetaLine(line, meta, labels);
+  return { meta, labels };
 }
 
 // GitHub's generated markdown templates use `**Label**` on their own line; older
 // hand-written ones use `## Label` headings. Accept both.
 export function parseMarkdownTemplate(raw: string, filename: string): IssueTemplate | null {
   const front = raw.match(FRONTMATTER_RE);
-  const meta = front ? parseFrontmatter(front[1] ?? '') : {};
+  const { meta, labels } = front ? parseFrontmatter(front[1] ?? '') : parseFrontmatter('');
   const body = front ? raw.slice(front[0].length) : raw;
   const fields: IssueTemplateField[] = [];
   for (const line of body.split('\n')) {
@@ -70,14 +86,17 @@ export function parseMarkdownTemplate(raw: string, filename: string): IssueTempl
     filename,
     name: meta.name || filename,
     about: meta.about,
+    labels,
     fields,
   };
 }
 
 // Hand-rolled YAML issue-form parser: pulls `body:` entries and each field's
 // id/label. Tolerant of unknown types, nested attributes and indentation quirks.
+// The yaml frontmatter has no `---` delimiters — it's the plain lines before
+// `body:`, so meta lines are collected there and parsed with the same rules.
 export function parseYamlTemplate(raw: string, filename: string): IssueTemplate | null {
-  const meta: Record<string, string> = {};
+  const metaLines: string[] = [];
   const fields: IssueTemplateField[] = [];
   let inBody = false;
   let fieldIndent = -1;
@@ -101,10 +120,7 @@ export function parseYamlTemplate(raw: string, filename: string): IssueTemplate 
         inBody = true;
         continue;
       }
-      const m = line.match(/^(name|about|description|title):\s*(.*)$/i);
-      if (m && m[1] && m[2] !== undefined) {
-        meta[m[1].toLowerCase()] = m[2].trim().replace(/^['"]|['"]$/g, '');
-      }
+      metaLines.push(rawLine);
       continue;
     }
 
@@ -132,11 +148,13 @@ export function parseYamlTemplate(raw: string, filename: string): IssueTemplate 
   flush();
 
   if (!fields.length) return null;
+  const { meta, labels } = parseFrontmatter(metaLines.join('\n'));
   return {
     kind: 'yaml',
     filename,
     name: meta.name || filename,
     about: meta.about,
+    labels,
     fields,
   };
 }
