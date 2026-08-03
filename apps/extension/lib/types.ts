@@ -46,6 +46,7 @@ export type StoredEvent = TrailEvent & { seq: number };
 
 export interface TrailCounts {
   click: number;
+  input: number;
   console: number;
   net: number;
 }

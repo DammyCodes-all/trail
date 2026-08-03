@@ -1,6 +1,7 @@
 import type { ScriptPublicPath } from 'wxt/utils/inject-script';
 import {
   MSG_BATCH,
+  MSG_OVERLAY_STATUS,
   MSG_REDACT,
   MSG_START,
   MSG_START_RECORDER,
@@ -15,8 +16,13 @@ import { suggestTitle } from '@/lib/report';
 import type { TrailCounts, TrailSession } from '@/lib/types';
 
 const RECORDER_JS = '/content-scripts/recorder.js' as ScriptPublicPath;
+const RELAY_JS = '/content-scripts/relay.js' as ScriptPublicPath;
+const OVERLAY_JS = '/content-scripts/recording-overlay.js' as ScriptPublicPath;
 
-const DEFAULT_COUNTS: TrailCounts = { click: 0, console: 0, net: 0 };
+const DEFAULT_COUNTS: TrailCounts = { click: 0, input: 0, console: 0, net: 0 };
+
+const totalCounts = (counts: TrailCounts) =>
+  counts.click + counts.input + counts.console + counts.net;
 
 // Serializes MSG_BATCH handling: handlers share read-modify-write on counts, and
 // two near-simultaneous flushes (interval + visibilitychange) would lose increments.
@@ -66,6 +72,11 @@ async function startRecording(tabId?: number): Promise<{ ok: boolean; error?: st
     ]);
     await browser.scripting.executeScript({
       target: { tabId: id },
+      world: 'ISOLATED',
+      files: [RELAY_JS, OVERLAY_JS],
+    });
+    await browser.scripting.executeScript({
+      target: { tabId: id },
       world: 'MAIN',
       files: [RECORDER_JS],
     });
@@ -89,7 +100,7 @@ async function startRecording(tabId?: number): Promise<{ ok: boolean; error?: st
   // never reports true while the page still has no recorder.
   await setSession({ tabId: id, startedAt: Date.now() });
 
-  browser.action.setBadgeBackgroundColor({ color: '#dc2626' });
+  browser.action.setBadgeBackgroundColor({ color: '#ff6a00' });
   browser.action.setBadgeText({ text: '0' });
   return { ok: true };
 }
@@ -156,9 +167,8 @@ export default defineBackground(() => {
         },
       ]);
       const counts = await getCounts();
-      const total = counts.click + counts.console + counts.net;
-      browser.action.setBadgeBackgroundColor({ color: '#dc2626' });
-      browser.action.setBadgeText({ text: String(total) });
+      browser.action.setBadgeBackgroundColor({ color: '#ff6a00' });
+      browser.action.setBadgeText({ text: String(totalCounts(counts)) });
     } catch {
       // nothing to do if re-registration fails
     }
@@ -175,11 +185,12 @@ export default defineBackground(() => {
           const counts = await getCounts();
           for (const d of msg.batch as Array<{ k: string }>) {
             if (d.k === 'click') counts.click++;
+            else if (d.k === 'input') counts.input++;
             else if (d.k === 'console') counts.console++;
             else if (d.k === 'net') counts.net++;
           }
           await browser.storage.session.set({ counts });
-          browser.action.setBadgeText({ text: String(counts.click + counts.console + counts.net) });
+          browser.action.setBadgeText({ text: String(totalCounts(counts)) });
         })
         .catch(() => {}); // never let a batch failure stall the chain
       return; // async, no response needed
@@ -213,6 +224,23 @@ export default defineBackground(() => {
           const session = await getSession();
           const counts = await getCounts();
           sendResponse({ recording: !!session, counts });
+        } catch (err) {
+          sendResponse({ recording: false, counts: DEFAULT_COUNTS, error: (err as Error).message });
+        }
+      })();
+      return true;
+    }
+
+    if (msg?.type === MSG_OVERLAY_STATUS) {
+      void (async () => {
+        try {
+          const session = await getSession();
+          const recording = !!session && sender.tab?.id === session.tabId;
+          sendResponse({
+            recording,
+            counts: recording ? await getCounts() : DEFAULT_COUNTS,
+            startedAt: recording ? session.startedAt : undefined,
+          });
         } catch (err) {
           sendResponse({ recording: false, counts: DEFAULT_COUNTS, error: (err as Error).message });
         }
