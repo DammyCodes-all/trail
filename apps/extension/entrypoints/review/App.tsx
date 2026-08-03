@@ -98,9 +98,10 @@ function App() {
   );
 
   const counts: TrailCounts = useMemo(() => {
-    const c: TrailCounts = { click: 0, console: 0, net: 0 };
+    const c: TrailCounts = { click: 0, input: 0, console: 0, net: 0 };
     for (const e of events) {
       if (e.k === 'click') c.click++;
+      else if (e.k === 'input') c.input++;
       else if (e.k === 'console') c.console++;
       else if (e.k === 'net') c.net++;
     }

@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { CirclePlus, MousePointerClick, ShieldCheck, Square, TriangleAlert, Trash2, WifiOff } from 'lucide-react';
+import { CirclePlus, Keyboard, MousePointerClick, ShieldCheck, Square, TriangleAlert, Trash2, WifiOff } from 'lucide-react';
 
 type Status = { recording: boolean; counts: TrailCounts } | null;
 type View = 'home' | 'setup' | 'recording';
@@ -98,7 +98,7 @@ function App() {
     (window as unknown as { __trailEvents: StoredEvent[] }).__trailEvents = events;
   }, [events]);
 
-  const counts = status?.counts ?? { click: 0, console: 0, net: 0 };
+  const counts = status?.counts ?? { click: 0, input: 0, console: 0, net: 0 };
   const recording = status?.recording ?? false;
 
   return (
@@ -109,7 +109,7 @@ function App() {
         </span>
         {recording && (
           <Badge className="pill gap-1.5 border-transparent bg-primary/15 text-primary">
-            <span className="size-1.5 animate-pulse rounded-full bg-primary" aria-hidden="true" />
+            <span className="size-1.5 animate-pulse rounded-none bg-primary" aria-hidden="true" />
             recording
           </Badge>
         )}
@@ -206,6 +206,10 @@ function App() {
             <Badge variant="outline" className="gap-1">
               <MousePointerClick aria-hidden="true" />
               clicks {counts.click}
+            </Badge>
+            <Badge variant="outline" className="gap-1">
+              <Keyboard aria-hidden="true" />
+              inputs {counts.input}
             </Badge>
             <Badge variant="destructive" className="gap-1">
               <TriangleAlert aria-hidden="true" />
