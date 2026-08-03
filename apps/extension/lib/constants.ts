@@ -17,3 +17,7 @@ export const MSG_START_RECORDER = 'trail:start-recorder';
 // chrome.storage.local keys for persisted preferences
 export const REDACT_KEY = 'trail:autoRedact';
 export const REPO_KEY = 'trail:repo';
+
+// Base URL of the replay share server (see replay-server/). Points at the local
+// twin by default; swap in the Vercel deployment URL for production.
+export const REPLAY_SERVER_URL = 'http://localhost:8898';

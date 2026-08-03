@@ -95,7 +95,10 @@ export function buildSections(
       name: 'Failed Requests',
       priority: SECTION_PRIORITIES['Failed Requests']!,
       text: nets
-        .map((e) => `- ${e.method} ${e.target} — ${e.status}${e.err ? ` (${e.err})` : ''}`)
+        .map((e) => {
+          const line = `- ${e.method} ${e.target} — ${e.status}${e.err ? ` (${e.err})` : ''}`;
+          return e.body ? `${line}\n  \`\`\`\n${e.body}\n  \`\`\`` : line;
+        })
         .join('\n'),
     });
   }

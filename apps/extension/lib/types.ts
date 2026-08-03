@@ -31,6 +31,8 @@ export interface NetEvent extends BaseTrailEvent {
   status: number;
   via: 'fetch' | 'xhr';
   err?: string;
+  // Response body of the failed request, capped and truncated by the recorder.
+  body?: string;
 }
 
 export interface RrwebEvent extends BaseTrailEvent {
