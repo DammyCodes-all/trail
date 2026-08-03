@@ -1,3 +1,4 @@
+import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'wxt';
 
 // rrweb's bundle contains literal U+FFFE (a Unicode non-character) used in its
@@ -48,7 +49,7 @@ function escapeNonAscii(): {
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite: () => ({
-    plugins: [escapeNonAscii()],
+    plugins: [tailwindcss(), escapeNonAscii()],
   }),
   manifest: {
     name: 'TRAIL',
