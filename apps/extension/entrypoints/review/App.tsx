@@ -259,7 +259,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 p-5">
+      <div className="mx-auto flex w-full max-w-300 flex-col gap-4 p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-2">
             <Skeleton className="h-3.5 w-16" />
@@ -277,22 +277,30 @@ function App() {
           <Skeleton className="h-9 w-44" />
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Skeleton className="h-[480px] rounded-xl" />
-          <Skeleton className="h-[480px] rounded-xl" />
+          <Skeleton className="h-120 rounded-xl" />
+          <Skeleton className="h-120 rounded-xl" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 p-5">
+    <div className="mx-auto flex w-full max-w-300 flex-col gap-4 p-5">
       <header className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="font-heading text-xs font-semibold tracking-[0.18em] text-muted-foreground">
-            TRAIL
-          </span>
+        <div className="flex min-w-0 items-start gap-3">
+          <img
+            src="/icon/48.png"
+            alt="TRAIL"
+            className="mt-0.5 size-14 shrink-0"
+            width={56}
+            height={56}
+          />
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className="font-heading text-xs font-semibold tracking-[0.18em] text-muted-foreground">
+              TRAIL
+            </span>
           <input
-            className="w-full max-w-[560px] rounded-md border border-transparent bg-transparent p-1 font-heading text-xl font-medium text-foreground outline-none transition-colors hover:border-border focus:border-border focus:bg-background"
+            className="w-full max-w-140 rounded-md border border-transparent bg-transparent p-1 font-heading text-xl font-medium text-foreground outline-none transition-colors hover:border-border focus:border-border focus:bg-background"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={persistTitle}
@@ -300,6 +308,7 @@ function App() {
             spellCheck={false}
             aria-label="Report title"
           />
+          </div>
         </div>
         <div className="flex shrink-0 gap-1.5">
           <Badge variant="outline" className="gap-1">
@@ -319,14 +328,14 @@ function App() {
 
       <section className="flex flex-wrap items-center gap-2">
         <Input
-          className="repo h-9 flex-1 min-w-[220px] font-mono text-sm"
+          className="repo h-9 flex-1 min-w-55 font-mono text-sm"
           placeholder="owner/repo — e.g. acme/widget"
           value={repo}
           onChange={(e) => setRepoAndSave(e.target.value)}
           spellCheck={false}
         />
         <Input
-          className="h-9 w-auto min-w-[140px] flex-[0.4] text-sm"
+          className="h-9 w-auto min-w-35 flex-[0.4] text-sm"
           placeholder="labels — e.g. bug, ui"
           value={labels}
           onChange={(e) => setLabels(e.target.value)}
@@ -378,11 +387,11 @@ function App() {
       </section>
 
       <main className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="min-h-[480px] overflow-hidden">
+        <Card className="min-h-120 overflow-hidden">
           {rrwebEvents.length ? (
             <ReplayPlayer events={rrwebEvents} />
           ) : (
-            <div className="flex h-full min-h-[480px] flex-col items-center justify-center gap-2 p-8 text-center">
+            <div className="flex h-full min-h-120 flex-col items-center justify-center gap-2 p-8 text-center">
               <h4 className="font-heading text-h4 font-medium">No replay frames captured</h4>
               <p className="max-w-xs text-body-sm text-muted-foreground">
                 The session has clicks, console and network events — but no rrweb frames
@@ -392,9 +401,9 @@ function App() {
           )}
         </Card>
 
-        <Card className="flex max-h-[640px] flex-col overflow-hidden">
+        <Card className="flex max-h-160 flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-            <h2 className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+            <h2 className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
               Timeline
             </h2>
             <Badge variant="ghost" className="font-mono text-[11px] text-muted-foreground">
@@ -442,7 +451,7 @@ function TimelineRow({ step }: { step: TimelineStep }) {
         {fmtTime(step.t)}
       </span>
       {prefix}
-      <span className={`min-w-0 text-[13px] leading-relaxed break-words ${textClass}`}>
+      <span className={`min-w-0 text-[13px] leading-relaxed wrap-break-word ${textClass}`}>
         {step.text}
       </span>
     </li>

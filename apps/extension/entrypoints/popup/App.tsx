@@ -102,11 +102,20 @@ function App() {
   const recording = status?.recording ?? false;
 
   return (
-    <div className="flex w-[380px] flex-col gap-4 p-4">
+    <div className="flex w-95 flex-col gap-4 p-4">
       <header className="flex items-center justify-between">
-        <span className="font-heading text-sm font-semibold tracking-[0.18em] text-foreground">
-          TRAIL
-        </span>
+        <div className="flex items-center gap-2">
+          <img
+            src="/icon/32.png"
+            alt="TRAIL"
+            className="size-10 shrink-0"
+            width={40}
+            height={40}
+          />
+          <span className="font-heading text-sm font-semibold tracking-[0.18em] text-foreground">
+            TRAIL
+          </span>
+        </div>
         {recording && (
           <Badge className="pill gap-1.5 border-transparent bg-primary/15 text-primary">
             <span className="size-1.5 animate-pulse rounded-none bg-primary" aria-hidden="true" />
@@ -127,7 +136,7 @@ function App() {
           </Button>
 
           <section className="flex flex-col gap-2">
-            <h3 className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+            <h3 className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
               Past reports
             </h3>
             {reports.length === 0 ? (
@@ -138,7 +147,7 @@ function App() {
                 </p>
               </div>
             ) : (
-              <ul className="flex max-h-[260px] flex-col gap-1.5 overflow-y-auto">
+              <ul className="flex max-h-65 flex-col gap-1.5 overflow-y-auto">
                 {reports.map((r) => (
                   <li key={r.seq} className="flex min-w-0 items-stretch gap-1.5">
                     <Button
