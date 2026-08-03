@@ -27,7 +27,7 @@ import {
   Trash2,
   WifiOff,
 } from "lucide-react";
-import { TrailLogo } from "@trail/logo";
+import { TrailLogo } from "@/components/ui/trail-logo";
 
 type Status = { recording: boolean; counts: TrailCounts } | null;
 type View = "home" | "setup" | "recording";
