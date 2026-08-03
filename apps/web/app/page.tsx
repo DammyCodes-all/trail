@@ -1,4 +1,4 @@
-import { TrailLogo } from "@trail/logo";
+import { TrailLogo } from "@/components/trail-logo";
 
 export default function Home() {
   return (
