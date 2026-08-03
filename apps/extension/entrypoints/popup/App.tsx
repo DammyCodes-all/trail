@@ -27,6 +27,7 @@ import {
   Trash2,
   WifiOff,
 } from "lucide-react";
+import { TrailLogo } from "@trail/logo";
 
 type Status = { recording: boolean; counts: TrailCounts } | null;
 type View = "home" | "setup" | "recording";
@@ -125,12 +126,11 @@ function App() {
     <div className="flex w-95 flex-col gap-4 p-4">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img
-            src="/icon/32.png"
-            alt="TRAIL"
+          <TrailLogo
             className="size-10 shrink-0"
             width={40}
             height={40}
+            aria-label="TRAIL logo"
           />
           <span className="font-heading text-sm font-semibold tracking-[0.18em] text-foreground">
             TRAIL

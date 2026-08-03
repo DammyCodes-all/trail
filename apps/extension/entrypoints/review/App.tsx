@@ -42,6 +42,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { ReplayPlayer } from "./ReplayPlayer";
+import { TrailLogo } from "@trail/logo";
 
 const fmtTime = (t: number) => {
   const d = new Date(t);
@@ -340,12 +341,11 @@ function App() {
     <div className="mx-auto flex w-full max-w-300 flex-col gap-4 p-5">
       <header className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <img
-            src="/icon/48.png"
-            alt="TRAIL"
+          <TrailLogo
             className="mt-0.5 size-14 shrink-0"
             width={56}
             height={56}
+            aria-label="TRAIL logo"
           />
           <div className="flex min-w-0 flex-col gap-1.5">
             <span className="font-heading text-xs font-semibold tracking-[0.18em] text-muted-foreground">
