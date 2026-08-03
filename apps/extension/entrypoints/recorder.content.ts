@@ -36,6 +36,16 @@ export default defineContentScript({
       }
     };
 
+    // Response bodies of failed requests, capped. Server replies are the payload
+    // of a bug report; anything longer is truncated rather than dropped.
+    const BODY_LIMIT = 4000;
+    const bodyText = (s: unknown): string | undefined => {
+      if (s == null) return undefined;
+      const str = String(s);
+      if (!str.trim()) return undefined;
+      return str.length > BODY_LIMIT ? `${str.slice(0, BODY_LIMIT)}\n...(truncated)` : str;
+    };
+
     let active = true;
     let running = false;
     let autoRedact = true; // default on; relay delivers the stored preference
@@ -141,16 +151,28 @@ export default defineContentScript({
       try {
         const r = await origFetch.apply(this, a as Parameters<typeof fetch>);
         if (!r.ok && active) {
-          const ev: NetEvent = {
-            k: 'net',
-            target: url,
-            method,
-            status: r.status,
-            t,
-            via: 'fetch',
-            url: pageUrl(),
-          };
-          emit(ev);
+          // Clone keeps the page's own read of the response intact; the body is
+          // captured async so a failed body read never blocks the app's fetch.
+          void (async () => {
+            let body: string | undefined;
+            try {
+              body = bodyText(await r.clone().text());
+            } catch {
+              // body unreadable — still record the failure without it
+            }
+            if (!active) return;
+            const ev: NetEvent = {
+              k: 'net',
+              target: url,
+              method,
+              status: r.status,
+              t,
+              via: 'fetch',
+              url: pageUrl(),
+              body,
+            };
+            emit(ev);
+          })();
         }
         return r;
       } catch (err) {
@@ -188,6 +210,13 @@ export default defineContentScript({
         const meta = (this as unknown as { __trail?: { method: string; url: string } }).__trail;
         const bad = this.status === 0 || this.status >= 400;
         if (bad && meta && active) {
+          let body: string | undefined;
+          try {
+            const rt = this.responseType;
+            if (rt === '' || rt === 'text') body = bodyText(this.responseText);
+          } catch {
+            // binary/opaque responses have no text body
+          }
           const ev: NetEvent = {
             k: 'net',
             target: meta.url,
@@ -196,6 +225,7 @@ export default defineContentScript({
             t,
             via: 'xhr',
             url: pageUrl(),
+            body,
           };
           emit(ev);
         }
