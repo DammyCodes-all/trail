@@ -224,9 +224,6 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.2.0(@types/node@20.19.43)(jiti@2.7.0))
-      '@trail/logo':
-        specifier: workspace:*
-        version: link:../../packages/logo
       '@trail/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
@@ -309,9 +306,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@trail/logo':
-        specifier: workspace:*
-        version: link:../../packages/logo
       next:
         specifier: 16.2.12
         version: 16.2.12(@babel/core@7.29.7(supports-color@7.2.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -346,12 +340,6 @@ importers:
       typescript:
         specifier: ^5
         version: 5.9.3
-
-  packages/logo:
-    dependencies:
-      react:
-        specifier: '>=18'
-        version: 19.2.4
 
   packages/tokens: {}
 
