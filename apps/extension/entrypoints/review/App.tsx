@@ -42,7 +42,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { ReplayPlayer } from "./ReplayPlayer";
-import { TrailLogo } from "@trail/logo";
+import { TrailLogo } from "@/components/ui/trail-logo";
 
 const fmtTime = (t: number) => {
   const d = new Date(t);
