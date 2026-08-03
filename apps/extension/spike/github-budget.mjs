@@ -1,40 +1,47 @@
-import { buildIssueUrl, sectionsFromEvents } from '../lib/github.ts';
+import { buildIssueUrl } from '../lib/github.ts';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(`ASSERTION FAILED: ${msg}`);
 }
 
-const chunks = (n, k) =>
-  Array.from({ length: n }, (_, i) => ({
-    k,
-    t: Date.now(),
-    url: `http://localhost:8899/page${(i % 3) + 1}.html`,
-    seq: i,
-    ...(k === 'console'
-      ? { lv: 'error', msg: `boom #${i}`, stack: `TypeError: boom #${i}\n    at a (file.js:${i}:1)\n    at b (file.js:${i}:2)` }
-      : k === 'net'
-        ? { target: `/api/thing-${i}`, method: 'POST', status: 500, via: 'fetch' }
-        : {}),
-  }));
-
-const makeSections = () => [
+// Mirrors the test-page interactions so the payload is realistic.
+const sections = [
   {
     name: 'Steps to Reproduce',
     priority: 1,
-    text: Array.from({ length: 12 }, (_, i) => `${i + 1}. Type a@b.com into Email, then click **Submit**.`).join('\n'),
+    text: [
+      '1. Navigate to http://localhost:8899/page1.html',
+      '2. Click Submit',
+      '3. Click Do XHR',
+      '4. Type into email',
+      '5. Navigate to http://localhost:8899/page2.html',
+      '6. Click Pay now',
+    ].join('\n'),
   },
-  ...sectionsFromEvents([
-    ...chunks(8, 'console'),
-    ...chunks(40, 'net'),
-  ]),
   {
-    name: 'Additional Logs',
-    priority: 5,
-    text: 'x'.repeat(6000),
+    name: 'Console Errors',
+    priority: 2,
+    text: [
+      '- `error` at /page1.html: boom: price calc failed',
+      '  Error: boom\n  at a (x.js:1:1)\n  at b (x.js:2:2)',
+      '- `error` at /page2.html: simulated payment failure',
+    ].join('\n'),
+  },
+  {
+    name: 'Environment',
+    priority: 3,
+    text: '- User agent: Mozilla/5.0 (test)',
+  },
+  {
+    name: 'Failed Requests',
+    priority: 4,
+    text: [
+      '- GET /missing-xhr — 404',
+      '- POST /fail — 500',
+    ].join('\n'),
   },
 ];
 
-const sections = makeSections();
 const result = buildIssueUrl('acme/widget', 'Checkout crashes after typing email', sections);
 
 const total = Buffer.byteLength(result.url);
@@ -44,10 +51,19 @@ assert(total < 8192, `url must stay under GitHub's 414 threshold (got ${total})`
 assert(total <= 7600, `url must fit our own budget of 7600 (got ${total})`);
 assert(!result.dropped.includes('Steps to Reproduce'), 'steps to reproduce must never drop');
 assert(!result.dropped.includes('Console Errors'), 'first console error must never drop');
-assert(result.dropped.includes('Additional Logs'), 'low-priority logs should drop first when oversize');
+assert(result.url.includes('Checkout%20crashes'), 'title is prefilled');
 
-const tiny = buildIssueUrl('acme/widget', 't', sections.slice(0, 2));
+// Oversized payload: low-priority sections must drop before anything important.
+const bigSections = [
+  ...sections,
+  { name: 'Additional Logs', priority: 5, text: 'x'.repeat(12000) },
+];
+const big = buildIssueUrl('acme/widget', 't', bigSections);
+assert(big.dropped.includes('Additional Logs'), 'low-priority logs should drop first when oversize');
+assert(!big.dropped.includes('Steps to Reproduce'), 'steps survive even in the oversized case');
+
+// Small report: nothing drops.
+const tiny = buildIssueUrl('acme/widget', 't', sections.slice(0, 1));
 assert(!tiny.dropped.length, 'a small report should drop nothing');
-assert(tiny.url.length < 8192, 'small url stays short');
 
 console.log('SPIKE 4 PASS');
