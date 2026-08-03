@@ -1,21 +1,34 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { eventWithTime } from '@rrweb/types';
-import { REPLAY_SERVER_URL, REPO_KEY } from '@/lib/constants';
-import { getAllEvents, getReport, getSessionEvents, updateReportTitle } from '@/lib/db';
-import { buildIssueUrl } from '@/lib/github';
-import { buildMarkdownFromSections, buildSections, suggestTitle } from '@/lib/report';
-import { suggestRepo } from '@/lib/repo';
-import { fetchIssueTemplate, shapeSections, type IssueTemplate } from '@/lib/templates';
-import { buildTimeline, type TimelineStep } from '@/lib/timeline';
-import type { StoredEvent, TrailCounts, TrailReport } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
-import { Toaster, toast } from '@/components/ui/toast';
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { eventWithTime } from "@rrweb/types";
+import { REPLAY_SERVER_URL, REPO_KEY } from "@/lib/constants";
+import {
+  getAllEvents,
+  getReport,
+  getSessionEvents,
+  updateReportTitle,
+} from "@/lib/db";
+import { buildIssueUrl } from "@/lib/github";
+import {
+  buildMarkdownFromSections,
+  buildSections,
+  suggestTitle,
+} from "@/lib/report";
+import { suggestRepo } from "@/lib/repo";
+import {
+  fetchIssueTemplate,
+  shapeSections,
+  type IssueTemplate,
+} from "@/lib/templates";
+import { buildTimeline, type TimelineStep } from "@/lib/timeline";
+import type { StoredEvent, TrailCounts, TrailReport } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Toaster, toast } from "@/components/ui/toast";
 import {
   CheckCircle2,
   Clapperboard,
@@ -27,34 +40,38 @@ import {
   Share2,
   TriangleAlert,
   WifiOff,
-} from 'lucide-react';
-import { ReplayPlayer } from './ReplayPlayer';
+} from "lucide-react";
+import { ReplayPlayer } from "./ReplayPlayer";
 
 const fmtTime = (t: number) => {
   const d = new Date(t);
-  const p = (n: number) => String(n).padStart(2, '0');
+  const p = (n: number) => String(n).padStart(2, "0");
   return `${p(d.getMinutes())}:${p(d.getSeconds())}`;
 };
 
 function App() {
-  const reportId = Number(new URLSearchParams(location.search).get('report')) || undefined;
+  const reportId =
+    Number(new URLSearchParams(location.search).get("report")) || undefined;
 
-  const [report, setReport] = useState<Pick<TrailReport, 'title'> | null>(null);
+  const [report, setReport] = useState<Pick<TrailReport, "title"> | null>(null);
   const [events, setEvents] = useState<StoredEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [redact, setRedact] = useState(true);
-  const [repo, setRepo] = useState('');
+  const [repo, setRepo] = useState("");
   const [template, setTemplate] = useState<IssueTemplate | null>(null);
-  const [templateState, setTemplateState] = useState<'idle' | 'checking' | 'found' | 'none'>('idle');
-  const [title, setTitle] = useState('');
-  const [labels, setLabels] = useState('');
-  const [sharing, setSharing] = useState<'idle' | 'uploading'>('idle');
-  const [replayLink, setReplayLink] = useState('');
+  const [templateState, setTemplateState] = useState<
+    "idle" | "checking" | "found" | "none"
+  >("idle");
+  const [title, setTitle] = useState("");
+  const [labels, setLabels] = useState("");
+  const [sharing, setSharing] = useState<"idle" | "uploading">("idle");
+  const [replayLink, setReplayLink] = useState("");
 
   useEffect(() => {
     void (async () => {
-      const { [REPO_KEY]: savedRepo } = await browser.storage.local.get(REPO_KEY);
-      setRepo(typeof savedRepo === 'string' ? savedRepo : '');
+      const { [REPO_KEY]: savedRepo } =
+        await browser.storage.local.get(REPO_KEY);
+      setRepo(typeof savedRepo === "string" ? savedRepo : "");
 
       if (reportId) {
         const rep = await getReport(reportId);
@@ -72,7 +89,7 @@ function App() {
 
   // Editable title, seeded from the loaded report.
   useEffect(() => {
-    setTitle(report?.title ?? '');
+    setTitle(report?.title ?? "");
   }, [report]);
 
   // Phase 5: suggest a repo from the recorded pages when the field is empty.
@@ -87,11 +104,14 @@ function App() {
     }
   }, [events, repo]);
 
-  const timeline = useMemo(() => buildTimeline(events, redact), [events, redact]);
+  const timeline = useMemo(
+    () => buildTimeline(events, redact),
+    [events, redact],
+  );
   const rrwebEvents = useMemo(
     () =>
       events
-        .filter((e) => e.k === 'rrweb')
+        .filter((e) => e.k === "rrweb")
         .map((e) => e.ev as eventWithTime)
         .sort((a, b) => a.timestamp - b.timestamp),
     [events],
@@ -100,10 +120,10 @@ function App() {
   const counts: TrailCounts = useMemo(() => {
     const c: TrailCounts = { click: 0, input: 0, console: 0, net: 0 };
     for (const e of events) {
-      if (e.k === 'click') c.click++;
-      else if (e.k === 'input') c.input++;
-      else if (e.k === 'console') c.console++;
-      else if (e.k === 'net') c.net++;
+      if (e.k === "click") c.click++;
+      else if (e.k === "input") c.input++;
+      else if (e.k === "console") c.console++;
+      else if (e.k === "net") c.net++;
     }
     return c;
   }, [events]);
@@ -114,16 +134,16 @@ function App() {
     const r = repo.trim();
     if (!r) {
       setTemplate(null);
-      setTemplateState('idle');
+      setTemplateState("idle");
       return;
     }
     let cancelled = false;
     const timer = setTimeout(() => {
-      setTemplateState('checking');
+      setTemplateState("checking");
       void fetchIssueTemplate(r).then((t) => {
         if (cancelled) return;
         setTemplate(t);
-        setTemplateState(t ? 'found' : 'none');
+        setTemplateState(t ? "found" : "none");
       });
     }, 600);
     return () => {
@@ -136,26 +156,29 @@ function App() {
   // user hasn't typed their own.
   useEffect(() => {
     if (template?.labels?.length && !labels.trim()) {
-      setLabels(template.labels.join(', '));
+      setLabels(template.labels.join(", "));
     }
   }, [template, labels]);
 
-  const base = report ?? { title: 'Bug report' };
+  const base = report ?? { title: "Bug report" };
   const displayTitle = title || base.title;
   const labelsList = labels
-    .split(',')
+    .split(",")
     .map((l) => l.trim())
     .filter(Boolean);
   const sections = useMemo(() => {
     const baseSections = buildSections(base, events, { repo, redact });
-    return template ? shapeSections(template, baseSections).sections : baseSections;
+    return template
+      ? shapeSections(template, baseSections).sections
+      : baseSections;
   }, [base, events, repo, redact, template]);
   const markdown = useMemo(
     () => buildMarkdownFromSections(displayTitle, sections),
     [displayTitle, sections],
   );
   const issue = useMemo(
-    () => (repo ? buildIssueUrl(repo, displayTitle, sections, labelsList) : null),
+    () =>
+      repo ? buildIssueUrl(repo, displayTitle, sections, labelsList) : null,
     [repo, displayTitle, sections, labelsList],
   );
 
@@ -165,14 +188,24 @@ function App() {
     w.__trailTimeline = timeline;
     w.__trailReplayCount = rrwebEvents.length;
     w.__trailMarkdown = markdown;
-    w.__trailIssueUrl = issue?.url ?? '';
+    w.__trailIssueUrl = issue?.url ?? "";
     w.__trailDropped = issue?.dropped ?? [];
     w.__trailTemplate = template?.name ?? null;
     w.__trailTemplateState = templateState;
     w.__trailTitle = displayTitle;
     w.__trailReplayLink = replayLink;
     w.__trailSuggestedRepo = repoSuggestedOnce.current ? repo : null;
-  }, [timeline, rrwebEvents, markdown, issue, template, templateState, displayTitle, replayLink, repo]);
+  }, [
+    timeline,
+    rrwebEvents,
+    markdown,
+    issue,
+    template,
+    templateState,
+    displayTitle,
+    replayLink,
+    repo,
+  ]);
 
   const setRepoAndSave = (value: string) => {
     setRepo(value);
@@ -183,37 +216,46 @@ function App() {
     try {
       await navigator.clipboard.writeText(markdown);
     } catch {
-      const ta = document.createElement('textarea');
+      const ta = document.createElement("textarea");
       ta.value = markdown;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand('copy');
+      document.execCommand("copy");
       ta.remove();
     }
-    toast.add({ type: 'success', title: 'Markdown copied to clipboard' });
+    toast.add({ type: "success", title: "Markdown copied to clipboard" });
   };
 
   const download = async (filename: string, blob: Blob) => {
     const url = URL.createObjectURL(blob);
     try {
       await browser.downloads.download({ url, filename });
-      toast.add({ type: 'success', title: `Downloaded ${filename}` });
+      toast.add({ type: "success", title: `Downloaded ${filename}` });
     } finally {
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     }
   };
 
   const downloadReport = () =>
-    download('trail-report.md', new Blob([markdown], { type: 'text/markdown' }));
+    download(
+      "trail-report.md",
+      new Blob([markdown], { type: "text/markdown" }),
+    );
 
   const downloadReplay = () =>
     download(
-      'trail-replay.json',
+      "trail-replay.json",
       new Blob(
-        [JSON.stringify({ title: base.title, repo, exportedAt: Date.now(), events }, null, 2)],
-        { type: 'application/json' },
+        [
+          JSON.stringify(
+            { title: base.title, repo, exportedAt: Date.now(), events },
+            null,
+            2,
+          ),
+        ],
+        { type: "application/json" },
       ),
     );
 
@@ -231,29 +273,39 @@ function App() {
   // Upload the session to the replay server and hand back the share link.
   // Clipboard failures never block the link from being generated.
   const copyReplayLink = async () => {
-    if (sharing === 'uploading') return;
-    setSharing('uploading');
+    if (sharing === "uploading") return;
+    setSharing("uploading");
     try {
       const res = await fetch(`${REPLAY_SERVER_URL}/api/replays`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title: displayTitle, exportedAt: Date.now(), events }),
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: displayTitle,
+          exportedAt: Date.now(),
+          events,
+        }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { id?: string };
-      if (!data.id) throw new Error('no id');
+      if (!data.id) throw new Error("no id");
       const link = `${REPLAY_SERVER_URL}/r/${data.id}`;
       setReplayLink(link);
       try {
         await navigator.clipboard.writeText(link);
-        toast.add({ type: 'success', title: 'Replay link copied to clipboard' });
+        toast.add({
+          type: "success",
+          title: "Replay link copied to clipboard",
+        });
       } catch {
-        toast.add({ type: 'info', title: `Replay link ready: ${link}` });
+        toast.add({ type: "info", title: `Replay link ready: ${link}` });
       }
     } catch {
-      toast.add({ type: 'error', title: `Replay server unreachable at ${REPLAY_SERVER_URL}` });
+      toast.add({
+        type: "error",
+        title: `Replay server unreachable at ${REPLAY_SERVER_URL}`,
+      });
     } finally {
-      setSharing('idle');
+      setSharing("idle");
     }
   };
 
@@ -299,15 +351,15 @@ function App() {
             <span className="font-heading text-xs font-semibold tracking-[0.18em] text-muted-foreground">
               TRAIL
             </span>
-          <input
-            className="w-full max-w-140 rounded-md border border-transparent bg-transparent p-1 font-heading text-xl font-medium text-foreground outline-none transition-colors hover:border-border focus:border-border focus:bg-background"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={persistTitle}
-            placeholder="Bug report title"
-            spellCheck={false}
-            aria-label="Report title"
-          />
+            <input
+              className="w-full max-w-140 rounded-md border border-transparent bg-transparent p-1 font-heading text-xl font-medium text-foreground outline-none transition-colors hover:border-border focus:border-border focus:bg-background"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={persistTitle}
+              placeholder="Bug report title"
+              spellCheck={false}
+              aria-label="Report title"
+            />
           </div>
         </div>
         <div className="flex shrink-0 gap-1.5">
@@ -345,15 +397,27 @@ function App() {
           <ExternalLink data-icon="inline-start" aria-hidden="true" />
           Open GitHub Issue
         </Button>
-        <Button variant="secondary" className="h-9" onClick={() => void copyMarkdown()}>
+        <Button
+          variant="secondary"
+          className="h-9"
+          onClick={() => void copyMarkdown()}
+        >
           <Copy data-icon="inline-start" aria-hidden="true" />
           Copy Markdown
         </Button>
-        <Button variant="outline" className="h-9" onClick={() => void downloadReport()}>
+        <Button
+          variant="outline"
+          className="h-9"
+          onClick={() => void downloadReport()}
+        >
           <FileDown data-icon="inline-start" aria-hidden="true" />
           Download .md
         </Button>
-        <Button variant="outline" className="h-9" onClick={() => void downloadReplay()}>
+        <Button
+          variant="outline"
+          className="h-9"
+          onClick={() => void downloadReplay()}
+        >
           <Clapperboard data-icon="inline-start" aria-hidden="true" />
           Download Replay
         </Button>
@@ -361,14 +425,14 @@ function App() {
           variant="outline"
           className="h-9"
           onClick={() => void copyReplayLink()}
-          disabled={sharing === 'uploading'}
+          disabled={sharing === "uploading"}
         >
-          {sharing === 'uploading' ? (
+          {sharing === "uploading" ? (
             <Loader2 className="animate-spin" aria-hidden="true" />
           ) : (
             <Share2 data-icon="inline-start" aria-hidden="true" />
           )}
-          {sharing === 'uploading' ? 'Sharing…' : 'Copy Replay Link'}
+          {sharing === "uploading" ? "Sharing…" : "Copy Replay Link"}
         </Button>
         <label className="flex cursor-pointer items-center gap-2 pl-1">
           <Switch
@@ -378,9 +442,12 @@ function App() {
           />
           <Label className="text-[13px] font-medium">Redact values</Label>
         </label>
-        {templateState === 'found' && template && (
+        {templateState === "found" && template && (
           <p className="flex w-full basis-full items-center gap-1.5 font-mono text-xs text-muted-foreground">
-            <CheckCircle2 className="size-3.5 text-success" aria-hidden="true" />
+            <CheckCircle2
+              className="size-3.5 text-success"
+              aria-hidden="true"
+            />
             Shaped for {template.filename} — {template.name}
           </p>
         )}
@@ -392,10 +459,12 @@ function App() {
             <ReplayPlayer events={rrwebEvents} />
           ) : (
             <div className="flex h-full min-h-120 flex-col items-center justify-center gap-2 p-8 text-center">
-              <h4 className="font-heading text-h4 font-medium">No replay frames captured</h4>
+              <h4 className="font-heading text-h4 font-medium">
+                No replay frames captured
+              </h4>
               <p className="max-w-xs text-body-sm text-muted-foreground">
-                The session has clicks, console and network events — but no rrweb frames
-                made it into this report.
+                The session has clicks, console and network events — but no
+                rrweb frames made it into this report.
               </p>
             </div>
           )}
@@ -406,7 +475,10 @@ function App() {
             <h2 className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
               Timeline
             </h2>
-            <Badge variant="ghost" className="font-mono text-[11px] text-muted-foreground">
+            <Badge
+              variant="ghost"
+              className="font-mono text-[11px] text-muted-foreground"
+            >
               {timeline.length} events
             </Badge>
           </div>
@@ -416,7 +488,9 @@ function App() {
             ))}
           </ol>
           {timeline.length === 0 && (
-            <p className="p-4 text-body-sm text-muted-foreground">No events captured.</p>
+            <p className="p-4 text-body-sm text-muted-foreground">
+              No events captured.
+            </p>
           )}
         </Card>
       </main>
@@ -428,19 +502,19 @@ function App() {
 
 function TimelineRow({ step }: { step: TimelineStep }) {
   const textClass =
-    step.kind === 'console'
-      ? 'text-destructive'
-      : step.kind === 'net'
-        ? 'text-primary'
-        : step.kind === 'nav'
-          ? 'font-medium text-foreground/70'
-          : 'text-foreground/85';
+    step.kind === "console"
+      ? "text-destructive"
+      : step.kind === "net"
+        ? "text-primary"
+        : step.kind === "nav"
+          ? "font-medium text-foreground/70"
+          : "text-foreground/85";
   const prefix =
-    step.kind === 'click' ? (
+    step.kind === "click" ? (
       <span className="text-primary" aria-hidden="true">
         ▸
       </span>
-    ) : step.kind === 'input' ? (
+    ) : step.kind === "input" ? (
       <span className="text-muted-foreground" aria-hidden="true">
         ✎
       </span>
@@ -451,7 +525,9 @@ function TimelineRow({ step }: { step: TimelineStep }) {
         {fmtTime(step.t)}
       </span>
       {prefix}
-      <span className={`min-w-0 text-[13px] leading-relaxed wrap-break-word ${textClass}`}>
+      <span
+        className={`min-w-0 text-[13px] leading-relaxed wrap-break-word ${textClass}`}
+      >
         {step.text}
       </span>
     </li>
