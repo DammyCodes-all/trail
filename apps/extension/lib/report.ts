@@ -1,6 +1,7 @@
-import type { ReportSection } from '@/lib/github';
-import { buildTimeline } from '@/lib/timeline';
-import type { StoredEvent, TrailReport } from '@/lib/types';
+import type { ReportSection } from './github.ts';
+import { defaultSectionRender } from './github.ts';
+import { buildTimeline } from './timeline.ts';
+import type { StoredEvent, TrailReport } from './types.ts';
 
 // Deterministic title for a report: first console error, else first failed request,
 // else "Bug on <host>".
@@ -102,12 +103,22 @@ export function buildSections(
   return sections;
 }
 
+// Render sections to markdown honoring each section's template renderer
+// (default: `## name`). Shared by copy/download and the GitHub URL body.
+export function buildMarkdownFromSections(
+  title: string,
+  sections: ReportSection[],
+): string {
+  const body = sections
+    .map((s) => (s.render ?? defaultSectionRender)(s.name, s.text))
+    .join('\n\n');
+  return `# ${title || 'Bug report'}\n\n${body}\n`;
+}
+
 export function buildMarkdown(
   report: Pick<TrailReport, 'title'>,
   events: StoredEvent[],
   opts: ReportOptions,
 ): string {
-  const sections = buildSections(report, events, opts);
-  const body = sections.map((s) => `## ${s.name}\n\n${s.text}`).join('\n\n');
-  return `# ${report.title || 'Bug report'}\n\n${body}\n`;
+  return buildMarkdownFromSections(report.title, buildSections(report, events, opts));
 }

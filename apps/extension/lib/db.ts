@@ -1,17 +1,20 @@
 import { openDB, type IDBPDatabase } from 'idb';
-import { DB_NAME, EVENTS_STORE, REPORTS_STORE } from '@/lib/constants';
-import type { StoredEvent, TrailReport } from '@/lib/types';
+import { DB_NAME, EVENTS_STORE, REPORTS_STORE, SESSIONS_STORE } from './constants.ts';
+import type { SessionEvents, StoredEvent, TrailReport } from './types.ts';
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
 export function getDb(): Promise<IDBPDatabase> {
-  dbPromise ??= openDB(DB_NAME, 2, {
+  dbPromise ??= openDB(DB_NAME, 3, {
     upgrade(d, oldVersion) {
       if (oldVersion < 1) {
         d.createObjectStore(EVENTS_STORE, { keyPath: 'seq', autoIncrement: true });
       }
       if (oldVersion < 2) {
         d.createObjectStore(REPORTS_STORE, { keyPath: 'seq', autoIncrement: true });
+      }
+      if (oldVersion < 3) {
+        d.createObjectStore(SESSIONS_STORE, { keyPath: 'reportId' });
       }
     },
   });
@@ -50,4 +53,17 @@ export async function getReports(): Promise<TrailReport[]> {
 export async function getReport(seq: number): Promise<TrailReport | undefined> {
   const db = await getDb();
   return db.get(REPORTS_STORE, seq);
+}
+
+// Snapshot a finished session's events so a report can be reopened after the live
+// events store is cleared by the next recording.
+export async function saveSessionEvents(reportId: number, events: StoredEvent[]): Promise<void> {
+  const db = await getDb();
+  await db.put(SESSIONS_STORE, { reportId, events } satisfies SessionEvents);
+}
+
+export async function getSessionEvents(reportId: number): Promise<StoredEvent[]> {
+  const db = await getDb();
+  const s = await db.get(SESSIONS_STORE, reportId);
+  return (s as SessionEvents | undefined)?.events ?? [];
 }

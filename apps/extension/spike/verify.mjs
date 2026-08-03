@@ -139,7 +139,7 @@ function main() {
       await testPage.goto(`${BASE}/page1.html`, { waitUntil: 'load' });
       await testPage.bringToFront();
 
-      const popup = await openPopup(browser, extId);
+      let popup = await openPopup(browser, extId);
       console.log('popup open');
       await testPage.bringToFront(); // active tab must be the page we record
 
@@ -203,12 +203,77 @@ function main() {
       );
       console.log('SPIKE 1 PASS');
 
-      // Phase 2: popup returns home with a report in history after stopping.
-      const wentHome = await popup.waitForSelector('#start', { timeout: 5000, polling: 100 });
-      assert(!!wentHome, 'popup returns to home after stop');
+      // Phase 3: stopping auto-opens the review tab with replay + timeline + export.
+      const reviewTarget = await browser.waitForTarget(
+        (t) => t.type() === 'page' && t.url().includes('review.html'),
+        { timeout: 10000 },
+      );
+      const review = await reviewTarget.page();
+      await review.waitForFunction(() => window.__trailMarkdown, {
+        timeout: 10000,
+        polling: 100,
+      });
+      const reviewHooks = await review.evaluate(() => ({
+        timeline: window.__trailTimeline,
+        replayCount: window.__trailReplayCount,
+        markdown: window.__trailMarkdown,
+        issueUrl: window.__trailIssueUrl,
+      }));
+      assert(
+        reviewHooks.timeline.some((s) => s.kind === 'click' && s.text.includes('Submit')),
+        'review timeline includes the Submit click',
+      );
+      assert(
+        reviewHooks.timeline.some((s) => s.kind === 'nav' && s.text.includes('page2.html')),
+        'review timeline includes the page2 navigation',
+      );
+      assert(reviewHooks.replayCount > 0, 'review has rrweb replay frames');
+      const playerReady = await review.evaluate(() => window.__trailPlayerReady === true);
+      assert(playerReady, 'rrweb-player Svelte component mounted');
+      assert(reviewHooks.markdown.includes('## Steps to Reproduce'), 'markdown has steps section');
+      assert(reviewHooks.markdown.includes('Click Submit'), 'markdown has the click step');
+      assert(!reviewHooks.markdown.includes('hunter2'), 'markdown never leaks the password');
+      // Type a repo and the fitted GitHub URL appears, within the 414 budget.
+      await review.focus('.repo');
+      await review.type('.repo', 'acme/widget');
+      await review.waitForFunction(
+        () => window.__trailIssueUrl.includes('github.com/acme/widget'),
+        { timeout: 5000, polling: 100 },
+      );
+      const issueUrl = await review.evaluate(() => window.__trailIssueUrl);
+      assert(issueUrl.length > 0 && Buffer.byteLength(issueUrl) < 8192, 'fitted issue URL is short enough');
+      // Phase 4: unknown repo → template detection must degrade to the generic body.
+      await review.waitForFunction(
+        () => window.__trailTemplateState === 'none' || window.__trailTemplateState === 'found',
+        { timeout: 10000, polling: 100 },
+      );
+      const templateName = await review.evaluate(() => window.__trailTemplate);
+      assert(templateName === null, 'unknown repo (acme/widget) resolves to no template — generic fallback');
+      const body = decodeURIComponent(issueUrl.split('body=')[1] ?? '');
+      assert(body.includes('## Steps to Reproduce'), 'fallback body keeps generic ## headings');
+      console.log('template fallback PASS');
+      console.log('review check PASS');
+
+      // Phase 2: history shows the saved report. Auto-open closed the popup, so reopen.
+      popup = await openPopup(browser, extId);
       const hasHistory = await popup.waitForSelector('.report', { timeout: 5000, polling: 100 });
       assert(!!hasHistory, 'report saved to history after stop');
       console.log('history check PASS');
+
+      // Phase 3: reopening a saved report loads its snapshot events.
+      await popup.evaluate(() => document.querySelector('.report')?.click());
+      const reopenTarget = await browser.waitForTarget(
+        (t) => t.type() === 'page' && t.url().includes('review.html?report='),
+        { timeout: 10000 },
+      );
+      const reopen = await reopenTarget.page();
+      await reopen.waitForFunction(() => window.__trailMarkdown, { timeout: 10000, polling: 100 });
+      const reopenTimeline = await reopen.evaluate(() => window.__trailTimeline);
+      assert(
+        reopenTimeline.some((s) => s.kind === 'click' && s.text.includes('Submit')),
+        'reopened report has the Submit step from its snapshot',
+      );
+      console.log('reopen check PASS');
       await testPage.close();
 
       // ============================================================
