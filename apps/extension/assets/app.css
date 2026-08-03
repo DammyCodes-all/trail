@@ -41,8 +41,8 @@
   }
 
   ::selection {
-    background: rgb(245 158 11 / 0.28);
-    color: #f5f5f4;
+    background: rgb(255 106 0 / 0.3);
+    color: #fff7ed;
   }
 
   ::-webkit-scrollbar {
@@ -55,14 +55,14 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #232c3a;
-    border-radius: 999px;
+    background: #3a2a1e;
+    border-radius: 0;
     border: 2px solid transparent;
     background-clip: content-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #2a3442;
+    background: #5a351d;
     border: 2px solid transparent;
     background-clip: content-box;
   }
@@ -91,7 +91,7 @@
 }
 
 .rr-progress__step {
-  background: rgb(245 158 11 / 0.35);
+  background: rgb(255 106 0 / 0.35);
 }
 
 .rr-progress__handler {
@@ -103,7 +103,7 @@
 }
 
 .rr-controller__btns button:active {
-  background: rgb(245 158 11 / 0.18);
+  background: rgb(255 106 0 / 0.18);
 }
 
 .rr-controller__btns button.active {
@@ -120,7 +120,7 @@
 }
 
 .switch label::before {
-  background: rgb(245 158 11 / 0.45);
+  background: rgb(255 106 0 / 0.45);
 }
 
 .switch input:checked + label::before {
