@@ -80,9 +80,10 @@
   --radius: 0.625rem;
 
   /* --- typography --- */
-  --font-heading: 'Outfit', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+  --font-heading:
+    "Outfit", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
 
   --text-h1: 2.5rem;
   --text-h1--line-height: 1.1;
