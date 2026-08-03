@@ -127,9 +127,9 @@ function App() {
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <TrailLogo
-            className="size-10 shrink-0"
-            width={40}
-            height={40}
+            className="size-8 shrink-0"
+            width={32}
+            height={32}
             aria-label="TRAIL logo"
           />
           <span className="font-heading text-sm font-semibold tracking-[0.18em] text-foreground">

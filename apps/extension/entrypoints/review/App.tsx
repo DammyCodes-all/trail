@@ -342,9 +342,9 @@ function App() {
       <header className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
           <TrailLogo
-            className="mt-0.5 size-14 shrink-0"
-            width={56}
-            height={56}
+            className="mt-0.5 size-10 shrink-0"
+            width={40}
+            height={40}
             aria-label="TRAIL logo"
           />
           <div className="flex min-w-0 flex-col gap-1.5">
