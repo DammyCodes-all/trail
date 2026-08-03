@@ -1,0 +1,114 @@
+/*
+ * TRAIL design tokens — single source of truth.
+ * Import order matters: tokens.css (raw values) must come before theme.css
+ * (Tailwind @theme mapping) in any entry stylesheet.
+ *
+ * Palette reasoning:
+ *  - Amber is the single brand/action color. Green is status-only (bug resolved).
+ *  - Red is error/critical only. Near-black blue-gray surfaces for depth.
+ *  - Outfit = headings/brand moments only; IBM Plex Sans = UI copy;
+ *    IBM Plex Mono = anything technical (IDs, timestamps, repo names, logs).
+ */
+
+:root {
+  /* --- raw palette --- */
+  --trail-primary: #f59e0b;
+  --trail-primary-hover: #fbbf24;
+  --trail-primary-active: #d97706;
+  --trail-primary-foreground: #131008;
+
+  --trail-bg: #0b0f14;
+  --trail-surface: #12181f;
+  --trail-surface-raised: #161d27;
+
+  --trail-text: #f5f5f4;
+  --trail-text-muted: #8a94a6;
+
+  --trail-success: #22c55e;
+  --trail-error: #ef4444;
+
+  --trail-border: #1e2530;
+  --trail-border-strong: #2a3442;
+
+  /* --- shadcn semantic slots (dark-only) --- */
+  --background: var(--trail-bg);
+  --foreground: var(--trail-text);
+
+  --card: var(--trail-surface);
+  --card-foreground: var(--trail-text);
+
+  --popover: var(--trail-surface-raised);
+  --popover-foreground: var(--trail-text);
+
+  --primary: var(--trail-primary);
+  --primary-foreground: var(--trail-primary-foreground);
+
+  --secondary: var(--trail-border);
+  --secondary-foreground: var(--trail-text);
+
+  --muted: #161e28;
+  --muted-foreground: var(--trail-text-muted);
+
+  --accent: color-mix(in oklab, var(--trail-primary) 12%, var(--trail-surface));
+  --accent-foreground: var(--trail-text);
+
+  --destructive: var(--trail-error);
+  --destructive-foreground: #f5f5f4;
+
+  --success: var(--trail-success);
+  --success-foreground: #0b0f14;
+
+  --border: var(--trail-border);
+  --input: var(--trail-border);
+  --ring: var(--trail-primary);
+
+  --chart-1: var(--trail-primary);
+  --chart-2: var(--trail-success);
+  --chart-3: var(--trail-error);
+  --chart-4: #60a5fa;
+  --chart-5: #a78bfa;
+
+  --sidebar: #0d1218;
+  --sidebar-foreground: var(--trail-text);
+  --sidebar-primary: var(--trail-primary);
+  --sidebar-primary-foreground: var(--trail-primary-foreground);
+  --sidebar-accent: var(--trail-border);
+  --sidebar-accent-foreground: var(--trail-text);
+  --sidebar-border: var(--trail-border);
+  --sidebar-ring: var(--trail-primary);
+
+  --radius: 0.625rem;
+
+  /* --- typography --- */
+  --font-heading: 'Outfit', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+
+  --text-h1: 2.5rem;
+  --text-h1--line-height: 1.1;
+  --text-h1--font-weight: 700;
+
+  --text-h2: 2rem;
+  --text-h2--line-height: 1.15;
+  --text-h2--font-weight: 600;
+
+  --text-h3: 1.5rem;
+  --text-h3--line-height: 1.25;
+  --text-h3--font-weight: 600;
+
+  --text-h4: 1.25rem;
+  --text-h4--line-height: 1.35;
+  --text-h4--font-weight: 500;
+
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-body--font-weight: 400;
+
+  --text-body-sm: 0.875rem;
+  --text-body-sm--line-height: 1.5;
+  --text-body-sm--font-weight: 400;
+
+  --text-mono: 0.875rem;
+  --text-mono--line-height: 1.5;
+  --text-mono--font-weight: 400;
+}
