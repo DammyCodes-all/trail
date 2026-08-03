@@ -1,6 +1,11 @@
-import { record } from 'rrweb';
-import { POST_MESSAGE_KEY } from '@/lib/constants';
-import type { ClickEvent, ConsoleEvent, InputEvent, NetEvent } from '@/lib/types';
+import { record } from "rrweb";
+import { POST_MESSAGE_KEY } from "@/lib/constants";
+import type {
+  ClickEvent,
+  ConsoleEvent,
+  InputEvent,
+  NetEvent,
+} from "@/lib/types";
 
 declare global {
   interface Window {
@@ -9,17 +14,17 @@ declare global {
 }
 
 export default defineContentScript({
-  matches: ['<all_urls>'],
-  runAt: 'document_start',
-  world: 'MAIN',
-  registration: 'runtime',
+  matches: ["<all_urls>"],
+  runAt: "document_start",
+  world: "MAIN",
+  registration: "runtime",
   noScriptStartedPostMessage: true,
   main() {
     if (window.__trailRecorder) return;
     window.__trailRecorder = true;
 
     const emit = (d: object) => {
-      window.postMessage({ [POST_MESSAGE_KEY]: true, d }, '*');
+      window.postMessage({ [POST_MESSAGE_KEY]: true, d }, "*");
     };
 
     const cap = (s: unknown, n = 60): string | null => {
@@ -30,7 +35,9 @@ export default defineContentScript({
 
     const fmt = (a: unknown): string => {
       try {
-        return typeof a === 'string' ? a : JSON.stringify(a)?.slice(0, 300) ?? String(a);
+        return typeof a === "string"
+          ? a
+          : (JSON.stringify(a)?.slice(0, 300) ?? String(a));
       } catch {
         return String(a);
       }
@@ -43,7 +50,9 @@ export default defineContentScript({
       if (s == null) return undefined;
       const str = String(s);
       if (!str.trim()) return undefined;
-      return str.length > BODY_LIMIT ? `${str.slice(0, BODY_LIMIT)}\n...(truncated)` : str;
+      return str.length > BODY_LIMIT
+        ? `${str.slice(0, BODY_LIMIT)}\n...(truncated)`
+        : str;
     };
 
     let active = true;
@@ -55,11 +64,12 @@ export default defineContentScript({
       try {
         rrwebStop = record({
           emit: (ev) => {
-            if (active) emit({ k: 'rrweb', ev, t: ev.timestamp, url: pageUrl() });
+            if (active)
+              emit({ k: "rrweb", ev, t: ev.timestamp, url: pageUrl() });
           },
-          recordAfter: 'DOMContentLoaded',
+          recordAfter: "DOMContentLoaded",
           maskInputOptions: { password: true },
-          blockClass: 'rr-block',
+          blockClass: "rr-block",
           checkoutEveryNms: 30_000,
           errorHandler: () => true, // never let a recording bug break the page
         });
@@ -71,31 +81,31 @@ export default defineContentScript({
 
     const pageUrl = () => location.href;
 
-    addEventListener('message', (e) => {
-      if (e.data?.[POST_MESSAGE_KEY] === 'stop') {
+    addEventListener("message", (e) => {
+      if (e.data?.[POST_MESSAGE_KEY] === "stop") {
         active = false;
         rrwebStop?.();
         running = false;
-      } else if (e.data?.[POST_MESSAGE_KEY] === 'start') {
+      } else if (e.data?.[POST_MESSAGE_KEY] === "start") {
         // Re-arm after a stop on the same page. The stale __trailRecorder guard
         // makes re-executing recorder.js a no-op, so re-activation has to come
         // through the relay as a message.
         active = true;
         if (!running) startRrweb();
-      } else if (e.data?.[POST_MESSAGE_KEY] === 'redact') {
+      } else if (e.data?.[POST_MESSAGE_KEY] === "redact") {
         autoRedact = e.data.value === true;
       }
     });
 
     // ---- console + uncaught errors (installed at document_start) ----
-    for (const lv of ['error', 'warn'] as const) {
+    for (const lv of ["error", "warn"] as const) {
       const orig = console[lv];
       console[lv] = function (...a: unknown[]) {
         if (active) {
           const ev: ConsoleEvent = {
-            k: 'console',
+            k: "console",
             lv,
-            msg: a.map(fmt).join(' '),
+            msg: a.map(fmt).join(" "),
             t: Date.now(),
             url: pageUrl(),
           };
@@ -106,12 +116,12 @@ export default defineContentScript({
     }
 
     addEventListener(
-      'error',
+      "error",
       (e) => {
         if (!active) return;
         const ev: ConsoleEvent = {
-          k: 'console',
-          lv: 'error',
+          k: "console",
+          lv: "error",
           t: Date.now(),
           url: pageUrl(),
           msg: e.message,
@@ -123,15 +133,15 @@ export default defineContentScript({
     );
 
     addEventListener(
-      'unhandledrejection',
+      "unhandledrejection",
       (e) => {
         if (!active) return;
         const ev: ConsoleEvent = {
-          k: 'console',
-          lv: 'error',
+          k: "console",
+          lv: "error",
           t: Date.now(),
           url: pageUrl(),
-          msg: 'Unhandled rejection: ' + fmt(e.reason),
+          msg: "Unhandled rejection: " + fmt(e.reason),
         };
         emit(ev);
       },
@@ -142,12 +152,15 @@ export default defineContentScript({
     const origFetch = window.fetch;
     window.fetch = async function (...a: unknown[]) {
       const t = Date.now();
-      const arg = a[0] as { url?: string; method?: string } | string | undefined;
-      const url = typeof arg === 'string' ? arg : (arg?.url ?? '');
+      const arg = a[0] as
+        | { url?: string; method?: string }
+        | string
+        | undefined;
+      const url = typeof arg === "string" ? arg : (arg?.url ?? "");
       const method =
         (a[1] as { method?: string } | undefined)?.method ??
-        (typeof arg === 'object' ? arg?.method : undefined) ??
-        'GET';
+        (typeof arg === "object" ? arg?.method : undefined) ??
+        "GET";
       try {
         const r = await origFetch.apply(this, a as Parameters<typeof fetch>);
         if (!r.ok && active) {
@@ -162,12 +175,12 @@ export default defineContentScript({
             }
             if (!active) return;
             const ev: NetEvent = {
-              k: 'net',
+              k: "net",
               target: url,
               method,
               status: r.status,
               t,
-              via: 'fetch',
+              via: "fetch",
               url: pageUrl(),
               body,
             };
@@ -178,13 +191,13 @@ export default defineContentScript({
       } catch (err) {
         if (active) {
           const ev: NetEvent = {
-            k: 'net',
+            k: "net",
             target: url,
             method,
             status: 0,
             err: (err as Error).message,
             t,
-            via: 'fetch',
+            via: "fetch",
             url: pageUrl(),
           };
           emit(ev);
@@ -197,8 +210,14 @@ export default defineContentScript({
     const XS = XMLHttpRequest.prototype.send;
     const callOpen = XO as unknown as (...args: unknown[]) => void;
     const callSend = XS as unknown as (...args: unknown[]) => void;
-    XMLHttpRequest.prototype.open = function (m: string, u: string | URL, ...r: unknown[]) {
-      (this as unknown as { __trail: { method: string; url: string } }).__trail = {
+    XMLHttpRequest.prototype.open = function (
+      m: string,
+      u: string | URL,
+      ...r: unknown[]
+    ) {
+      (
+        this as unknown as { __trail: { method: string; url: string } }
+      ).__trail = {
         method: m,
         url: String(u),
       };
@@ -206,24 +225,26 @@ export default defineContentScript({
     };
     XMLHttpRequest.prototype.send = function (...a: unknown[]) {
       const t = Date.now();
-      this.addEventListener('loadend', () => {
-        const meta = (this as unknown as { __trail?: { method: string; url: string } }).__trail;
+      this.addEventListener("loadend", () => {
+        const meta = (
+          this as unknown as { __trail?: { method: string; url: string } }
+        ).__trail;
         const bad = this.status === 0 || this.status >= 400;
         if (bad && meta && active) {
           let body: string | undefined;
           try {
             const rt = this.responseType;
-            if (rt === '' || rt === 'text') body = bodyText(this.responseText);
+            if (rt === "" || rt === "text") body = bodyText(this.responseText);
           } catch {
             // binary/opaque responses have no text body
           }
           const ev: NetEvent = {
-            k: 'net',
+            k: "net",
             target: meta.url,
             method: meta.method,
             status: this.status,
             t,
-            via: 'xhr',
+            via: "xhr",
             url: pageUrl(),
             body,
           };
@@ -235,11 +256,11 @@ export default defineContentScript({
 
     // ---- clicks, with a readable label ----
     const label = (el: Element): string | null =>
-      cap(el.getAttribute?.('aria-label')) ??
+      cap(el.getAttribute?.("aria-label")) ??
       cap(el.textContent) ??
-      cap(el.getAttribute?.('placeholder')) ??
-      cap(el.getAttribute?.('alt')) ??
-      cap(el.getAttribute?.('name') || el.id) ??
+      cap(el.getAttribute?.("placeholder")) ??
+      cap(el.getAttribute?.("alt")) ??
+      cap(el.getAttribute?.("name") || el.id) ??
       `<${el.tagName.toLowerCase()}>`;
 
     // A click is only a report-worthy *action* when it lands on an interactive
@@ -247,29 +268,43 @@ export default defineContentScript({
     // already captured by the change handler, and counting the focus-clicks that
     // precede every keystroke inflates the report. Blank background and inert
     // wrappers (body, labels, plain divs) are noise, not steps.
-    const TEXT_LIKE = /^(text|email|password|search|tel|url|number|date|datetime-local|month|week|time|file)$/;
-    const CLICKABLE = 'button,a[href],[role=button],[onclick],select,summary,details,input';
+    const TEXT_LIKE =
+      /^(text|email|password|search|tel|url|number|date|datetime-local|month|week|time|file)$/;
+    const CLICKABLE =
+      "button,a[href],[role=button],[onclick],select,summary,details,input";
 
     const actionTarget = (el: Element): Element | null => {
+      if (
+        el.closest?.(
+          'trail-recording-overlay, #trail-recording-overlay, [data-trail-overlay="true"]',
+        )
+      )
+        return null;
       const node = (el.closest?.(CLICKABLE) ?? el) as Element;
       const tag = node.tagName?.toLowerCase();
-      if (tag === 'input') {
-        const type = (node as HTMLInputElement).type || 'text';
+      if (tag === "input") {
+        const type = (node as HTMLInputElement).type || "text";
         return TEXT_LIKE.test(type) ? null : node;
       }
-      if (tag === 'textarea' || tag === 'label' || tag === 'body' || tag === 'html') return null;
-      if (tag === 'a' && !(node as HTMLAnchorElement).href) return null;
+      if (
+        tag === "textarea" ||
+        tag === "label" ||
+        tag === "body" ||
+        tag === "html"
+      )
+        return null;
+      if (tag === "a" && !(node as HTMLAnchorElement).href) return null;
       return node;
     };
 
     addEventListener(
-      'click',
+      "click",
       (e) => {
         if (!active) return;
         const node = actionTarget(e.target as Element);
         if (!node) return;
         const ev: ClickEvent = {
-          k: 'click',
+          k: "click",
           label: label(node) ?? `<${node.tagName.toLowerCase()}>`,
           tag: node.tagName.toLowerCase(),
           t: Date.now(),
@@ -281,24 +316,27 @@ export default defineContentScript({
     );
 
     // ---- typed input, masked by default ----
-    const SENSITIVE = /pass|pwd|secret|token|otp|cvv|ssn|card|auth|api[-_]?key/i;
+    const SENSITIVE =
+      /pass|pwd|secret|token|otp|cvv|ssn|card|auth|api[-_]?key/i;
     addEventListener(
-      'change',
+      "change",
       (e) => {
         if (!active) return;
         const el = e.target as HTMLInputElement;
-        if (!el.matches?.('input,textarea,select')) return;
+        if (!el.matches?.("input,textarea,select")) return;
         const hide =
           autoRedact ||
-          el.type === 'password' ||
-          SENSITIVE.test(el.name + el.id + (el.getAttribute('autocomplete') ?? ''));
+          el.type === "password" ||
+          SENSITIVE.test(
+            el.name + el.id + (el.getAttribute("autocomplete") ?? ""),
+          );
         const ev: InputEvent = {
-          k: 'input',
+          k: "input",
           label: label(el) ?? `<${el.tagName.toLowerCase()}>`,
           t: Date.now(),
           url: pageUrl(),
           masked: hide,
-          value: hide ? '•'.repeat(8) : (cap(el.value, 100) ?? ''),
+          value: hide ? "•".repeat(8) : (cap(el.value, 100) ?? ""),
         };
         emit(ev);
       },
