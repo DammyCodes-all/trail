@@ -63,3 +63,8 @@ export interface TrailReport {
   counts: TrailCounts;
   url: string;
 }
+
+export interface SessionEvents {
+  reportId: number;
+  events: StoredEvent[];
+}
