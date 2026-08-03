@@ -12,6 +12,8 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
+    "test:page": "node spike/test-page.mjs",
+    "verify": "tsc --noEmit && wxt build && node spike/verify.mjs",
     "postinstall": "wxt prepare"
   },
   "dependencies": {
