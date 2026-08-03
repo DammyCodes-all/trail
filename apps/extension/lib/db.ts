@@ -55,6 +55,23 @@ export async function getReport(seq: number): Promise<TrailReport | undefined> {
   return db.get(REPORTS_STORE, seq);
 }
 
+// Remove a report and its session snapshot. The live events store is untouched —
+// it holds the current recording, not history.
+export async function deleteReport(seq: number): Promise<void> {
+  const db = await getDb();
+  await Promise.all([
+    db.delete(REPORTS_STORE, seq),
+    db.delete(SESSIONS_STORE, seq),
+  ]);
+}
+
+export async function updateReportTitle(seq: number, title: string): Promise<void> {
+  const db = await getDb();
+  const report = await db.get(REPORTS_STORE, seq);
+  if (!report) return;
+  await db.put(REPORTS_STORE, { ...report, title });
+}
+
 // Snapshot a finished session's events so a report can be reopened after the live
 // events store is cleared by the next recording.
 export async function saveSessionEvents(reportId: number, events: StoredEvent[]): Promise<void> {

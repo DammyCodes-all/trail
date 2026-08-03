@@ -29,11 +29,17 @@ export function buildIssueUrl(
   repo: string,
   title: string,
   sections: ReportSection[],
+  labels: string[] = [],
 ): IssueUrlResult {
   const base = `https://github.com/${repo}/issues/new`;
   const encTitle = encodeURIComponent(cap(title, 120));
-  const overhead =
-    base.length + '?title='.length + encTitle.length + '&body='.length;
+  const cleanLabels = labels
+    .filter((l): l is string => typeof l === 'string')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+  const labelsPart = cleanLabels.length ? `&labels=${encodeURIComponent(cleanLabels.join(','))}` : '';
+  const overhead = base.length + '?title='.length + encTitle.length + '&body='.length + labelsPart.length;
   const budget = URL_LIMIT - overhead;
 
   const ordered = [...sections].sort((a, b) => a.priority - b.priority);
@@ -56,5 +62,8 @@ export function buildIssueUrl(
     if (encodeURIComponent(note + body).length <= budget) body = note + body;
   }
 
-  return { url: `${base}?title=${encTitle}&body=${encodeURIComponent(body)}`, dropped };
+  return {
+    url: `${base}?title=${encTitle}&body=${encodeURIComponent(body)}${labelsPart}`,
+    dropped,
+  };
 }
