@@ -66,4 +66,12 @@ assert(!big.dropped.includes('Steps to Reproduce'), 'steps survive even in the o
 const tiny = buildIssueUrl('acme/widget', 't', sections.slice(0, 1));
 assert(!tiny.dropped.length, 'a small report should drop nothing');
 
+// Labels ride along in the URL and stay inside the budget.
+const withLabels = buildIssueUrl('acme/widget', 't', sections, ['bug', 'ui']);
+assert(withLabels.url.includes('labels='), 'labels param present');
+assert(withLabels.url.includes('bug%2Cui'), 'labels are comma-joined and encoded');
+assert(Buffer.byteLength(withLabels.url) <= 7600, `labels fit within the budget (got ${Buffer.byteLength(withLabels.url)})`);
+const emptyLabels = buildIssueUrl('acme/widget', 't', sections, ['', '  ', null, 'bug']);
+assert(emptyLabels.url.includes('labels=bug'), 'empty label entries are filtered');
+
 console.log('SPIKE 4 PASS');
