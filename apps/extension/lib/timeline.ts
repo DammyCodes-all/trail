@@ -1,4 +1,4 @@
-import type { StoredEvent } from '@/lib/types';
+import type { StoredEvent } from './types.ts';
 
 export type StepKind = 'nav' | 'click' | 'input' | 'console' | 'net';
 
