@@ -6,12 +6,21 @@ import {
   POST_MESSAGE_KEY,
 } from '@/lib/constants';
 
+declare global {
+  interface Window {
+    __trailRelay?: boolean;
+  }
+}
+
 export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_start',
   world: 'ISOLATED',
   noScriptStartedPostMessage: true,
   main() {
+    if (window.__trailRelay) return;
+    window.__trailRelay = true;
+
     let buf: unknown[] = [];
 
     // MAIN world → here. Batch on a timer so we're not doing one sendMessage per event.
