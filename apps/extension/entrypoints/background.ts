@@ -10,7 +10,7 @@ import {
   RECORDER_ID,
   REDACT_KEY,
 } from '@/lib/constants';
-import { addEvents, clearEvents, getAllEvents, saveReport } from '@/lib/db';
+import { addEvents, clearEvents, getAllEvents, saveReport, saveSessionEvents } from '@/lib/db';
 import { suggestTitle } from '@/lib/report';
 import type { TrailCounts, TrailSession } from '@/lib/types';
 
@@ -118,7 +118,7 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
   if (session) {
     try {
       const events = await getAllEvents();
-      await saveReport({
+      const seq = await saveReport({
         title: suggestTitle(events),
         repo: '',
         startedAt: session.startedAt,
@@ -127,6 +127,9 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
         counts,
         url: events[0]?.url ?? '',
       });
+      // Snapshot the events so the report can be reopened after the next recording
+      // clears the live store (history detail view).
+      await saveSessionEvents(seq, events);
     } catch {
       // history is best-effort
     }

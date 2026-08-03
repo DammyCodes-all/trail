@@ -165,12 +165,22 @@ body {
 }
 
 .report {
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
   border: 1px solid #e5e5e5;
   border-radius: 8px;
   padding: 8px 10px;
+  background: #fafafa;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.report:hover {
+  background: #f0f0f0;
 }
 
 .r-title {

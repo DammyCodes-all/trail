@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@puppeteer/browsers": "^3.0.6",
+    "@rrweb/types": "^2.1.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.1.5",
