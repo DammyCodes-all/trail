@@ -66,10 +66,15 @@ function App() {
       setEvents(evs);
       setReports(reps);
       await refresh();
+      // The demo payoff: stop recording, drop straight into the review tab.
+      await browser.tabs.create({ url: browser.runtime.getURL('/review.html') });
     } finally {
       setBusy(false);
     }
   };
+
+  const openReport = (seq: number) =>
+    void browser.tabs.create({ url: browser.runtime.getURL(`/review.html?report=${seq}`) });
 
   useEffect(() => {
     if (!events.length) return;
@@ -107,12 +112,14 @@ function App() {
             ) : (
               <ul>
                 {reports.map((r) => (
-                  <li key={r.seq} className="report">
-                    <span className="r-title">{r.title || 'Untitled report'}</span>
-                    <span className="r-meta">
-                      {fmtTime(r.endedAt)} · {r.eventCount} events
-                      {r.repo ? ` · ${r.repo}` : ''}
-                    </span>
+                  <li key={r.seq}>
+                    <button className="report" onClick={() => openReport(r.seq)}>
+                      <span className="r-title">{r.title || 'Untitled report'}</span>
+                      <span className="r-meta">
+                        {fmtTime(r.endedAt)} · {r.eventCount} events
+                        {r.repo ? ` · ${r.repo}` : ''}
+                      </span>
+                    </button>
                   </li>
                 ))}
               </ul>
