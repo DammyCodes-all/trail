@@ -1,0 +1,14 @@
+{
+  "name": "trail-replay-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TRAIL replay share server: store a session JSON, serve a player page.",
+  "scripts": {
+    "dev": "node server/index.mjs",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.6.1"
+  }
+}
