@@ -7,6 +7,7 @@ export interface TimelineStep {
   kind: StepKind;
   text: string;
   level?: 'error' | 'warn';
+  status?: number;
   // true when the typed value is hidden (masked at capture, or by the redaction backstop)
   masked?: boolean;
 }
@@ -52,6 +53,7 @@ export function buildTimeline(events: StoredEvent[], redact = true): TimelineSte
         steps.push({
           t: e.t,
           kind: 'net',
+          status: e.status,
           text: `${e.method} ${e.target} — ${e.status}${e.err ? ` (${e.err})` : ''}`,
         });
         break;

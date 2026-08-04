@@ -316,7 +316,55 @@ function main() {
       assert(reviewHooks.markdown.includes('## Steps to Reproduce'), 'markdown has steps section');
       assert(reviewHooks.markdown.includes('Click Submit'), 'markdown has the click step');
       assert(!reviewHooks.markdown.includes('hunter2'), 'markdown never leaks the password');
-      // Type a repo and the fitted GitHub URL appears, within the 414 budget.
+      const incidentUi = await review.evaluate(() => ({
+        text: document.body.innerText,
+        repoVisible: !!document.querySelector('.repo'),
+        title: window.__trailTitle,
+      }));
+      assert(incidentUi.text.includes('High severity'), 'review leads with derived severity');
+      assert(incidentUi.text.includes('Evidence trail'), 'review leads with chronological evidence');
+      assert(incidentUi.text.includes('Runtime evidence'), 'review exposes grouped runtime findings');
+      assert(incidentUi.text.includes('Create GitHub Issue'), 'review has one focused GitHub action');
+      assert(!incidentUi.repoVisible, 'repo configuration stays out of the report until requested');
+      assert(
+        incidentUi.title.startsWith('Submit failed:'),
+        'report title connects the triggering action to the captured failure',
+      );
+      await review.evaluate(() => {
+        const step = [...document.querySelectorAll('button')].find((el) =>
+          el.textContent?.includes('Pay now'),
+        );
+        step?.click();
+      });
+      await review.waitForFunction(
+        () => typeof window.__trailReplayTime === 'number' && window.__trailReplayTime > 0,
+        { timeout: 5000, polling: 100 },
+      );
+      if (process.env.TRAIL_SCREENSHOT_DIR) {
+        await review.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+        await sleep(250);
+        await review.screenshot({
+          path: path.join(process.env.TRAIL_SCREENSHOT_DIR, 'review-desktop.png'),
+          fullPage: true,
+        });
+        await review.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+        await sleep(250);
+        await review.screenshot({
+          path: path.join(process.env.TRAIL_SCREENSHOT_DIR, 'review-mobile.png'),
+          fullPage: true,
+        });
+        await review.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+      }
+      console.log('incident hierarchy + evidence seek PASS');
+      // Open the issue action, fill the repo in its focused dialog, and verify
+      // the fitted GitHub URL appears within the 414 budget.
+      await review.evaluate(() => {
+        const button = [...document.querySelectorAll('button')].find((el) =>
+          /Create GitHub Issue|Open GitHub Issue/.test(el.textContent ?? ''),
+        );
+        button?.click();
+      });
+      await review.waitForSelector('[role="dialog"]', { timeout: 5000, polling: 100 });
       await review.focus('.repo');
       await review.type('.repo', 'acme/widget');
       await review.waitForFunction(

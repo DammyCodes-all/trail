@@ -23,7 +23,7 @@ function Stat({
   icon: LucideIcon;
   label: string;
   value: number;
-  accent: "neutral" | "primary" | "destructive";
+  accent: "neutral" | "warn" | "destructive";
 }) {
   return (
     <Card
@@ -31,7 +31,7 @@ function Stat({
       className={cn(
         "flex flex-row items-center gap-2.5 rounded-xl px-3 py-2.5 ring-1",
         accent === "neutral" && "bg-card",
-        accent === "primary" && "bg-primary/5 ring-primary/15",
+        accent === "warn" && "bg-warn/5 ring-warn/15",
         accent === "destructive" && "bg-destructive/5 ring-destructive/15"
       )}
     >
@@ -39,7 +39,7 @@ function Stat({
         className={cn(
           "flex size-7 shrink-0 items-center justify-center rounded-lg",
           accent === "neutral" && "bg-muted text-muted-foreground",
-          accent === "primary" && "bg-primary/15 text-primary",
+          accent === "warn" && "bg-warn/15 text-warn",
           accent === "destructive" && "bg-destructive/15 text-destructive"
         )}
       >
@@ -81,7 +81,7 @@ export function RecordingScreen({
         <Stat icon={MousePointerClick} label="clicks" value={counts.click} accent="neutral" />
         <Stat icon={Keyboard} label="inputs" value={counts.input} accent="neutral" />
         <Stat icon={TriangleAlert} label="errors" value={counts.console} accent="destructive" />
-        <Stat icon={WifiOff} label="failures" value={counts.net} accent="primary" />
+        <Stat icon={WifiOff} label="failures" value={counts.net} accent="warn" />
       </div>
       <p className="text-body-sm text-muted-foreground">
         Reproduce the bug. Every click, error, and failed request is being

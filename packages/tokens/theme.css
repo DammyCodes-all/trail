@@ -23,29 +23,44 @@
   --color-secondary: var(--trail-border);
   --color-secondary-foreground: var(--trail-text);
 
-  --color-muted: #15110e;
+  --color-muted: #131518;
   --color-muted-foreground: var(--trail-text-muted);
+  --color-subtle-foreground: var(--trail-text-subtle);
 
-  --color-accent: color-mix(in oklab, var(--trail-primary) 12%, var(--trail-surface));
+  --color-accent: #191c1f;
   --color-accent-foreground: var(--trail-text);
 
   --color-destructive: var(--trail-error);
-  --color-destructive-foreground: #f5f5f4;
+  --color-destructive-foreground: #fff5f5;
+  --color-destructive-soft: var(--trail-error-soft);
+
+  --color-warn: var(--trail-warn);
+  --color-warn-foreground: #08090a;
+  --color-warn-soft: var(--trail-warn-soft);
 
   --color-success: var(--trail-success);
-  --color-success-foreground: #050505;
+  --color-success-foreground: #08090a;
+  --color-success-soft: var(--trail-success-soft);
+
+  --color-info: var(--trail-info);
+  --color-info-foreground: #08090a;
+
+  --color-severity-high: var(--trail-sev-high);
+  --color-severity-medium: var(--trail-sev-medium);
+  --color-severity-low: var(--trail-sev-low);
 
   --color-border: var(--trail-border);
+  --color-border-strong: var(--trail-border-strong);
   --color-input: var(--trail-border);
   --color-ring: var(--trail-primary);
 
   --color-chart-1: var(--trail-primary);
   --color-chart-2: var(--trail-success);
   --color-chart-3: var(--trail-error);
-  --color-chart-4: #ffb15c;
-  --color-chart-5: #7a2b00;
+  --color-chart-4: var(--trail-warn);
+  --color-chart-5: var(--trail-info);
 
-  --color-sidebar: #050505;
+  --color-sidebar: var(--trail-bg);
   --color-sidebar-foreground: var(--trail-text);
   --color-sidebar-primary: var(--trail-primary);
   --color-sidebar-primary-foreground: var(--trail-primary-foreground);

@@ -1,7 +1,7 @@
 // Shadow-DOM styles for the recording overlay. Kept as a string: the overlay is
 // injected into the page inside a closed shadow root, so a real stylesheet
 // would leak page-wide. Design family: 18px panel, 12px chips, 999px pills,
-// orange hairline + inset glow + blur (matches the popup/review tokens).
+// orange recording accent + inset glow + blur (matches the popup/review tokens).
 export const overlayStyles = `
   :host {
     position: fixed;
@@ -35,7 +35,7 @@ export const overlayStyles = `
       0 18px 48px rgba(0, 0, 0, 0.34),
       0 0 0 1px rgba(255, 106, 0, 0.06) inset;
     backdrop-filter: blur(20px) saturate(155%);
-    color: #fff7ed;
+    color: #f2f4f6;
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     padding: 11px 12px 12px;
     will-change: transform;
@@ -94,7 +94,7 @@ export const overlayStyles = `
   }
 
   .trail-overlay__time {
-    color: rgba(255, 247, 237, 0.68);
+    color: rgba(242, 244, 246, 0.68);
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
     letter-spacing: 0;
@@ -103,9 +103,9 @@ export const overlayStyles = `
 
   .trail-overlay__stop {
     appearance: none;
-    border: 1px solid rgba(255, 77, 77, 0.58);
-    background: rgba(18, 10, 10, 0.82);
-    color: #ffb7b7;
+    border: 1px solid rgba(255, 77, 79, 0.58);
+    background: rgba(42, 20, 22, 0.82);
+    color: #ffb8b9;
     border-radius: 12px;
     padding: 5px 10px;
     font-size: 10px;
@@ -114,7 +114,7 @@ export const overlayStyles = `
     letter-spacing: 0.08em;
     text-transform: uppercase;
     cursor: pointer;
-    box-shadow: 0 0 0 1px rgba(255, 77, 77, 0.08) inset;
+    box-shadow: 0 0 0 1px rgba(255, 77, 79, 0.08) inset;
     transition:
       background-color 140ms ease,
       border-color 140ms ease,
@@ -123,8 +123,8 @@ export const overlayStyles = `
   }
 
   .trail-overlay__stop:hover {
-    background: rgba(255, 77, 77, 0.14);
-    border-color: rgba(255, 77, 77, 0.92);
+    background: rgba(255, 77, 79, 0.14);
+    border-color: rgba(255, 77, 79, 0.92);
     color: #ffd5d5;
   }
 
@@ -133,7 +133,7 @@ export const overlayStyles = `
   }
 
   .trail-overlay__stop:focus-visible {
-    outline: 2px solid #ff4d4d;
+    outline: 2px solid #ff4d4f;
     outline-offset: 2px;
   }
 
@@ -149,7 +149,7 @@ export const overlayStyles = `
     font-weight: 800;
     line-height: 0.92;
     letter-spacing: -0.04em;
-    color: #fff7ed;
+    color: #f2f4f6;
   }
 
   .trail-overlay__total > span:last-child {
@@ -180,7 +180,7 @@ export const overlayStyles = `
     padding: 7px 7px 7px 8px;
     font-size: 10px;
     line-height: 1;
-    color: rgba(255, 247, 237, 0.68);
+    color: rgba(242, 244, 246, 0.68);
   }
 
   .trail-overlay__metric [data-slot="sliding-number"] {
@@ -189,6 +189,14 @@ export const overlayStyles = `
     font-weight: 760;
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
+  }
+
+  .trail-overlay__metric--error {
+    border-color: rgba(255, 77, 79, 0.2);
+  }
+
+  .trail-overlay__metric--error [data-slot="sliding-number"] {
+    color: #ff4d4f;
   }
 
   @media (prefers-reduced-motion: no-preference) {

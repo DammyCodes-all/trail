@@ -338,16 +338,19 @@ function RecordingOverlay() {
         <Metric
           label="Clicks"
           value={status.counts.click}
+          accent="neutral"
           transition={numberTransition}
         />
         <Metric
           label="Inputs"
           value={status.counts.input}
+          accent="neutral"
           transition={numberTransition}
         />
         <Metric
           label="Issues"
           value={status.counts.console + status.counts.net}
+          accent="error"
           transition={numberTransition}
         />
       </div>
@@ -358,14 +361,16 @@ function RecordingOverlay() {
 function Metric({
   label,
   value,
+  accent,
   transition,
 }: {
   label: string;
   value: number;
+  accent: "neutral" | "error";
   transition: { stiffness: number; damping: number; mass: number };
 }) {
   return (
-    <span className="trail-overlay__metric">
+    <span className={`trail-overlay__metric trail-overlay__metric--${accent}`}>
       <SlidingNumber
         number={value}
         fromNumber={0}

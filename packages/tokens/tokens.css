@@ -4,31 +4,53 @@
  * (Tailwind @theme mapping) in any entry stylesheet.
  *
  * Palette reasoning:
- *  - Orange is the single brand/action/status color.
+ *  - Orange is TRAIL's BRAND color only: logo, recording indicator, focus ring,
+ *    primary action. It never means "something is wrong".
+ *  - Status has its own hues so severity is readable at a glance:
+ *    red = failure, amber = warning/degraded, green = healthy/confirmed.
+ *    (Before this split, success and error were both orange — which made the
+ *    brand color and the failure color indistinguishable.)
+ *  - Neutrals are cool gray, not warm brown. A warm neutral ramp makes orange
+ *    read as the ambient temperature; a cool one makes it read as a deliberate
+ *    accent. This is what lets a single orange element actually draw the eye.
  *  - Black surfaces keep recording chrome quiet over busy pages.
  *  - Outfit = headings/brand moments only; IBM Plex Sans = UI copy;
  *    IBM Plex Mono = anything technical (IDs, timestamps, repo names, logs).
  */
 
 :root {
-  /* --- raw palette --- */
+  /* --- brand --- */
   --trail-primary: #ff6a00;
   --trail-primary-hover: #ff8a1f;
   --trail-primary-active: #d94f00;
   --trail-primary-foreground: #050505;
 
-  --trail-bg: #050505;
-  --trail-surface: #0b0b0b;
-  --trail-surface-raised: #111111;
+  /* --- surfaces (cool, near-black) --- */
+  --trail-bg: #08090a;
+  --trail-surface: #0d0e10;
+  --trail-surface-raised: #141618;
 
-  --trail-text: #fff7ed;
-  --trail-text-muted: #a69b92;
+  /* --- text (cool gray ramp) --- */
+  --trail-text: #f2f4f6;
+  --trail-text-muted: #8b929c;
+  --trail-text-subtle: #626973;
 
-  --trail-success: #ff8a1f;
-  --trail-error: #ff3d00;
+  /* --- status: each hue means exactly one thing --- */
+  --trail-error: #ff4d4f;
+  --trail-error-soft: #2a1416;
+  --trail-warn: #ffb020;
+  --trail-warn-soft: #2a2011;
+  --trail-success: #30d158;
+  --trail-success-soft: #10241a;
+  --trail-info: #4a9eff;
 
-  --trail-border: #26201b;
-  --trail-border-strong: #453426;
+  /* --- severity ramp (report triage) --- */
+  --trail-sev-high: var(--trail-error);
+  --trail-sev-medium: var(--trail-warn);
+  --trail-sev-low: var(--trail-text-muted);
+
+  --trail-border: #1e2124;
+  --trail-border-strong: #2e3338;
 
   /* --- shadcn semantic slots (dark-only) --- */
   --background: var(--trail-bg);
@@ -46,17 +68,27 @@
   --secondary: var(--trail-border);
   --secondary-foreground: var(--trail-text);
 
-  --muted: #15110e;
+  --muted: #131518;
   --muted-foreground: var(--trail-text-muted);
 
-  --accent: color-mix(in oklab, var(--trail-primary) 12%, var(--trail-surface));
+  --accent: #191c1f;
   --accent-foreground: var(--trail-text);
 
   --destructive: var(--trail-error);
-  --destructive-foreground: #f5f5f4;
+  --destructive-foreground: #fff5f5;
+
+  --warn: var(--trail-warn);
+  --warn-foreground: #08090a;
 
   --success: var(--trail-success);
-  --success-foreground: #050505;
+  --success-foreground: #08090a;
+
+  --info: var(--trail-info);
+  --info-foreground: #08090a;
+
+  --severity-high: var(--trail-sev-high);
+  --severity-medium: var(--trail-sev-medium);
+  --severity-low: var(--trail-sev-low);
 
   --border: var(--trail-border);
   --input: var(--trail-border);
@@ -65,10 +97,10 @@
   --chart-1: var(--trail-primary);
   --chart-2: var(--trail-success);
   --chart-3: var(--trail-error);
-  --chart-4: #ffb15c;
-  --chart-5: #7a2b00;
+  --chart-4: var(--trail-warn);
+  --chart-5: var(--trail-info);
 
-  --sidebar: #050505;
+  --sidebar: var(--trail-bg);
   --sidebar-foreground: var(--trail-text);
   --sidebar-primary: var(--trail-primary);
   --sidebar-primary-foreground: var(--trail-primary-foreground);

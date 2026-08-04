@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { eventWithTime } from "@rrweb/types";
 import { REPLAY_SERVER_URL, REPO_KEY } from "@/lib/constants";
 import {
@@ -8,6 +8,7 @@ import {
   updateReportTitle,
 } from "@/lib/db";
 import { buildIssueUrl } from "@/lib/github";
+import { buildReportFacts } from "@/lib/facts";
 import {
   buildMarkdownFromSections,
   buildSections,
@@ -22,17 +23,20 @@ import {
 import { buildTimeline } from "@/lib/timeline";
 import type { StoredEvent, TrailCounts, TrailReport } from "@/lib/types";
 import { Toaster, toast } from "@/components/ui/toast";
-import { ExportToolbar } from "./components/ExportToolbar";
+import { ActionBar } from "./components/ActionBar";
+import { EvidencePanel } from "./components/EvidencePanel";
+import { GitHubIssueDialog } from "./components/GitHubIssueDialog";
+import { IncidentHeader } from "./components/IncidentHeader";
 import { LoadingSkeleton } from "./components/LoadingSkeleton";
-import { ReplayCard } from "./components/ReplayCard";
-import { ReviewHeader } from "./components/ReviewHeader";
+import { ReplayPanel } from "./components/ReplayPanel";
 import { TimelineCard } from "./components/TimelineCard";
+import type { ReplayPlayerHandle } from "./ReplayPlayer";
 
 function App() {
   const reportId =
     Number(new URLSearchParams(location.search).get("report")) || undefined;
 
-  const [report, setReport] = useState<Pick<TrailReport, "title"> | null>(null);
+  const [report, setReport] = useState<TrailReport | null>(null);
   const [events, setEvents] = useState<StoredEvent[]>([]);
   const [loading, setLoading] = useState(true);
   // Typed values are always redacted from the timeline and report — capture-time
@@ -47,6 +51,9 @@ function App() {
   const [labels, setLabels] = useState("");
   const [sharing, setSharing] = useState<"idle" | "uploading">("idle");
   const [replayLink, setReplayLink] = useState("");
+  const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+  const [currentReplayTime, setCurrentReplayTime] = useState(0);
+  const replayRef = useRef<ReplayPlayerHandle>(null);
 
   useEffect(() => {
     void (async () => {
@@ -61,7 +68,24 @@ function App() {
         setEvents(evs);
       } else {
         const evs = await getAllEvents();
-        setReport({ title: suggestTitle(evs) });
+        const timestamps = evs.map((event) => event.t).filter(Number.isFinite);
+        const counts: TrailCounts = { click: 0, input: 0, console: 0, net: 0 };
+        for (const event of evs) {
+          if (event.k === "click") counts.click++;
+          else if (event.k === "input") counts.input++;
+          else if (event.k === "console") counts.console++;
+          else if (event.k === "net") counts.net++;
+        }
+        setReport({
+          seq: 0,
+          title: suggestTitle(evs),
+          repo: "",
+          startedAt: timestamps.length ? Math.min(...timestamps) : Date.now(),
+          endedAt: timestamps.length ? Math.max(...timestamps) : Date.now(),
+          eventCount: evs.length,
+          counts,
+          url: evs[0]?.url ?? "",
+        });
         setEvents(evs);
       }
       setLoading(false);
@@ -100,6 +124,7 @@ function App() {
         .sort((a, b) => a.timestamp - b.timestamp),
     [events],
   );
+  const replayT0 = rrwebEvents[0]?.timestamp ?? t0;
 
   const counts: TrailCounts = useMemo(() => {
     const c: TrailCounts = { click: 0, input: 0, console: 0, net: 0 };
@@ -111,6 +136,10 @@ function App() {
     }
     return c;
   }, [events]);
+  const facts = useMemo(
+    () => buildReportFacts(events, report),
+    [events, report],
+  );
 
   // Phase 4: when a repo is typed, detect its issue template (debounced). Any
   // failure (no template, private repo, offline) resolves to null → generic body.
@@ -168,6 +197,7 @@ function App() {
 
   // Test hooks for spike/verify.mjs.
   useEffect(() => {
+    if (loading) return;
     const w = window as unknown as Record<string, unknown>;
     w.__trailTimeline = timeline;
     w.__trailReplayCount = rrwebEvents.length;
@@ -178,6 +208,7 @@ function App() {
     w.__trailTemplateState = templateState;
     w.__trailTitle = displayTitle;
     w.__trailReplayLink = replayLink;
+    w.__trailReplayTime = currentReplayTime;
     w.__trailSuggestedRepo = repoSuggestedOnce.current ? repo : null;
   }, [
     timeline,
@@ -188,7 +219,9 @@ function App() {
     templateState,
     displayTitle,
     replayLink,
+    currentReplayTime,
     repo,
+    loading,
   ]);
 
   const setRepoAndSave = (value: string) => {
@@ -245,8 +278,24 @@ function App() {
 
   const openIssue = () => {
     if (!issue) return;
+    setIssueDialogOpen(false);
     void browser.tabs.create({ url: issue.url });
   };
+
+  const handleCreateIssue = () => setIssueDialogOpen(true);
+
+  const seekReplay = useCallback(
+    (timestamp: number) => {
+      const offset = Math.max(0, timestamp - replayT0);
+      setCurrentReplayTime(offset);
+      replayRef.current?.seek(offset, false);
+    },
+    [replayT0],
+  );
+
+  const handleReplayTimeChange = useCallback((timeOffset: number) => {
+    setCurrentReplayTime(timeOffset);
+  }, []);
 
   const persistTitle = () => {
     if (reportId && title && title !== report?.title) {
@@ -302,33 +351,56 @@ function App() {
 
   return (
     <div className="mx-auto flex w-full max-w-300 flex-col gap-4 p-5">
-      <ReviewHeader
+      <IncidentHeader
         title={title}
         onTitleChange={setTitle}
         onTitleBlur={persistTitle}
+        facts={facts}
         counts={counts}
       />
 
-      <ExportToolbar
-        repo={repo}
-        onRepoChange={setRepoAndSave}
-        labels={labels}
-        onLabelsChange={setLabels}
-        issueReady={!!issue}
+      <ActionBar
         sharing={sharing}
         template={template}
         templateState={templateState}
-        onOpenIssue={openIssue}
+        onCreateIssue={handleCreateIssue}
         onCopyMarkdown={() => void copyMarkdown()}
         onDownloadReport={downloadReport}
         onDownloadReplay={downloadReplay}
         onCopyReplayLink={() => void copyReplayLink()}
       />
 
-      <main className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ReplayCard events={rrwebEvents} />
-        <TimelineCard steps={timeline} t0={t0} />
+      <main className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,28rem)] lg:items-start">
+        <div className="min-w-0">
+          <TimelineCard
+            steps={timeline}
+            t0={t0}
+            replayT0={replayT0}
+            currentTime={currentReplayTime}
+            onSeek={seekReplay}
+          />
+          <EvidencePanel events={events} t0={t0} onSeek={seekReplay} />
+        </div>
+        <ReplayPanel
+          ref={replayRef}
+          events={rrwebEvents}
+          facts={facts}
+          onCurrentTimeChange={handleReplayTimeChange}
+        />
       </main>
+
+      <GitHubIssueDialog
+        open={issueDialogOpen}
+        onOpenChange={setIssueDialogOpen}
+        repo={repo}
+        onRepoChange={setRepoAndSave}
+        labels={labels}
+        onLabelsChange={setLabels}
+        issueReady={!!issue}
+        template={template}
+        templateState={templateState}
+        onOpenIssue={openIssue}
+      />
 
       <Toaster />
     </div>

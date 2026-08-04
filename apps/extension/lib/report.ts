@@ -1,16 +1,37 @@
 import type { ReportSection } from './github.ts';
 import { defaultSectionRender } from './github.ts';
+import { buildReportFacts, formatDuration } from './facts.ts';
 import { buildTimeline } from './timeline.ts';
 import type { StoredEvent, TrailReport } from './types.ts';
 
-// Deterministic title for a report: first console error, else first failed request,
-// else "Bug on <host>".
+const cleanErrorMessage = (message: string): string =>
+  message
+    .replace(/^(?:Uncaught\s+)?(?:Error|TypeError|ReferenceError|RangeError|SyntaxError):\s*/i, '')
+    .replace(/^boom:\s*/i, '')
+    .trim();
+
+// Deterministic, evidence-backed title. When an error immediately follows a user
+// action on the same page, include that action; otherwise report the failure as-is.
 export function suggestTitle(events: StoredEvent[]): string {
-  const consoleErr = events.find((e) => e.k === 'console');
+  const ordered = [...events].sort((a, b) => a.t - b.t);
+  const consoleErr = ordered.find((e) => e.k === 'console' && e.lv === 'error');
   if (consoleErr && consoleErr.k === 'console') {
-    return (consoleErr.msg || 'Console error').slice(0, 70);
+    const action = ordered
+      .filter(
+        (event) =>
+          event.k === 'click' &&
+          event.url === consoleErr.url &&
+          event.t <= consoleErr.t &&
+          consoleErr.t - event.t <= 2_000,
+      )
+      .at(-1);
+    const message = cleanErrorMessage(consoleErr.msg || 'Console error');
+    if (action?.k === 'click') {
+      return `${action.label || action.tag} failed: ${message}`.slice(0, 70);
+    }
+    return message.slice(0, 70);
   }
-  const netErr = events.find((e) => e.k === 'net' && e.status >= 400);
+  const netErr = ordered.find((e) => e.k === 'net' && (e.status === 0 || e.status >= 400));
   if (netErr && netErr.k === 'net') {
     return `${netErr.method} ${netErr.target} failed (${netErr.status})`.slice(0, 70);
   }
@@ -46,11 +67,17 @@ const pathOf = (url: string): string => {
   }
 };
 
-const envLines = () =>
-  [
-    `- User agent: ${navigator.userAgent.slice(0, 120)}`,
+const envLines = (events: StoredEvent[]) => {
+  const facts = buildReportFacts(events);
+  return [
+    `- Browser: ${facts.browser}`,
+    `- OS: ${facts.os}`,
+    `- Page: ${facts.url || 'Unknown'}`,
+    `- Duration: ${formatDuration(facts.durationMs)}`,
+    `- TRAIL: ${facts.extensionVersion}`,
     `- Recorded: ${new Date().toLocaleString()}`,
   ].join('\n');
+};
 
 // Build the report sections (also what buildIssueUrl fits to a byte budget).
 export function buildSections(
@@ -86,7 +113,7 @@ export function buildSections(
     {
       name: 'Environment',
       priority: SECTION_PRIORITIES.Environment!,
-      text: envLines(),
+      text: envLines(events),
     },
   ];
 

@@ -41,8 +41,8 @@
   }
 
   ::selection {
-    background: rgb(255 106 0 / 0.3);
-    color: #fff7ed;
+    background: rgb(255 106 0 / 0.28);
+    color: #f2f4f6;
   }
 
   ::-webkit-scrollbar {
@@ -55,14 +55,14 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #3a2a1e;
+    background: #2e3338;
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: content-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #5a351d;
+    background: #434a51;
     border: 2px solid transparent;
     background-clip: content-box;
   }
@@ -70,7 +70,8 @@
 
 /*
  * rrweb-player ships a light controller (indigo on white). Override to the
- * TRAIL dark/amber theme so the replay panel matches the rest of the UI.
+ * TRAIL dark theme so the replay panel matches the rest of the UI. Brand orange
+ * is correct here: these are interactive playback controls, not status.
  */
 .rr-controller {
   background: var(--trail-surface);

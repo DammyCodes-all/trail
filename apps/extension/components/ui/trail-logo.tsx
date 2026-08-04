@@ -19,7 +19,7 @@ export function TrailLogo({
   width,
   height,
   viewBox = "388 222 519 388",
-  color = "#ff810c",
+  color = "#ff6a00",
   className,
   "aria-label": ariaLabel,
   ...props
