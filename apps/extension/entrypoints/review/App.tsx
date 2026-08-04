@@ -19,37 +19,14 @@ import {
   shapeSections,
   type IssueTemplate,
 } from "@/lib/templates";
-import { buildTimeline, type TimelineStep } from "@/lib/timeline";
+import { buildTimeline } from "@/lib/timeline";
 import type { StoredEvent, TrailCounts, TrailReport } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster, toast } from "@/components/ui/toast";
-import {
-  CheckCircle2,
-  Clapperboard,
-  Copy,
-  ExternalLink,
-  FileDown,
-  Loader2,
-  MousePointerClick,
-  Share2,
-  TriangleAlert,
-  WifiOff,
-} from "lucide-react";
-import { ReplayPlayer } from "./ReplayPlayer";
-import { TrailLogo } from "@/components/ui/trail-logo";
-
-const fmtTime = (ms: number) => {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  const p = (n: number) => String(n).padStart(2, "0");
-  return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
-};
+import { ExportToolbar } from "./components/ExportToolbar";
+import { LoadingSkeleton } from "./components/LoadingSkeleton";
+import { ReplayCard } from "./components/ReplayCard";
+import { ReviewHeader } from "./components/ReviewHeader";
+import { TimelineCard } from "./components/TimelineCard";
 
 function App() {
   const reportId =
@@ -317,218 +294,41 @@ function App() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex w-full max-w-300 flex-col gap-4 p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-3.5 w-16" />
-            <Skeleton className="h-7 w-72" />
-          </div>
-          <div className="flex gap-1.5">
-            <Skeleton className="h-5 w-16" />
-            <Skeleton className="h-5 w-16" />
-            <Skeleton className="h-5 w-16" />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-9 w-56" />
-          <Skeleton className="h-9 w-36" />
-          <Skeleton className="h-9 w-44" />
-        </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Skeleton className="h-120 rounded-xl" />
-          <Skeleton className="h-120 rounded-xl" />
-        </div>
-      </div>
-    );
+    return <LoadingSkeleton />;
   }
 
   return (
     <div className="mx-auto flex w-full max-w-300 flex-col gap-4 p-5">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <TrailLogo
-            className="mt-0.5 size-10 shrink-0"
-            width={40}
-            height={40}
-            aria-label="TRAIL logo"
-          />
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="font-heading text-xs font-semibold tracking-[0.18em] text-muted-foreground">
-              TRAIL
-            </span>
-            <input
-              className="w-full max-w-140 rounded-md border border-transparent bg-transparent p-1 font-heading text-xl font-medium text-foreground outline-none transition-colors hover:border-border focus:border-border focus:bg-background"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={persistTitle}
-              placeholder="Bug report title"
-              spellCheck={false}
-              aria-label="Report title"
-            />
-          </div>
-        </div>
-        <div className="flex shrink-0 gap-1.5">
-          <Badge variant="outline" className="gap-1">
-            <MousePointerClick aria-hidden="true" />
-            {counts.click}
-          </Badge>
-          <Badge variant="destructive" className="gap-1">
-            <TriangleAlert aria-hidden="true" />
-            {counts.console}
-          </Badge>
-          <Badge className="gap-1 border-transparent bg-primary/10 text-primary">
-            <WifiOff aria-hidden="true" />
-            {counts.net}
-          </Badge>
-        </div>
-      </header>
+      <ReviewHeader
+        title={title}
+        onTitleChange={setTitle}
+        onTitleBlur={persistTitle}
+        counts={counts}
+      />
 
-      <section className="flex flex-wrap items-center gap-2">
-        <Input
-          className="repo h-9 flex-1 min-w-55 font-mono text-sm"
-          placeholder="owner/repo — e.g. acme/widget"
-          value={repo}
-          onChange={(e) => setRepoAndSave(e.target.value)}
-          spellCheck={false}
-        />
-        <Input
-          className="h-9 w-auto min-w-35 flex-[0.4] text-sm"
-          placeholder="labels — e.g. bug, ui"
-          value={labels}
-          onChange={(e) => setLabels(e.target.value)}
-          spellCheck={false}
-        />
-        <Button className="h-9" onClick={openIssue} disabled={!issue}>
-          <ExternalLink data-icon="inline-start" aria-hidden="true" />
-          Open GitHub Issue
-        </Button>
-        <Button
-          variant="secondary"
-          className="h-9"
-          onClick={() => void copyMarkdown()}
-        >
-          <Copy data-icon="inline-start" aria-hidden="true" />
-          Copy Markdown
-        </Button>
-        <Button
-          variant="outline"
-          className="h-9"
-          onClick={() => void downloadReport()}
-        >
-          <FileDown data-icon="inline-start" aria-hidden="true" />
-          Download .md
-        </Button>
-        <Button
-          variant="outline"
-          className="h-9"
-          onClick={() => void downloadReplay()}
-        >
-          <Clapperboard data-icon="inline-start" aria-hidden="true" />
-          Download Replay
-        </Button>
-        <Button
-          variant="outline"
-          className="h-9"
-          onClick={() => void copyReplayLink()}
-          disabled={sharing === "uploading"}
-        >
-          {sharing === "uploading" ? (
-            <Loader2 className="animate-spin" aria-hidden="true" />
-          ) : (
-            <Share2 data-icon="inline-start" aria-hidden="true" />
-          )}
-          {sharing === "uploading" ? "Sharing…" : "Copy Replay Link"}
-        </Button>
-        {templateState === "found" && template && (
-          <p className="flex w-full basis-full items-center gap-1.5 font-mono text-xs text-muted-foreground">
-            <CheckCircle2
-              className="size-3.5 text-success"
-              aria-hidden="true"
-            />
-            Shaped for {template.filename} — {template.name}
-          </p>
-        )}
-      </section>
+      <ExportToolbar
+        repo={repo}
+        onRepoChange={setRepoAndSave}
+        labels={labels}
+        onLabelsChange={setLabels}
+        issueReady={!!issue}
+        sharing={sharing}
+        template={template}
+        templateState={templateState}
+        onOpenIssue={openIssue}
+        onCopyMarkdown={() => void copyMarkdown()}
+        onDownloadReport={downloadReport}
+        onDownloadReplay={downloadReplay}
+        onCopyReplayLink={() => void copyReplayLink()}
+      />
 
       <main className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="min-h-120 overflow-hidden">
-          {rrwebEvents.length ? (
-            <ReplayPlayer events={rrwebEvents} />
-          ) : (
-            <div className="flex h-full min-h-120 flex-col items-center justify-center gap-2 p-8 text-center">
-              <h4 className="font-heading text-h4 font-medium">
-                No replay frames captured
-              </h4>
-              <p className="max-w-xs text-body-sm text-muted-foreground">
-                The session has clicks, console and network events — but no
-                rrweb frames made it into this report.
-              </p>
-            </div>
-          )}
-        </Card>
-
-        <Card className="flex max-h-160 flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-            <h2 className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-              Timeline
-            </h2>
-            <Badge
-              variant="ghost"
-              className="font-mono text-[11px] text-muted-foreground"
-            >
-              {timeline.length} events
-            </Badge>
-          </div>
-          <ol className="flex-1 divide-y divide-border overflow-y-auto px-4 py-1">
-            {timeline.map((s, i) => (
-              <TimelineRow key={i} step={s} t0={t0} />
-            ))}
-          </ol>
-          {timeline.length === 0 && (
-            <p className="p-4 text-body-sm text-muted-foreground">
-              No events captured.
-            </p>
-          )}
-        </Card>
+        <ReplayCard events={rrwebEvents} />
+        <TimelineCard steps={timeline} t0={t0} />
       </main>
 
       <Toaster />
     </div>
-  );
-}
-
-function TimelineRow({ step, t0 }: { step: TimelineStep; t0: number }) {
-  const textClass =
-    step.kind === "console"
-      ? "text-destructive"
-      : step.kind === "net"
-        ? "text-primary"
-        : step.kind === "nav"
-          ? "font-medium text-foreground/70"
-          : "text-foreground/85";
-  const prefix =
-    step.kind === "click" ? (
-      <span className="text-primary" aria-hidden="true">
-        ▸
-      </span>
-    ) : step.kind === "input" ? (
-      <span className="text-muted-foreground" aria-hidden="true">
-        ✎
-      </span>
-    ) : null;
-  return (
-    <li className="flex items-baseline gap-2 py-2">
-      <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
-        {fmtTime(step.t - t0)}
-      </span>
-      {prefix}
-      <span
-        className={`min-w-0 text-[13px] leading-relaxed wrap-break-word ${textClass}`}
-      >
-        {step.text}
-      </span>
-    </li>
   );
 }
 
