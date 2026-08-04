@@ -54,10 +54,11 @@
   --color-sidebar-border: var(--trail-border);
   --color-sidebar-ring: var(--trail-primary);
 
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: var(--radius);
-  --radius-xl: 0;
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
 
   --font-heading: var(--font-heading);
   --font-sans: var(--font-sans);
