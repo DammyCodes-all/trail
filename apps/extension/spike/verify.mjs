@@ -313,6 +313,41 @@ function main() {
       assert(reviewHooks.replayCount > 0, 'review has rrweb replay frames');
       const playerReady = await review.evaluate(() => window.__trailPlayerReady === true);
       assert(playerReady, 'rrweb-player Svelte component mounted');
+      const replayControls = await review.evaluate(() => ({
+        hasCustomScrubber: !!document.querySelector('input[aria-label="Replay position"]'),
+        hasPlayButton: !!document.querySelector('button[aria-label="Play replay"]'),
+        hasStockController: !!document.querySelector('.rr-controller'),
+      }));
+      assert(replayControls.hasCustomScrubber, 'review uses the custom replay scrubber');
+      assert(replayControls.hasPlayButton, 'review exposes custom replay playback controls');
+      assert(!replayControls.hasStockController, 'rrweb stock controls stay hidden');
+      await review.evaluate(() => {
+        document.querySelector('button[aria-label="Replay speed"]')?.click();
+      });
+      await review.waitForSelector('[data-slot="dropdown-menu-content"]', {
+        timeout: 5000,
+        polling: 100,
+      });
+      await review.evaluate(() => {
+        const speed = [...document.querySelectorAll('[data-slot="dropdown-menu-item"]')].find(
+          (item) => item.textContent?.trim() === '2x',
+        );
+        speed?.click();
+      });
+      await review.waitForFunction(
+        () => document.querySelector('button[aria-label="Replay speed"]')?.textContent?.includes('2x'),
+        { timeout: 5000, polling: 100 },
+      );
+      await review.evaluate(() => {
+        document.querySelector('button[aria-label="Play replay"]')?.click();
+      });
+      await review.waitForFunction(
+        () => typeof window.__trailReplayTime === 'number' && window.__trailReplayTime > 0,
+        { timeout: 5000, polling: 100 },
+      );
+      await review.evaluate(() => {
+        document.querySelector('button[aria-label="Pause replay"]')?.click();
+      });
       assert(reviewHooks.markdown.includes('## Steps to Reproduce'), 'markdown has steps section');
       assert(reviewHooks.markdown.includes('Click Submit'), 'markdown has the click step');
       assert(!reviewHooks.markdown.includes('hunter2'), 'markdown never leaks the password');
@@ -321,9 +356,10 @@ function main() {
         repoVisible: !!document.querySelector('.repo'),
         title: window.__trailTitle,
       }));
-      assert(incidentUi.text.includes('High severity'), 'review leads with derived severity');
-      assert(incidentUi.text.includes('Evidence trail'), 'review leads with chronological evidence');
-      assert(incidentUi.text.includes('Runtime evidence'), 'review exposes grouped runtime findings');
+      assert(!incidentUi.text.includes('High severity'), 'review omits the severity label');
+      assert(incidentUi.text.includes('Evidence timeline'), 'review leads with chronological evidence');
+      assert(incidentUi.text.includes('Session replay'), 'review places replay below the timeline');
+      assert(incidentUi.text.includes('DOM snapshot'), 'review exposes grouped runtime evidence');
       assert(incidentUi.text.includes('Create GitHub Issue'), 'review has one focused GitHub action');
       assert(!incidentUi.repoVisible, 'repo configuration stays out of the report until requested');
       assert(

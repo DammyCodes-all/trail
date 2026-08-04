@@ -1,30 +1,33 @@
 import {
-  AlertTriangle,
+  ChevronDown,
+  Clapperboard,
   Clock3,
-  Globe2,
+  Copy,
+  ExternalLink,
+  FileText,
+  Link2,
   ListChecks,
+  Loader2,
+  Monitor,
   MousePointer2,
+  Share2,
   Terminal,
-  Wifi,
+  WifiOff,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { TrailLogo } from "@/components/ui/trail-logo";
 import type { ReportFacts } from "@/lib/facts";
 import { formatDuration } from "@/lib/facts";
 import type { TrailCounts } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const severityStyles = {
-  high: "border-destructive/35 bg-destructive-soft text-destructive",
-  medium: "border-warn/35 bg-warn-soft text-warn",
-  low: "border-border bg-muted text-muted-foreground",
-} as const;
-
-const severityLabels = {
-  high: "High severity",
-  medium: "Needs review",
-  low: "Low severity",
-} as const;
 
 function Fact({
   icon: Icon,
@@ -38,22 +41,29 @@ function Fact({
   tone?: "neutral" | "error" | "warn";
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <Icon
+    <div className="min-w-0 py-4 sm:py-5">
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <Icon
+          className={cn(
+            "size-3.5 shrink-0",
+            tone === "error" && "text-destructive",
+            tone === "warn" && "text-warn",
+            tone === "neutral" && "text-muted-foreground",
+          )}
+          aria-hidden="true"
+        />
+        <span>{label}</span>
+      </div>
+      <strong
         className={cn(
-          "size-3.5 shrink-0",
+          "mt-1.5 block truncate pl-5 font-heading text-sm font-semibold tabular-nums text-foreground",
           tone === "error" && "text-destructive",
           tone === "warn" && "text-warn",
-          tone === "neutral" && "text-muted-foreground",
         )}
-        aria-hidden="true"
-      />
-      <span className="truncate text-[12px] text-muted-foreground">
-        <strong className="font-mono font-medium tabular-nums text-foreground">
-          {value}
-        </strong>{" "}
-        {label}
-      </span>
+        title={String(value)}
+      >
+        {value}
+      </strong>
     </div>
   );
 }
@@ -64,50 +74,91 @@ export function IncidentHeader({
   onTitleBlur,
   facts,
   counts,
+  sharing,
+  onCreateIssue,
+  onCopyMarkdown,
+  onDownloadReport,
+  onDownloadReplay,
+  onCopyReplayLink,
 }: {
   title: string;
   onTitleChange: (value: string) => void;
   onTitleBlur: () => void;
   facts: ReportFacts;
   counts: TrailCounts;
+  sharing: "idle" | "uploading";
+  onCreateIssue: () => void;
+  onCopyMarkdown: () => void;
+  onDownloadReport: () => void;
+  onDownloadReplay: () => void;
+  onCopyReplayLink: () => void;
 }) {
   return (
-    <header className="border-b border-border pb-5">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5">
+    <header>
+      <div className="flex flex-col gap-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3.5">
           <TrailLogo
-            className="size-7 shrink-0 text-primary"
-            width={28}
-            height={28}
+            className="size-10 shrink-0 text-primary"
+            width={40}
+            height={40}
             aria-label="TRAIL logo"
           />
-          <span className="font-heading text-[11px] font-semibold tracking-[0.2em] text-muted-foreground">
-            TRAIL <span className="text-border-strong">/</span> INCIDENT REVIEW
+          <span className="font-heading text-base font-semibold tracking-[0.08em] text-foreground">
+            TRAIL
           </span>
         </div>
-        <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          Evidence collected
-        </span>
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  className="min-h-10 gap-2 rounded-sm border-border-strong px-4 py-2.5"
+                >
+                  <Share2 data-icon="inline-start" aria-hidden="true" />
+                  Share
+                  <ChevronDown className="size-3.5" aria-hidden="true" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={onCopyMarkdown}>
+                <Copy aria-hidden="true" />
+                Copy Markdown
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onDownloadReport}>
+                <FileText aria-hidden="true" />
+                Download Report
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onDownloadReplay}>
+                <Clapperboard aria-hidden="true" />
+                Download Replay
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onCopyReplayLink} disabled={sharing === "uploading"}>
+                {sharing === "uploading" ? (
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Link2 aria-hidden="true" />
+                )}
+                {sharing === "uploading" ? "Preparing link..." : "Copy Replay Link"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            className="min-h-10 rounded-sm bg-white px-4 py-2.5 text-black hover:bg-white/90"
+            onClick={onCreateIssue}
+          >
+            <ExternalLink data-icon="inline-start" aria-hidden="true" />
+            Create GitHub Issue
+          </Button>
+        </div>
       </div>
 
-      <div className="mt-6 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "inline-flex h-6 items-center rounded-full border px-2.5 text-[11px] font-semibold",
-              severityStyles[facts.severity],
-            )}
-          >
-            <span className="mr-1.5 size-1.5 rounded-full bg-current" aria-hidden="true" />
-            {severityLabels[facts.severity]}
-          </span>
-          <span className="font-mono text-[11px] text-muted-foreground">
-            {facts.host}
-          </span>
-        </div>
+      <div className="pb-6 pt-8 sm:pb-8 sm:pt-12">
         <textarea
           rows={1}
-          className="-ml-1 min-h-10 w-full max-w-4xl resize-none overflow-hidden rounded-md border border-transparent bg-transparent px-1 py-0.5 font-heading text-[2rem] font-semibold leading-[1.08] tracking-normal text-foreground outline-none transition-[background-color,border-color] duration-150 [field-sizing:content] placeholder:text-muted-foreground/60 hover:border-border focus:border-border focus:bg-card"
+          className="-ml-1 min-h-11 w-full max-w-5xl resize-none overflow-hidden rounded-sm border border-transparent bg-transparent px-1 py-0.5 font-heading text-[1.75rem] font-semibold leading-[1.1] tracking-normal text-foreground outline-none transition-[background-color,border-color] duration-150 [field-sizing:content] placeholder:text-muted-foreground/60 hover:border-border focus:border-border focus:bg-card sm:text-[2.35rem]"
           value={title}
           onChange={(event) => onTitleChange(event.target.value.replace(/\n/g, " "))}
           onKeyDown={(event) => {
@@ -121,31 +172,44 @@ export function IncidentHeader({
           spellCheck={false}
           aria-label="Report title"
         />
-        <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
           Trail captured the sequence, page context, and runtime failures needed to investigate this incident.
         </p>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2.5 border-t border-border/70 pt-4">
-        <Fact icon={Clock3} label="duration" value={formatDuration(facts.durationMs)} />
-        <Fact icon={ListChecks} label="evidence events" value={facts.eventCount} />
+      <div className="grid grid-cols-2 border-y border-border sm:grid-cols-3 lg:grid-cols-6 lg:divide-x lg:divide-border">
+        <div className="lg:pr-5">
+          <Fact icon={Clock3} label="Duration" value={formatDuration(facts.durationMs)} />
+        </div>
+        <div className="lg:px-5">
+          <Fact
+            icon={MousePointer2}
+            label="Interactions"
+            value={counts.click + counts.input}
+          />
+        </div>
+        <div className="lg:px-5">
+          <Fact icon={ListChecks} label="Evidence events" value={facts.eventCount} />
+        </div>
+        <div className="lg:px-5">
+          <Fact
+            icon={WifiOff}
+            label="Failed requests"
+            value={facts.failedRequests}
+            tone={facts.failedRequests ? "error" : "neutral"}
+          />
+        </div>
+        <div className="lg:px-5">
         <Fact
           icon={Terminal}
-          label="console errors"
+          label="Console errors"
           value={facts.consoleErrors}
           tone={facts.consoleErrors ? "error" : "neutral"}
         />
-        <Fact
-          icon={Wifi}
-          label="failed requests"
-          value={counts.net}
-          tone={counts.net ? "warn" : "neutral"}
-        />
-        <Fact icon={MousePointer2} label="interactions" value={counts.click + counts.input} />
-        <Fact icon={Globe2} label="page" value={facts.host} />
-        {facts.severity === "high" && (
-          <Fact icon={AlertTriangle} label="triage" value="immediate" tone="error" />
-        )}
+        </div>
+        <div className="lg:pl-5">
+          <Fact icon={Monitor} label="Environment" value={facts.os} />
+        </div>
       </div>
     </header>
   );
