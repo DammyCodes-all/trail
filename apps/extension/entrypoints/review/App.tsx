@@ -25,12 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Switch,
-  SwitchThumb,
-} from "@/components/animate-ui/primitives/base/switch";
 import { Toaster, toast } from "@/components/ui/toast";
 import {
   CheckCircle2,
@@ -60,7 +55,9 @@ function App() {
   const [report, setReport] = useState<Pick<TrailReport, "title"> | null>(null);
   const [events, setEvents] = useState<StoredEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [redact, setRedact] = useState(true);
+  // Typed values are always redacted from the timeline and report — capture-time
+  // masking is the primary line of defense; this is the permanent backstop.
+  const redact = true;
   const [repo, setRepo] = useState("");
   const [template, setTemplate] = useState<IssueTemplate | null>(null);
   const [templateState, setTemplateState] = useState<
@@ -109,8 +106,8 @@ function App() {
   }, [events, repo]);
 
   const timeline = useMemo(
-    () => buildTimeline(events, redact),
-    [events, redact],
+    () => buildTimeline(events),
+    [events],
   );
   const rrwebEvents = useMemo(
     () =>
@@ -175,7 +172,7 @@ function App() {
     return template
       ? shapeSections(template, baseSections).sections
       : baseSections;
-  }, [base, events, repo, redact, template]);
+  }, [base, events, repo, template]);
   const markdown = useMemo(
     () => buildMarkdownFromSections(displayTitle, sections),
     [displayTitle, sections],
@@ -437,20 +434,6 @@ function App() {
           )}
           {sharing === "uploading" ? "Sharing…" : "Copy Replay Link"}
         </Button>
-        <label className="flex cursor-pointer items-center gap-2 pl-1">
-          <Switch
-            checked={redact}
-            onCheckedChange={(v) => setRedact(v)}
-            aria-label="Redact values"
-            className="relative flex h-[18.4px] w-[32px] shrink-0 cursor-pointer items-center justify-start rounded-full border border-transparent p-[2px] outline-none transition-colors select-none data-[checked]:justify-end data-[checked]:bg-primary data-[unchecked]:bg-input data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            <SwitchThumb
-              className="pointer-events-none block h-full aspect-square rounded-full bg-foreground shadow-sm data-[checked]:bg-primary-foreground"
-              pressedAnimation={{ scale: 1.2 }}
-            />
-          </Switch>
-          <Label className="text-[13px] font-medium">Redact values</Label>
-        </label>
         {templateState === "found" && template && (
           <p className="flex w-full basis-full items-center gap-1.5 font-mono text-xs text-muted-foreground">
             <CheckCircle2
