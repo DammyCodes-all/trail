@@ -16,7 +16,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import {
+  Switch,
+  SwitchThumb,
+} from "@/components/animate-ui/primitives/base/switch";
 import {
   CirclePlus,
   Keyboard,
@@ -139,7 +142,7 @@ function App() {
         {recording && (
           <Badge className="pill gap-1.5 border-transparent bg-primary/15 text-primary">
             <span
-              className="size-1.5 animate-pulse rounded-none bg-primary"
+              className="size-1.5 animate-pulse rounded-full bg-primary"
               aria-hidden="true"
             />
             recording
@@ -230,7 +233,13 @@ function App() {
               checked={autoRedact}
               onCheckedChange={(v) => void toggleRedact(v)}
               aria-label="Auto-redact typed values"
-            />
+              className="relative flex h-[18.4px] w-[32px] shrink-0 cursor-pointer items-center justify-start rounded-full border border-transparent p-[2px] outline-none transition-colors select-none data-[checked]:justify-end data-[checked]:bg-primary data-[unchecked]:bg-input data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <SwitchThumb
+                className="pointer-events-none block h-full aspect-square rounded-full bg-foreground shadow-sm data-[checked]:bg-primary-foreground"
+                pressedAnimation={{ scale: 1.2 }}
+              />
+            </Switch>
           </div>
           <div className="flex gap-2">
             <Button

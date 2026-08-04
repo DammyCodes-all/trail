@@ -27,7 +27,10 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
+import {
+  Switch,
+  SwitchThumb,
+} from "@/components/animate-ui/primitives/base/switch";
 import { Toaster, toast } from "@/components/ui/toast";
 import {
   CheckCircle2,
@@ -439,7 +442,13 @@ function App() {
             checked={redact}
             onCheckedChange={(v) => setRedact(v)}
             aria-label="Redact values"
-          />
+            className="relative flex h-[18.4px] w-[32px] shrink-0 cursor-pointer items-center justify-start rounded-full border border-transparent p-[2px] outline-none transition-colors select-none data-[checked]:justify-end data-[checked]:bg-primary data-[unchecked]:bg-input data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <SwitchThumb
+              className="pointer-events-none block h-full aspect-square rounded-full bg-foreground shadow-sm data-[checked]:bg-primary-foreground"
+              pressedAnimation={{ scale: 1.2 }}
+            />
+          </Switch>
           <Label className="text-[13px] font-medium">Redact values</Label>
         </label>
         {templateState === "found" && template && (
