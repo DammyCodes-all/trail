@@ -1,11 +1,9 @@
-import { record, takeFullSnapshot } from "rrweb";
 import { POST_MESSAGE_KEY } from "@/lib/constants";
-import type {
-  ClickEvent,
-  ConsoleEvent,
-  InputEvent,
-  NetEvent,
-} from "@/lib/types";
+import type { RecordContext } from "@/lib/record/context";
+import { instrumentConsole } from "@/lib/record/console";
+import { instrumentClicks, instrumentInputs } from "@/lib/record/interactions";
+import { instrumentNetwork } from "@/lib/record/network";
+import { createRrweb } from "@/lib/record/rrweb";
 
 declare global {
   interface Window {
@@ -13,6 +11,9 @@ declare global {
   }
 }
 
+// Orchestrates the MAIN-world recorders (see lib/record/*) and the relay
+// messages that arm/disarm them. This file only wires state and lifecycle;
+// each instrumenter owns its capture logic.
 export default defineContentScript({
   matches: ["<all_urls>"],
   runAt: "document_start",
@@ -23,381 +24,44 @@ export default defineContentScript({
     if (window.__trailRecorder) return;
     window.__trailRecorder = true;
 
-    const emit = (d: object) => {
-      window.postMessage({ [POST_MESSAGE_KEY]: true, d }, "*");
-    };
-
-    const cap = (s: unknown, n = 60): string | null => {
-      if (s == null) return null;
-      const str = String(s).trim();
-      return str.length > n ? str.slice(0, n) : str;
-    };
-
-    const fmt = (a: unknown): string => {
-      try {
-        return typeof a === "string"
-          ? a
-          : (JSON.stringify(a)?.slice(0, 300) ?? String(a));
-      } catch {
-        return String(a);
-      }
-    };
-
-    // Response bodies of failed requests, capped. Server replies are the payload
-    // of a bug report; anything longer is truncated rather than dropped.
-    const BODY_LIMIT = 4000;
-    const bodyText = (s: unknown): string | undefined => {
-      if (s == null) return undefined;
-      const str = String(s);
-      if (!str.trim()) return undefined;
-      return str.length > BODY_LIMIT
-        ? `${str.slice(0, BODY_LIMIT)}\n...(truncated)`
-        : str;
-    };
-
     let active = true;
-    let running = false;
     let autoRedact = true; // default on; relay delivers the stored preference
-    let rrwebStop: (() => void) | undefined;
 
-    // Free-text inputs mask in the visual replay when redact is on. color/range/
-    // select are excluded: their values are choices, not typed secrets.
-    const MASKED_FREE_TEXT = {
-      text: true,
-      email: true,
-      search: true,
-      tel: true,
-      url: true,
-      number: true,
-      date: true,
-      "datetime-local": true,
-      month: true,
-      week: true,
-      time: true,
-      textarea: true,
-    } as const;
-    const maskInputs = (redact: boolean) => ({
-      ...(redact ? MASKED_FREE_TEXT : {}),
-      password: true, // always, even when redact is off
-    });
-
-    const startRrweb = () => {
-      try {
-        rrwebStop = record({
-          emit: (ev) => {
-            if (active)
-              emit({ k: "rrweb", ev, t: ev.timestamp, url: pageUrl() });
-          },
-          recordAfter: "DOMContentLoaded",
-          maskInputOptions: maskInputs(autoRedact),
-          blockClass: "rr-block",
-          checkoutEveryNms: 30_000,
-          errorHandler: () => true, // never let a recording bug break the page
-        });
-        running = true;
-      } catch {
-        // never break the page if rrweb can't start
-      }
+    const ctx: RecordContext = {
+      emit: (d) => window.postMessage({ [POST_MESSAGE_KEY]: true, d }, "*"),
+      isActive: () => active,
+      pageUrl: () => location.href,
     };
 
-    const pageUrl = () => location.href;
+    const rrweb = createRrweb(ctx, () => autoRedact);
+
+    instrumentConsole(ctx);
+    instrumentNetwork(ctx);
+    instrumentClicks(ctx);
+    instrumentInputs(ctx, () => autoRedact);
 
     addEventListener("message", (e) => {
       if (e.data?.[POST_MESSAGE_KEY] === "stop") {
         active = false;
-        rrwebStop?.();
-        running = false;
+        rrweb.stop();
       } else if (e.data?.[POST_MESSAGE_KEY] === "start") {
         // Re-arm after a stop on the same page. The stale __trailRecorder guard
         // makes re-executing recorder.js a no-op, so re-activation has to come
         // through the relay as a message.
         active = true;
-        if (!running) startRrweb();
+        if (!rrweb.running) rrweb.start();
       } else if (e.data?.[POST_MESSAGE_KEY] === "redact") {
         const on = e.data.value === true;
         if (on !== autoRedact) {
           autoRedact = on;
-          // rrweb's masking options are fixed per recording: restart on a change
-          // so the visual replay honors the new preference. Frames captured
-          // before the toggle keep whatever state they were recorded with.
-          if (running) {
-            rrwebStop?.();
-            rrwebStop = undefined;
-            running = false;
-            startRrweb();
-            takeFullSnapshot();
-          }
+          // rrweb's masking options are fixed per recording: restart so the
+          // visual replay honors the new preference.
+          if (rrweb.running) rrweb.restart();
         }
       }
     });
 
-    // ---- console + uncaught errors (installed at document_start) ----
-    for (const lv of ["error", "warn"] as const) {
-      const orig = console[lv];
-      console[lv] = function (...a: unknown[]) {
-        if (active) {
-          const ev: ConsoleEvent = {
-            k: "console",
-            lv,
-            msg: a.map(fmt).join(" "),
-            t: Date.now(),
-            url: pageUrl(),
-          };
-          emit(ev);
-        }
-        return orig.apply(this, a);
-      };
-    }
-
-    addEventListener(
-      "error",
-      (e) => {
-        if (!active) return;
-        const ev: ConsoleEvent = {
-          k: "console",
-          lv: "error",
-          t: Date.now(),
-          url: pageUrl(),
-          msg: e.message,
-          stack: e.error?.stack?.slice(0, 500),
-        };
-        emit(ev);
-      },
-      true,
-    );
-
-    addEventListener(
-      "unhandledrejection",
-      (e) => {
-        if (!active) return;
-        const ev: ConsoleEvent = {
-          k: "console",
-          lv: "error",
-          t: Date.now(),
-          url: pageUrl(),
-          msg: "Unhandled rejection: " + fmt(e.reason),
-        };
-        emit(ev);
-      },
-      true,
-    );
-
-    // ---- failed network requests ----
-    const origFetch = window.fetch;
-    window.fetch = async function (...a: unknown[]) {
-      const t = Date.now();
-      const arg = a[0] as
-        | { url?: string; method?: string }
-        | string
-        | undefined;
-      const url = typeof arg === "string" ? arg : (arg?.url ?? "");
-      const method =
-        (a[1] as { method?: string } | undefined)?.method ??
-        (typeof arg === "object" ? arg?.method : undefined) ??
-        "GET";
-      try {
-        const r = await origFetch.apply(this, a as Parameters<typeof fetch>);
-        if (!r.ok && active) {
-          // Clone keeps the page's own read of the response intact; the body is
-          // captured async so a failed body read never blocks the app's fetch.
-          void (async () => {
-            let body: string | undefined;
-            try {
-              body = bodyText(await r.clone().text());
-            } catch {
-              // body unreadable — still record the failure without it
-            }
-            if (!active) return;
-            const ev: NetEvent = {
-              k: "net",
-              target: url,
-              method,
-              status: r.status,
-              t,
-              via: "fetch",
-              url: pageUrl(),
-              body,
-            };
-            emit(ev);
-          })();
-        }
-        return r;
-      } catch (err) {
-        if (active) {
-          const ev: NetEvent = {
-            k: "net",
-            target: url,
-            method,
-            status: 0,
-            err: (err as Error).message,
-            t,
-            via: "fetch",
-            url: pageUrl(),
-          };
-          emit(ev);
-        }
-        throw err;
-      }
-    };
-
-    const XO = XMLHttpRequest.prototype.open;
-    const XS = XMLHttpRequest.prototype.send;
-    const callOpen = XO as unknown as (...args: unknown[]) => void;
-    const callSend = XS as unknown as (...args: unknown[]) => void;
-    XMLHttpRequest.prototype.open = function (
-      m: string,
-      u: string | URL,
-      ...r: unknown[]
-    ) {
-      (
-        this as unknown as { __trail: { method: string; url: string } }
-      ).__trail = {
-        method: m,
-        url: String(u),
-      };
-      return callOpen.call(this, m, u, ...r);
-    };
-    XMLHttpRequest.prototype.send = function (...a: unknown[]) {
-      const t = Date.now();
-      this.addEventListener("loadend", () => {
-        const meta = (
-          this as unknown as { __trail?: { method: string; url: string } }
-        ).__trail;
-        const bad = this.status === 0 || this.status >= 400;
-        if (bad && meta && active) {
-          let body: string | undefined;
-          try {
-            const rt = this.responseType;
-            if (rt === "" || rt === "text") body = bodyText(this.responseText);
-          } catch {
-            // binary/opaque responses have no text body
-          }
-          const ev: NetEvent = {
-            k: "net",
-            target: meta.url,
-            method: meta.method,
-            status: this.status,
-            t,
-            via: "xhr",
-            url: pageUrl(),
-            body,
-          };
-          emit(ev);
-        }
-      });
-      return callSend.apply(this, a);
-    };
-
-    // ---- clicks, with a readable label ----
-    // Candidates are skipped when empty: inputs report no textContent, and an
-    // empty string must not short-circuit the fallbacks (placeholder, name/id).
-    const label = (el: Element): string | null => {
-      const first = (s: unknown) => {
-        const v = cap(s);
-        return v ? v : null;
-      };
-      const forLabel = (e: Element): string | null => {
-        const id = e.getAttribute?.("id");
-        if (!id) return null;
-        const escaped = id.replace(/["\\]/g, "\\$&");
-        return first(
-          e.ownerDocument?.querySelector(`label[for="${escaped}"]`)?.textContent,
-        );
-      };
-      return (
-        first(el.getAttribute?.("aria-label")) ??
-        first(el.textContent) ??
-        forLabel(el) ??
-        first(el.closest?.("label")?.textContent) ??
-        first(el.getAttribute?.("placeholder")) ??
-        first(el.getAttribute?.("alt")) ??
-        first(el.getAttribute?.("autocomplete")) ??
-        first(el.getAttribute?.("name") || el.id) ??
-        `<${el.tagName.toLowerCase()}>`
-      );
-    };
-
-    // A click is only a report-worthy *action* when it lands on an interactive
-    // control. Text-ish inputs and textareas are excluded: typing into them is
-    // already captured by the change handler, and counting the focus-clicks that
-    // precede every keystroke inflates the report. Blank background and inert
-    // wrappers (body, labels, plain divs) are noise, not steps.
-    const TEXT_LIKE =
-      /^(text|email|password|search|tel|url|number|date|datetime-local|month|week|time|file)$/;
-    const CLICKABLE =
-      "button,a[href],[role=button],[onclick],select,summary,details,input";
-
-    const actionTarget = (el: Element): Element | null => {
-      if (
-        el.closest?.(
-          'trail-recording-overlay, #trail-recording-overlay, [data-trail-overlay="true"]',
-        )
-      )
-        return null;
-      const node = (el.closest?.(CLICKABLE) ?? el) as Element;
-      const tag = node.tagName?.toLowerCase();
-      if (tag === "input") {
-        const type = (node as HTMLInputElement).type || "text";
-        return TEXT_LIKE.test(type) ? null : node;
-      }
-      if (
-        tag === "textarea" ||
-        tag === "label" ||
-        tag === "body" ||
-        tag === "html"
-      )
-        return null;
-      if (tag === "a" && !(node as HTMLAnchorElement).href) return null;
-      return node;
-    };
-
-    addEventListener(
-      "click",
-      (e) => {
-        if (!active) return;
-        const node = actionTarget(e.target as Element);
-        if (!node) return;
-        const ev: ClickEvent = {
-          k: "click",
-          label: label(node) ?? `<${node.tagName.toLowerCase()}>`,
-          tag: node.tagName.toLowerCase(),
-          t: Date.now(),
-          url: pageUrl(),
-        };
-        emit(ev);
-      },
-      true,
-    );
-
-    // ---- typed input, masked by default ----
-    const SENSITIVE =
-      /pass|pwd|secret|token|otp|cvv|ssn|card|auth|api[-_]?key/i;
-    addEventListener(
-      "change",
-      (e) => {
-        if (!active) return;
-        const el = e.target as HTMLInputElement;
-        if (!el.matches?.("input,textarea,select")) return;
-        const hide =
-          autoRedact ||
-          el.type === "password" ||
-          SENSITIVE.test(
-            el.name + el.id + (el.getAttribute("autocomplete") ?? ""),
-          );
-        const ev: InputEvent = {
-          k: "input",
-          label: label(el) ?? `<${el.tagName.toLowerCase()}>`,
-          t: Date.now(),
-          url: pageUrl(),
-          masked: hide,
-          value: hide ? "•".repeat(8) : (cap(el.value, 100) ?? ""),
-        };
-        emit(ev);
-      },
-      true,
-    );
-
     // ---- rrweb: visual replay only ----
-    startRrweb();
+    rrweb.start();
   },
 });
