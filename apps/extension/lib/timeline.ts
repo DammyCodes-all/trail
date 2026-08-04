@@ -33,13 +33,15 @@ export function buildTimeline(events: StoredEvent[], redact = true): TimelineSte
         break;
       case 'input': {
         const hidden = e.masked || redact;
+        // Fall back for legacy events recorded before the label chain was fixed.
+        const field = e.label || '<input>';
         steps.push({
           t: e.t,
           kind: 'input',
           masked: hidden,
           text: hidden
-            ? `Type into ${e.label}`
-            : `Type "${e.value}" into ${e.label}`,
+            ? `Type into ${field}`
+            : `Type "${e.value}" into ${field}`,
         });
         break;
       }

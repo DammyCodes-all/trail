@@ -6,8 +6,8 @@ const PAGE1 = `<!doctype html>
 <body>
   <h1>Checkout</h1>
   <p class="rr-block">This whole paragraph is blocked from replay.</p>
-  <label>Email <input id="email" type="text" autocomplete="email"></label><br>
-  <label>Password <input id="pass" type="password" autocomplete="current-password"></label><br>
+  <label for="email">Email</label> <input id="email" type="text" autocomplete="email"><br>
+  <label for="pass">Password</label> <input id="pass" type="password" autocomplete="current-password"><br>
   <button id="boom" onclick="throw new Error('boom: price calc failed')">Submit</button>
   <button id="xhr" onclick="var x=new XMLHttpRequest();x.open('GET','/missing-xhr');x.send()">Do XHR</button>
   <a id="next" href="/page2.html">Go to step 2</a>

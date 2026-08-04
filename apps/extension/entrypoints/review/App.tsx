@@ -42,10 +42,13 @@ import {
 import { ReplayPlayer } from "./ReplayPlayer";
 import { TrailLogo } from "@/components/ui/trail-logo";
 
-const fmtTime = (t: number) => {
-  const d = new Date(t);
+const fmtTime = (ms: number) => {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
   const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
 };
 
 function App() {
@@ -109,6 +112,9 @@ function App() {
     () => buildTimeline(events),
     [events],
   );
+  // Elapsed-time baseline: anchor the timeline to its first step so it always
+  // starts at 00:00, instead of showing wall-clock times.
+  const t0 = timeline[0]?.t ?? 0;
   const rrwebEvents = useMemo(
     () =>
       events
@@ -476,7 +482,7 @@ function App() {
           </div>
           <ol className="flex-1 divide-y divide-border overflow-y-auto px-4 py-1">
             {timeline.map((s, i) => (
-              <TimelineRow key={i} step={s} />
+              <TimelineRow key={i} step={s} t0={t0} />
             ))}
           </ol>
           {timeline.length === 0 && (
@@ -492,7 +498,7 @@ function App() {
   );
 }
 
-function TimelineRow({ step }: { step: TimelineStep }) {
+function TimelineRow({ step, t0 }: { step: TimelineStep; t0: number }) {
   const textClass =
     step.kind === "console"
       ? "text-destructive"
@@ -514,7 +520,7 @@ function TimelineRow({ step }: { step: TimelineStep }) {
   return (
     <li className="flex items-baseline gap-2 py-2">
       <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
-        {fmtTime(step.t)}
+        {fmtTime(step.t - t0)}
       </span>
       {prefix}
       <span

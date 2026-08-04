@@ -194,6 +194,15 @@ function main() {
       const passEvent = s1.find((e) => e.k === 'input' && e.masked);
       assert(passEvent, 'expected a masked password input event');
       assert(!passEvent.value.includes('hunter2'), 'password must be masked, never recorded');
+      // Privacy: the visual replay stream must not contain typed values either.
+      const rrwebPayload = s1
+        .filter((e) => e.k === 'rrweb')
+        .map((e) => JSON.stringify(e.ev))
+        .join('\n');
+      assert(
+        !rrwebPayload.includes('a@b.com') && !rrwebPayload.includes('hunter2'),
+        'replay stream is masked: typed values never enter rrweb events',
+      );
       const clickEvent = s1.find((e) => e.k === 'click' && e.tag === 'button');
       assert(clickEvent?.label, 'expected readable click label');
       const noise = s1.filter((e) => e.k === 'click' && (e.tag === 'input' || e.tag === 'body'));
@@ -226,6 +235,18 @@ function main() {
       assert(
         reviewHooks.timeline.some((s) => s.kind === 'nav' && s.text.includes('page2.html')),
         'review timeline includes the page2 navigation',
+      );
+      assert(
+        reviewHooks.timeline.some((s) => s.kind === 'input' && s.text === 'Type into Email'),
+        'review timeline names the typed field (label[for])',
+      );
+      assert(
+        reviewHooks.timeline.some((s) => s.kind === 'input' && s.text === 'Type into Password'),
+        'review timeline names the password field (label[for])',
+      );
+      assert(
+        reviewHooks.timeline.every((s) => s.kind !== 'input' || s.text !== 'Type into '),
+        'review timeline never shows an unnamed typed field',
       );
       assert(reviewHooks.replayCount > 0, 'review has rrweb replay frames');
       const playerReady = await review.evaluate(() => window.__trailPlayerReady === true);

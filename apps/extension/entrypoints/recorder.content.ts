@@ -1,4 +1,4 @@
-import { record } from "rrweb";
+import { record, takeFullSnapshot } from "rrweb";
 import { POST_MESSAGE_KEY } from "@/lib/constants";
 import type {
   ClickEvent,
@@ -60,6 +60,27 @@ export default defineContentScript({
     let autoRedact = true; // default on; relay delivers the stored preference
     let rrwebStop: (() => void) | undefined;
 
+    // Free-text inputs mask in the visual replay when redact is on. color/range/
+    // select are excluded: their values are choices, not typed secrets.
+    const MASKED_FREE_TEXT = {
+      text: true,
+      email: true,
+      search: true,
+      tel: true,
+      url: true,
+      number: true,
+      date: true,
+      "datetime-local": true,
+      month: true,
+      week: true,
+      time: true,
+      textarea: true,
+    } as const;
+    const maskInputs = (redact: boolean) => ({
+      ...(redact ? MASKED_FREE_TEXT : {}),
+      password: true, // always, even when redact is off
+    });
+
     const startRrweb = () => {
       try {
         rrwebStop = record({
@@ -68,7 +89,7 @@ export default defineContentScript({
               emit({ k: "rrweb", ev, t: ev.timestamp, url: pageUrl() });
           },
           recordAfter: "DOMContentLoaded",
-          maskInputOptions: { password: true },
+          maskInputOptions: maskInputs(autoRedact),
           blockClass: "rr-block",
           checkoutEveryNms: 30_000,
           errorHandler: () => true, // never let a recording bug break the page
@@ -93,7 +114,20 @@ export default defineContentScript({
         active = true;
         if (!running) startRrweb();
       } else if (e.data?.[POST_MESSAGE_KEY] === "redact") {
-        autoRedact = e.data.value === true;
+        const on = e.data.value === true;
+        if (on !== autoRedact) {
+          autoRedact = on;
+          // rrweb's masking options are fixed per recording: restart on a change
+          // so the visual replay honors the new preference. Frames captured
+          // before the toggle keep whatever state they were recorded with.
+          if (running) {
+            rrwebStop?.();
+            rrwebStop = undefined;
+            running = false;
+            startRrweb();
+            takeFullSnapshot();
+          }
+        }
       }
     });
 
@@ -255,13 +289,33 @@ export default defineContentScript({
     };
 
     // ---- clicks, with a readable label ----
-    const label = (el: Element): string | null =>
-      cap(el.getAttribute?.("aria-label")) ??
-      cap(el.textContent) ??
-      cap(el.getAttribute?.("placeholder")) ??
-      cap(el.getAttribute?.("alt")) ??
-      cap(el.getAttribute?.("name") || el.id) ??
-      `<${el.tagName.toLowerCase()}>`;
+    // Candidates are skipped when empty: inputs report no textContent, and an
+    // empty string must not short-circuit the fallbacks (placeholder, name/id).
+    const label = (el: Element): string | null => {
+      const first = (s: unknown) => {
+        const v = cap(s);
+        return v ? v : null;
+      };
+      const forLabel = (e: Element): string | null => {
+        const id = e.getAttribute?.("id");
+        if (!id) return null;
+        const escaped = id.replace(/["\\]/g, "\\$&");
+        return first(
+          e.ownerDocument?.querySelector(`label[for="${escaped}"]`)?.textContent,
+        );
+      };
+      return (
+        first(el.getAttribute?.("aria-label")) ??
+        first(el.textContent) ??
+        forLabel(el) ??
+        first(el.closest?.("label")?.textContent) ??
+        first(el.getAttribute?.("placeholder")) ??
+        first(el.getAttribute?.("alt")) ??
+        first(el.getAttribute?.("autocomplete")) ??
+        first(el.getAttribute?.("name") || el.id) ??
+        `<${el.tagName.toLowerCase()}>`
+      );
+    };
 
     // A click is only a report-worthy *action* when it lands on an interactive
     // control. Text-ish inputs and textareas are excluded: typing into them is
