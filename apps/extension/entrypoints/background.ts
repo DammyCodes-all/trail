@@ -1,4 +1,3 @@
-import type { ScriptPublicPath } from "wxt/utils/inject-script";
 import {
   MSG_BATCH,
   MSG_OVERLAY_STATUS,
@@ -8,7 +7,6 @@ import {
   MSG_STATUS,
   MSG_STOP,
   MSG_STOP_RECORDER,
-  RECORDER_ID,
   REDACT_KEY,
 } from "@/lib/constants";
 import {
@@ -18,36 +16,26 @@ import {
   saveReport,
   saveSessionEvents,
 } from "@/lib/db";
+import {
+  injectRecorderIntoPage,
+  registerRecorderScripts,
+  unregisterRecorderScripts,
+} from "@/lib/recorder-scripts";
 import { suggestTitle } from "@/lib/report";
-import type { TrailCounts, TrailSession } from "@/lib/types";
-
-const RECORDER_JS = "/content-scripts/recorder.js" as ScriptPublicPath;
-const RELAY_JS = "/content-scripts/relay.js" as ScriptPublicPath;
-const OVERLAY_JS = "/content-scripts/recording-overlay.js" as ScriptPublicPath;
-
-const DEFAULT_COUNTS: TrailCounts = { click: 0, input: 0, console: 0, net: 0 };
-
-const totalCounts = (counts: TrailCounts) =>
-  counts.click + counts.input + counts.console + counts.net;
+import {
+  clearCounts,
+  DEFAULT_COUNTS,
+  getCounts,
+  getSession,
+  setCounts,
+  setSession,
+  totalCounts,
+} from "@/lib/session";
+import type { TrailCounts } from "@/lib/types";
 
 // Serializes MSG_BATCH handling: handlers share read-modify-write on counts, and
 // two near-simultaneous flushes (interval + visibilitychange) would lose increments.
 let batchChain: Promise<void> = Promise.resolve();
-
-async function getSession(): Promise<TrailSession | null> {
-  const { session } = await browser.storage.session.get("session");
-  return (session as TrailSession) ?? null;
-}
-
-async function setSession(session: TrailSession | null): Promise<void> {
-  if (session) await browser.storage.session.set({ session });
-  else await browser.storage.session.remove("session");
-}
-
-async function getCounts(): Promise<TrailCounts> {
-  const { counts } = await browser.storage.session.get("counts");
-  return { ...DEFAULT_COUNTS, ...(counts as Partial<TrailCounts>) };
-}
 
 async function startRecording(
   tabId?: number,
@@ -73,33 +61,13 @@ async function startRecording(
     };
   }
   await clearEvents();
-  await browser.storage.session.set({ counts: DEFAULT_COUNTS });
+  await setCounts(DEFAULT_COUNTS);
 
   try {
-    // registerContentScripts covers FUTURE navigations; executeScript covers the
-    // page that's already open. You need both — that pair is the whole trick.
-    await browser.scripting.registerContentScripts([
-      {
-        id: RECORDER_ID,
-        js: [RECORDER_JS],
-        matches: ["<all_urls>"],
-        runAt: "document_start",
-        world: "MAIN",
-        persistAcrossSessions: false,
-      },
-    ]);
-    await browser.scripting.executeScript({
-      target: { tabId: id },
-      world: "ISOLATED",
-      files: [RELAY_JS, OVERLAY_JS],
-    });
-    await browser.scripting.executeScript({
-      target: { tabId: id },
-      world: "MAIN",
-      files: [RECORDER_JS],
-    });
+    await registerRecorderScripts();
+    await injectRecorderIntoPage(id);
   } catch (err) {
-    await browser.storage.session.remove("counts");
+    await clearCounts();
     return { ok: false, error: (err as Error).message };
   }
 
@@ -130,7 +98,7 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
   const session = await getSession();
   const counts = await getCounts();
   try {
-    await browser.scripting.unregisterContentScripts({ ids: [RECORDER_ID] });
+    await unregisterRecorderScripts();
     if (session) {
       await browser.tabs
         .sendMessage(session.tabId, { type: MSG_STOP_RECORDER })
@@ -144,7 +112,7 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
   // tail of the recording.
   await new Promise((r) => setTimeout(r, 400));
   await setSession(null);
-  await browser.storage.session.remove("counts");
+  await clearCounts();
   browser.action.setBadgeText({ text: "" });
 
   // Save a report entry for the popup's history list. Best-effort: never fail a
@@ -183,16 +151,7 @@ export default defineBackground(() => {
     const session = await getSession();
     if (!session) return;
     try {
-      await browser.scripting.registerContentScripts([
-        {
-          id: RECORDER_ID,
-          js: [RECORDER_JS],
-          matches: ["<all_urls>"],
-          runAt: "document_start",
-          world: "MAIN",
-          persistAcrossSessions: false,
-        },
-      ]);
+      await registerRecorderScripts();
       const counts = await getCounts();
       browser.action.setBadgeBackgroundColor({ color: "#ff6a00" });
       browser.action.setBadgeText({ text: String(totalCounts(counts)) });
@@ -221,7 +180,7 @@ export default defineBackground(() => {
             else if (d.k === "console") counts.console++;
             else if (d.k === "net") counts.net++;
           }
-          await browser.storage.session.set({ counts });
+          await setCounts(counts);
           browser.action.setBadgeText({ text: String(totalCounts(counts)) });
         })
         .catch(() => {}); // never let a batch failure stall the chain
