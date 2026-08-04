@@ -7,7 +7,11 @@ import {
   useReducedMotion,
 } from "motion/react";
 import { SlidingNumber } from "@/components/animate-ui/primitives/texts/sliding-number";
-import { MSG_OVERLAY_STATUS, MSG_STOP } from "@/lib/constants";
+import {
+  MSG_OVERLAY_STATUS,
+  MSG_OVERLAY_UPDATE,
+  MSG_STOP,
+} from "@/lib/constants";
 import type { TrailCounts } from "@/lib/types";
 import {
   bounded,
@@ -30,7 +34,16 @@ type OverlayStatus = {
   startedAt?: number;
 };
 
+type OverlayMessage = Partial<OverlayStatus> & {
+  error?: string;
+  type?: string;
+  version?: number;
+};
+
 const ZERO_COUNTS: TrailCounts = { click: 0, input: 0, console: 0, net: 0 };
+
+const countTotal = (counts: TrailCounts) =>
+  counts.click + counts.input + counts.console + counts.net;
 
 const normalizeCounts = (counts?: Partial<TrailCounts>): TrailCounts => ({
   click: counts?.click ?? 0,
@@ -60,6 +73,7 @@ function RecordingOverlay() {
   const [positioned, setPositioned] = React.useState(false);
   const panelRef = React.useRef<HTMLDivElement>(null);
   const sizeRef = React.useRef<Size>({ width: 232, height: 108 });
+  const statusVersionRef = React.useRef(0);
   const dragRef = React.useRef<{
     pointerId: number;
     originPointerX: number;
@@ -121,25 +135,64 @@ function RecordingOverlay() {
   React.useEffect(() => {
     let disposed = false;
 
-    const refresh = async () => {
-      const response = await browser.runtime
-        .sendMessage({ type: MSG_OVERLAY_STATUS })
-        .catch(() => null);
-      if (disposed || !response) return;
-      setStatus({
+    const applyStatus = (response: OverlayMessage) => {
+      if (disposed || response.error) return;
+      if (
+        typeof response.version === "number" &&
+        response.version < statusVersionRef.current
+      ) {
+        return;
+      }
+      if (typeof response.version === "number") {
+        statusVersionRef.current = response.version;
+      }
+      const nextStatus: OverlayStatus = {
         recording: response.recording === true,
         counts: normalizeCounts(response.counts),
         startedAt:
           typeof response.startedAt === "number"
             ? response.startedAt
             : undefined,
+      };
+      setStatus((current) => {
+        if (
+          current.recording &&
+          nextStatus.recording &&
+          current.startedAt === nextStatus.startedAt &&
+          countTotal(nextStatus.counts) < countTotal(current.counts)
+        ) {
+          return current;
+        }
+
+        if (!nextStatus.recording) {
+          return {
+            ...nextStatus,
+            startedAt: nextStatus.startedAt ?? current.startedAt,
+          };
+        }
+
+        return nextStatus;
       });
     };
 
+    const refresh = async () => {
+      const response = await browser.runtime
+        .sendMessage({ type: MSG_OVERLAY_STATUS })
+        .catch(() => null);
+      if (!response) return;
+      applyStatus(response);
+    };
+
+    const handleMessage = (message: OverlayMessage) => {
+      if (message?.type === MSG_OVERLAY_UPDATE) applyStatus(message);
+    };
+
+    browser.runtime.onMessage.addListener(handleMessage);
     void refresh();
-    const interval = window.setInterval(refresh, 450);
+    const interval = window.setInterval(refresh, 5000);
     return () => {
       disposed = true;
+      browser.runtime.onMessage.removeListener(handleMessage);
       window.clearInterval(interval);
     };
   }, []);

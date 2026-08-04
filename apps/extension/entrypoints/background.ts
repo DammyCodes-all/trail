@@ -1,6 +1,7 @@
 import {
   MSG_BATCH,
   MSG_OVERLAY_STATUS,
+  MSG_OVERLAY_UPDATE,
   MSG_REDACT,
   MSG_START,
   MSG_START_RECORDER,
@@ -31,11 +32,31 @@ import {
   setSession,
   totalCounts,
 } from "@/lib/session";
-import type { TrailCounts } from "@/lib/types";
+import type { TrailCounts, TrailSession } from "@/lib/types";
 
 // Serializes MSG_BATCH handling: handlers share read-modify-write on counts, and
 // two near-simultaneous flushes (interval + visibilitychange) would lose increments.
 let batchChain: Promise<void> = Promise.resolve();
+let overlayVersion = Date.now();
+
+const nextOverlayVersion = () =>
+  (overlayVersion = Math.max(Date.now(), overlayVersion + 1));
+
+function pushOverlayStatus(
+  session: TrailSession,
+  counts: TrailCounts,
+  recording = true,
+): void {
+  void browser.tabs
+    .sendMessage(session.tabId, {
+      type: MSG_OVERLAY_UPDATE,
+      recording,
+      counts: recording ? counts : DEFAULT_COUNTS,
+      startedAt: session.startedAt,
+      version: nextOverlayVersion(),
+    })
+    .catch(() => {});
+}
 
 async function startRecording(
   tabId?: number,
@@ -62,13 +83,14 @@ async function startRecording(
   }
   await clearEvents();
   await setCounts(DEFAULT_COUNTS);
+  const session: TrailSession = { tabId: id, startedAt: Date.now() };
 
   try {
     await registerRecorderScripts();
     // Session must be live BEFORE the recorder is injected: the batch gate drops
     // everything without a session, and the recorder's very first event is the
     // rrweb full snapshot that the replay needs as its base frame.
-    await setSession({ tabId: id, startedAt: Date.now() });
+    await setSession(session);
     await injectRecorderIntoPage(id);
   } catch (err) {
     await setSession(null);
@@ -89,6 +111,8 @@ async function startRecording(
   await browser.tabs
     .sendMessage(id, { type: MSG_START_RECORDER })
     .catch(() => {});
+
+  pushOverlayStatus(session, DEFAULT_COUNTS);
 
   browser.action.setBadgeBackgroundColor({ color: "#ff6a00" });
   browser.action.setBadgeText({ text: "0" });
@@ -115,6 +139,7 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
   const counts = await getCounts();
   await setSession(null);
   await clearCounts();
+  if (session) pushOverlayStatus(session, DEFAULT_COUNTS, false);
   browser.action.setBadgeText({ text: "" });
 
   // Save a report entry for the popup's history list. Best-effort: never fail a
@@ -154,11 +179,16 @@ export default defineBackground(() => {
     if (!session) return;
     try {
       await registerRecorderScripts();
+    } catch {
+      // The runtime registration can already exist after a normal SW restart.
+    }
+    try {
       const counts = await getCounts();
       browser.action.setBadgeBackgroundColor({ color: "#ff6a00" });
       browser.action.setBadgeText({ text: String(totalCounts(counts)) });
+      pushOverlayStatus(session, counts);
     } catch {
-      // nothing to do if re-registration fails
+      // Nothing to restore if session storage is unavailable.
     }
   })();
 
@@ -180,13 +210,24 @@ export default defineBackground(() => {
           }
           await addEvents(msg.batch);
           const counts = await getCounts();
+          let countsChanged = false;
           for (const d of msg.batch as Array<{ k: string }>) {
-            if (d.k === "click") counts.click++;
-            else if (d.k === "input") counts.input++;
-            else if (d.k === "console") counts.console++;
-            else if (d.k === "net") counts.net++;
+            if (d.k === "click") {
+              counts.click++;
+              countsChanged = true;
+            } else if (d.k === "input") {
+              counts.input++;
+              countsChanged = true;
+            } else if (d.k === "console") {
+              counts.console++;
+              countsChanged = true;
+            } else if (d.k === "net") {
+              counts.net++;
+              countsChanged = true;
+            }
           }
           await setCounts(counts);
+          if (countsChanged) pushOverlayStatus(session, counts);
           browser.action.setBadgeText({ text: String(totalCounts(counts)) });
           if (msg.final === true) sendResponse({ ok: true });
         })
@@ -242,6 +283,7 @@ export default defineBackground(() => {
     }
 
     if (msg?.type === MSG_OVERLAY_STATUS) {
+      const version = nextOverlayVersion();
       void (async () => {
         try {
           const session = await getSession();
@@ -250,11 +292,13 @@ export default defineBackground(() => {
             recording,
             counts: recording ? await getCounts() : DEFAULT_COUNTS,
             startedAt: recording ? session.startedAt : undefined,
+            version,
           });
         } catch (err) {
           sendResponse({
             recording: false,
             counts: DEFAULT_COUNTS,
+            version,
             error: (err as Error).message,
           });
         }

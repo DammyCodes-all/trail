@@ -101,6 +101,33 @@ async function clickStop(popup) {
   return popup.evaluate(() => window.__trailEvents);
 }
 
+async function getOverlayTotal(page) {
+  return page.evaluate(() => {
+    const label = document
+      .querySelector('#trail-recording-overlay')
+      ?.shadowRoot?.querySelector('.trail-overlay__total [aria-label]')
+      ?.getAttribute('aria-label');
+    const value = label?.match(/^\d+/)?.[0];
+    return value === undefined ? -1 : Number(value);
+  });
+}
+
+async function waitForOverlayTotalAbove(page, previous) {
+  await page.waitForFunction(
+    (minimum) => {
+      const label = document
+        .querySelector('#trail-recording-overlay')
+        ?.shadowRoot?.querySelector('.trail-overlay__total [aria-label]')
+        ?.getAttribute('aria-label');
+      const value = label?.match(/^\d+/)?.[0];
+      return value !== undefined && Number(value) > minimum;
+    },
+    { timeout: 8000, polling: 100 },
+    previous,
+  );
+  return getOverlayTotal(page);
+}
+
 async function killServiceWorker(page) {
   const cdp = await page.createCDPSession();
   await cdp.send('ServiceWorker.enable');
@@ -347,18 +374,37 @@ function main() {
       await clickStart(browser, popup, testPage2);
       await testPage2.bringToFront();
 
+      await testPage2.waitForFunction(
+        () =>
+          document
+            .querySelector('#trail-recording-overlay')
+            ?.shadowRoot?.querySelector('.trail-overlay__total [aria-label]'),
+        { timeout: 8000, polling: 100 },
+      );
+      const initialOverlayTotal = await getOverlayTotal(testPage2);
       await testPage2.click('#boom'); // event before the kill
-      await sleep(1500); // flushed
+      const totalBeforeKill = await waitForOverlayTotalAbove(
+        testPage2,
+        initialOverlayTotal,
+      );
       const killTime = await killServiceWorker(testPage2);
       await sleep(500);
       await testPage2.click('#xhr'); // event after the kill
       await testPage2.evaluate(() =>
         fetch('/missing', { method: 'POST' }).catch(() => {}),
       );
-      await sleep(1500); // flushed through a restarted SW
+      const totalAfterKill = await waitForOverlayTotalAbove(
+        testPage2,
+        totalBeforeKill,
+      );
 
       const s2 = await clickStop(popup);
       console.log('spike2 event counts:', summary(s2));
+      console.log('overlay totals across SW kill:', {
+        initialOverlayTotal,
+        totalBeforeKill,
+        totalAfterKill,
+      });
       console.log('kill time:', new Date(killTime).toISOString());
       const before = s2.filter((e) => e.t <= killTime + 500);
       const after = s2.filter((e) => e.t > killTime + 500);
