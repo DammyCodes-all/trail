@@ -5,6 +5,7 @@ import { getAllEvents, getReports } from "@/lib/db";
 import type { StoredEvent, TrailCounts, TrailReport } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { CirclePlus } from "lucide-react";
 import { TrailLogo } from "@/components/ui/trail-logo";
 import { HistoryList } from "./components/HistoryList";
@@ -131,34 +132,41 @@ function App() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", bounce: 0, duration: 0.35 }}
         >
+          <div className="flex shrink-0 flex-col gap-2">
+            <p className="text-[11px] tracking-tight text-muted-foreground">
+              Bug reports that replay themselves.
+            </p>
             <Button
-              className="h-9 w-full shrink-0"
+              className="h-11 w-full"
               id="start"
               onClick={() => setView("setup")}
             >
               <CirclePlus data-icon="inline-start" aria-hidden="true" />
               Start Report
             </Button>
+          </div>
 
-            <section className="flex min-h-0 flex-1 flex-col gap-2">
-              <div className="flex shrink-0 items-baseline justify-between">
-                <h3 className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-                  Past reports
-                </h3>
-                {reports.length > 0 && (
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    {reports.length}
-                  </span>
-                )}
-              </div>
-              <HistoryList
-                reports={reports}
-                onOpen={openReport}
-                onDeleted={() => void getReports().then(setReports)}
-              />
-            </section>
-          </motion.div>
-        )}
+          <Separator className="my-1 shrink-0" />
+
+          <section className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="flex shrink-0 items-baseline justify-between">
+              <h3 className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+                Past reports
+              </h3>
+              {reports.length > 0 && (
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {reports.length}
+                </span>
+              )}
+            </div>
+            <HistoryList
+              reports={reports}
+              onOpen={openReport}
+              onDeleted={() => void getReports().then(setReports)}
+            />
+          </section>
+        </motion.div>
+      )}
 
         {view === "setup" && (
           <motion.div
