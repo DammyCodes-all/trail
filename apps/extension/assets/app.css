@@ -126,3 +126,39 @@
 .switch input:checked + label::before {
   background: var(--trail-primary);
 }
+
+/*
+ * MagicUI pulsating button — tokens renamed from the registry defaults
+ * (`pulsating`/`pulsating-ripple`) so Tailwind's built-in `animate-pulse`
+ * utility (recording indicator) is not clobbered.
+ */
+@theme inline {
+  --animate-pulsating: pulsating var(--duration) ease-out infinite;
+  --animate-pulsating-ripple: pulsating-ripple var(--duration) cubic-bezier(0.16, 1, 0.3, 1) infinite;
+
+  @keyframes pulsating {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 var(--pulse-color, oklch(from var(--bg) l c h / 0.5));
+    }
+    50% {
+      box-shadow: 0 0 0 var(--distance) var(--pulse-color, oklch(from var(--bg) l c h / 0.5));
+    }
+  }
+
+  @keyframes pulsating-ripple {
+    0% {
+      box-shadow: 0 0 0 0 oklch(from var(--pulse-color, var(--bg)) l c h / 1);
+    }
+    100% {
+      box-shadow: 0 0 0 var(--distance) oklch(from var(--pulse-color, var(--bg)) l c h / 0);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulsating,
+  .animate-pulsating-ripple {
+    animation: none;
+  }
+}
