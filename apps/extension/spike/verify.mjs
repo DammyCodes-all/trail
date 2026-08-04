@@ -149,6 +149,21 @@ function main() {
       console.log('recorder live on page1:', await testPage.evaluate(() => window.__trailRecorder));
       await testPage.bringToFront();
 
+      // A page opened mid-session is NOT the session tab: the recorder it
+      // inherits (registered for <all_urls>) must be disarmed by the relay's
+      // session check, or it would keep capturing an unrelated page.
+      const stray = await browser.newPage();
+      await stray.goto(`${BASE}/stray.html`, { waitUntil: 'load' });
+      await stray.waitForFunction(() => window.__trailRecorderActive === false, {
+        timeout: 8000,
+        polling: 100,
+      });
+      console.log('stray tab recorder disarmed');
+      await stray.close();
+      // newPage() left the stray tab focused; synthetic mouse events follow the
+      // active tab, so bring the session page back to front before clicking.
+      await testPage.bringToFront();
+
       // page1 interactions (after start)
       await testPage.click('#boom');
       console.log('clicked boom');
@@ -209,6 +224,26 @@ function main() {
       assert(
         noise.length === 0,
         `focus-clicks into text fields / blank space must not be counted (got ${noise.length})`,
+      );
+      assert(
+        !s1.some((e) => e.url.includes('stray.html')),
+        'events from the stray (non-session) tab never reach storage',
+      );
+      // The rrweb stream must open with a full snapshot: it's the base frame the
+      // player renders. Losing it (e.g. to the session-start gate) blanks replay.
+      const rrwebSorted = s1
+        .filter((e) => e.k === 'rrweb')
+        .sort((a, b) => a.ev.timestamp - b.ev.timestamp);
+      const firstFull = rrwebSorted.find((e) => e.ev?.type === 2);
+      assert(firstFull, 'rrweb stream has a full snapshot (base frame)');
+      const firstIncr = rrwebSorted.find((e) => e.ev?.type === 3);
+      assert(
+        !firstIncr || firstIncr.ev.timestamp >= firstFull.ev.timestamp,
+        'full snapshot precedes all incremental frames',
+      );
+      assert(
+        s1.some((e) => e.k === 'click' && e.label?.includes('Pay now')),
+        'final click before stop survives the teardown (no tail loss)',
       );
       console.log('SPIKE 1 PASS');
 
@@ -293,6 +328,10 @@ function main() {
       assert(
         reopenTimeline.some((s) => s.kind === 'click' && s.text.includes('Submit')),
         'reopened report has the Submit step from its snapshot',
+      );
+      assert(
+        reopenTimeline.some((s) => s.kind === 'click' && s.text.includes('Pay now')),
+        'reopened report has the final Pay now step — the stop tail is in the snapshot',
       );
       console.log('reopen check PASS');
       await testPage.close();

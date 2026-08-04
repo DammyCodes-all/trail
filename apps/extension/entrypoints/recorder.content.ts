@@ -8,6 +8,9 @@ import { createRrweb } from "@/lib/record/rrweb";
 declare global {
   interface Window {
     __trailRecorder?: boolean;
+    // Test hook: mirrors `active`, so the spike can assert a non-session page's
+    // recorder gets disarmed by the relay's session check.
+    __trailRecorderActive?: boolean;
   }
 }
 
@@ -27,6 +30,11 @@ export default defineContentScript({
     let active = true;
     let autoRedact = true; // default on; relay delivers the stored preference
 
+    const setActive = (v: boolean) => {
+      active = v;
+      window.__trailRecorderActive = v;
+    };
+
     const ctx: RecordContext = {
       emit: (d) => window.postMessage({ [POST_MESSAGE_KEY]: true, d }, "*"),
       isActive: () => active,
@@ -42,13 +50,16 @@ export default defineContentScript({
 
     addEventListener("message", (e) => {
       if (e.data?.[POST_MESSAGE_KEY] === "stop") {
-        active = false;
+        setActive(false);
         rrweb.stop();
+        // Ack so the relay knows capture is sealed and can flush the final
+        // batch without racing new events.
+        window.postMessage({ [POST_MESSAGE_KEY]: "stopped" }, "*");
       } else if (e.data?.[POST_MESSAGE_KEY] === "start") {
         // Re-arm after a stop on the same page. The stale __trailRecorder guard
         // makes re-executing recorder.js a no-op, so re-activation has to come
         // through the relay as a message.
-        active = true;
+        setActive(true);
         if (!rrweb.running) rrweb.start();
       } else if (e.data?.[POST_MESSAGE_KEY] === "redact") {
         const on = e.data.value === true;
@@ -62,6 +73,11 @@ export default defineContentScript({
     });
 
     // ---- rrweb: visual replay only ----
+    setActive(true);
     rrweb.start();
+
+    // Announce the boot: a page that loaded mid-session inherits this recorder,
+    // and the relay decides whether it belongs here by re-checking the session.
+    window.postMessage({ [POST_MESSAGE_KEY]: "boot" }, "*");
   },
 });

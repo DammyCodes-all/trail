@@ -65,8 +65,13 @@ async function startRecording(
 
   try {
     await registerRecorderScripts();
+    // Session must be live BEFORE the recorder is injected: the batch gate drops
+    // everything without a session, and the recorder's very first event is the
+    // rrweb full snapshot that the replay needs as its base frame.
+    await setSession({ tabId: id, startedAt: Date.now() });
     await injectRecorderIntoPage(id);
   } catch (err) {
+    await setSession(null);
     await clearCounts();
     return { ok: false, error: (err as Error).message };
   }
@@ -85,10 +90,6 @@ async function startRecording(
     .sendMessage(id, { type: MSG_START_RECORDER })
     .catch(() => {});
 
-  // Session goes live only once the recorder is actually injected, so "recording"
-  // never reports true while the page still has no recorder.
-  await setSession({ tabId: id, startedAt: Date.now() });
-
   browser.action.setBadgeBackgroundColor({ color: "#ff6a00" });
   browser.action.setBadgeText({ text: "0" });
   return { ok: true };
@@ -96,10 +97,13 @@ async function startRecording(
 
 async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
   const session = await getSession();
-  const counts = await getCounts();
   try {
     await unregisterRecorderScripts();
     if (session) {
+      // Deterministic teardown: the relay stops the recorder, waits for its
+      // ack, then uploads the final tail as a `final` batch. This sendMessage
+      // resolves only once that batch is persisted, so the session can be torn
+      // down without a sleep and the tail is never lost.
       await browser.tabs
         .sendMessage(session.tabId, { type: MSG_STOP_RECORDER })
         .catch(() => {});
@@ -107,10 +111,8 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }
-  // Let the relay's final buffer flush (MSG_BATCH) land BEFORE tearing the session
-  // down: the batch handler gates on `session`, so clearing it first would drop the
-  // tail of the recording.
-  await new Promise((r) => setTimeout(r, 400));
+  // Read counts AFTER the final flush so the saved report includes the tail.
+  const counts = await getCounts();
   await setSession(null);
   await clearCounts();
   browser.action.setBadgeText({ text: "" });
@@ -166,12 +168,16 @@ export default defineBackground(() => {
         .then(async () => {
           const session = await getSession();
           // Gate by tab (matches is <all_urls>, so any page could be talking).
+          // Final batches (the stop tail) must still be acked so the relay's
+          // handshake can resolve — with {ok:false} when they're gated out.
           if (
             !session ||
             sender.tab?.id !== session.tabId ||
             !Array.isArray(msg.batch)
-          )
+          ) {
+            if (msg.final === true) sendResponse({ ok: false });
             return;
+          }
           await addEvents(msg.batch);
           const counts = await getCounts();
           for (const d of msg.batch as Array<{ k: string }>) {
@@ -182,9 +188,15 @@ export default defineBackground(() => {
           }
           await setCounts(counts);
           browser.action.setBadgeText({ text: String(totalCounts(counts)) });
+          if (msg.final === true) sendResponse({ ok: true });
         })
-        .catch(() => {}); // never let a batch failure stall the chain
-      return; // async, no response needed
+        .catch(() => {
+          // never let a batch failure stall the chain — but a stalled ack would
+          // hang the stop handshake, so final batches always answer
+          if (msg.final === true) sendResponse({ ok: false });
+        });
+      // Keep the channel open for the ack; fire-and-forget otherwise.
+      return msg.final === true;
     }
 
     if (msg?.type === MSG_START) {

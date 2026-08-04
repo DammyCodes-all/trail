@@ -266,7 +266,10 @@ function App() {
         body: JSON.stringify({
           title: displayTitle,
           exportedAt: Date.now(),
-          events,
+          // rrweb events only: the share page feeds this straight to
+          // rrweb-player, which expects eventWithTime[] — not the storage
+          // wrapper format.
+          events: rrwebEvents,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
