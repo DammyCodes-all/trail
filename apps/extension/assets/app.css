@@ -68,64 +68,82 @@
   }
 }
 
-/*
- * rrweb-player ships a light controller (indigo on white). Override to the
- * TRAIL dark theme so the replay panel matches the rest of the UI. Brand orange
- * is correct here: these are interactive playback controls, not status.
- */
-.rr-controller {
-  background: var(--trail-surface);
-  border-top: 1px solid var(--trail-border);
-  border-radius: 0 0 calc(var(--radius) - 2px) calc(var(--radius) - 2px);
+/* rrweb renders only the replay frame. TRAIL owns the playback controls. */
+.replay .rr-player {
+  float: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.rr-timeline__time {
-  color: var(--trail-text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
+.replay .rr-player__frame {
+  background: var(--trail-bg);
 }
 
-.rr-progress {
-  background: var(--trail-border);
-  border-top-color: var(--trail-surface);
-  border-bottom-color: var(--trail-surface);
+.replay-scrubber {
+  --replay-progress: 0%;
+  height: 1rem;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+  touch-action: none;
 }
 
-.rr-progress__step {
-  background: rgb(255 106 0 / 0.35);
+.replay-scrubber::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 1px;
+  background: linear-gradient(
+    to right,
+    var(--trail-primary) 0%,
+    var(--trail-primary) var(--replay-progress),
+    var(--trail-border-strong) var(--replay-progress),
+    var(--trail-border-strong) 100%
+  );
 }
 
-.rr-progress__handler {
+.replay-scrubber::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -5px;
+  cursor: grab;
+  appearance: none;
+  border: 2px solid var(--trail-surface);
+  border-radius: 50%;
+  background: var(--trail-primary);
+  box-shadow: 0 0 0 2px rgb(255 106 0 / 0.18);
+}
+
+.replay-scrubber:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+
+.replay-scrubber:focus-visible {
+  outline: none;
+}
+
+.replay-scrubber:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgb(255 106 0 / 0.3);
+}
+
+.replay-scrubber::-moz-range-track {
+  height: 3px;
+  border-radius: 1px;
+  background: var(--trail-border-strong);
+}
+
+.replay-scrubber::-moz-range-progress {
+  height: 3px;
+  border-radius: 1px;
   background: var(--trail-primary);
 }
 
-.rr-controller__btns button {
-  color: var(--trail-text-muted);
-}
-
-.rr-controller__btns button:active {
-  background: rgb(255 106 0 / 0.18);
-}
-
-.rr-controller__btns button.active {
-  color: var(--trail-primary-foreground);
+.replay-scrubber::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  cursor: grab;
+  border: 2px solid var(--trail-surface);
+  border-radius: 50%;
   background: var(--trail-primary);
-}
-
-.rr-controller__btns button:disabled {
-  opacity: 0.4;
-}
-
-.switch {
-  color: var(--trail-text);
-}
-
-.switch label::before {
-  background: rgb(255 106 0 / 0.45);
-}
-
-.switch input:checked + label::before {
-  background: var(--trail-primary);
+  box-shadow: 0 0 0 2px rgb(255 106 0 / 0.18);
 }
 
 /*

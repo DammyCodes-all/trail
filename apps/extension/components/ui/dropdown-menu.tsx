@@ -15,11 +15,14 @@ function DropdownMenuContent({
   className,
   align = "end",
   sideOffset = 6,
+  portalContainer,
   ...props
 }: MenuPrimitive.Popup.Props &
-  Pick<MenuPrimitive.Positioner.Props, "align" | "side" | "sideOffset">) {
+  Pick<MenuPrimitive.Positioner.Props, "align" | "side" | "sideOffset"> & {
+    portalContainer?: MenuPrimitive.Portal.Props["container"];
+  }) {
   return (
-    <MenuPrimitive.Portal>
+    <MenuPrimitive.Portal container={portalContainer}>
       <MenuPrimitive.Positioner
         align={align}
         sideOffset={sideOffset}
