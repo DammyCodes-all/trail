@@ -32,7 +32,7 @@ export function HistoryList({
 }) {
   if (reports.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border px-4 py-6 text-center">
         <h4 className="font-heading text-h4 font-medium">No reports yet</h4>
         <p className="mt-1 text-body-sm text-muted-foreground">
           Start a report, reproduce the bug, and TRAIL writes the issue for
@@ -43,9 +43,9 @@ export function HistoryList({
   }
 
   return (
-    <ul className="flex max-h-65 flex-col gap-1.5 overflow-y-auto">
+    <ul className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
       {reports.map((r) => (
-        <li key={r.seq} className="flex min-w-0 items-stretch gap-1.5">
+        <li key={r.seq} className="flex min-w-0 shrink-0 items-stretch gap-1.5">
           <Button
             variant="ghost"
             className="report h-auto min-w-0 flex-1 flex-col items-start justify-center gap-0.5 rounded-lg px-3 py-2"

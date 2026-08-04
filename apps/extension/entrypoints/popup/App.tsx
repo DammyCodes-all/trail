@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import { MSG_START, MSG_STATUS, MSG_STOP, REDACT_KEY } from "@/lib/constants";
 import { getAllEvents, getReports } from "@/lib/db";
 import type { StoredEvent, TrailCounts, TrailReport } from "@/lib/types";
@@ -98,8 +99,8 @@ function App() {
   const recording = status?.recording ?? false;
 
   return (
-    <div className="flex w-95 flex-col gap-4 p-4">
-      <header className="flex items-center justify-between">
+    <div className="flex h-120 w-95 flex-col gap-3 overflow-hidden p-4">
+      <header className="flex shrink-0 items-center justify-between">
         <div className="flex items-center gap-2">
           <TrailLogo
             className="size-8 shrink-0"
@@ -123,46 +124,75 @@ function App() {
       </header>
 
       {view === "home" && (
-        <>
-          <Button
-            className="h-9 w-full"
-            id="start"
-            onClick={() => setView("setup")}
+        <motion.div
+          key="home"
+          className="flex min-h-0 flex-1 flex-col gap-3"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", bounce: 0, duration: 0.35 }}
+        >
+            <Button
+              className="h-9 w-full shrink-0"
+              id="start"
+              onClick={() => setView("setup")}
+            >
+              <CirclePlus data-icon="inline-start" aria-hidden="true" />
+              Start Report
+            </Button>
+
+            <section className="flex min-h-0 flex-1 flex-col gap-2">
+              <div className="flex shrink-0 items-baseline justify-between">
+                <h3 className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+                  Past reports
+                </h3>
+                {reports.length > 0 && (
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    {reports.length}
+                  </span>
+                )}
+              </div>
+              <HistoryList
+                reports={reports}
+                onOpen={openReport}
+                onDeleted={() => void getReports().then(setReports)}
+              />
+            </section>
+          </motion.div>
+        )}
+
+        {view === "setup" && (
+          <motion.div
+            key="setup"
+            className="flex min-h-0 flex-1 flex-col"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
           >
-            <CirclePlus data-icon="inline-start" aria-hidden="true" />
-            Start Report
-          </Button>
-
-          <section className="flex flex-col gap-2">
-            <h3 className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-              Past reports
-            </h3>
-            <HistoryList
-              reports={reports}
-              onOpen={openReport}
-              onDeleted={() => void getReports().then(setReports)}
+            <SetupScreen
+              autoRedact={autoRedact}
+              onToggleRedact={(v) => void toggleRedact(v)}
+              busy={busy}
+              onBack={() => setView("home")}
+              onBegin={() => void start()}
             />
-          </section>
-        </>
-      )}
+          </motion.div>
+        )}
 
-      {view === "setup" && (
-        <SetupScreen
-          autoRedact={autoRedact}
-          onToggleRedact={(v) => void toggleRedact(v)}
-          busy={busy}
-          onBack={() => setView("home")}
-          onBegin={() => void start()}
-        />
-      )}
-
-      {view === "recording" && (
-        <RecordingScreen
-          counts={counts}
-          busy={busy}
-          onStop={() => void stop()}
-        />
-      )}
+        {view === "recording" && (
+          <motion.div
+            key="recording"
+            className="flex min-h-0 flex-1 flex-col"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
+          >
+            <RecordingScreen
+              counts={counts}
+              busy={busy}
+              onStop={() => void stop()}
+            />
+          </motion.div>
+        )}
     </div>
   );
 }

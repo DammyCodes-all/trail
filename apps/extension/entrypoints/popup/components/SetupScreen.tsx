@@ -52,7 +52,7 @@ export function SetupScreen({
           />
         </Switch>
       </div>
-      <div className="flex gap-2">
+      <div className="mt-auto flex shrink-0 gap-2">
         <Button
           variant="secondary"
           className="flex-1"
