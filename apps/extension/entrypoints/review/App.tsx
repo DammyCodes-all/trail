@@ -23,7 +23,8 @@ import {
 import { buildTimeline } from "@/lib/timeline";
 import type { StoredEvent, TrailCounts, TrailReport } from "@/lib/types";
 import { Toaster, toast } from "@/components/ui/toast";
-import { ActionBar } from "./components/ActionBar";
+
+import { AttachmentsPanel } from "./components/AttachmentsPanel";
 import { EvidencePanel } from "./components/EvidencePanel";
 import { GitHubIssueDialog } from "./components/GitHubIssueDialog";
 import { IncidentHeader } from "./components/IncidentHeader";
@@ -276,6 +277,90 @@ function App() {
       ),
     );
 
+  const networkEvents = events.filter((event) => event.k === "net");
+  const consoleEvents = events.filter((event) => event.k === "console");
+
+  const downloadNetworkHar = () => {
+    const har = {
+      log: {
+        version: "1.2",
+        creator: { name: "TRAIL", version: facts.extensionVersion },
+        entries: networkEvents.map((event) => ({
+          startedDateTime: new Date(event.t).toISOString(),
+          time: 0,
+          request: {
+            method: event.method,
+            url: event.target,
+            httpVersion: "",
+            headers: [],
+            queryString: [],
+            cookies: [],
+            headersSize: -1,
+            bodySize: -1,
+          },
+          response: {
+            status: event.status,
+            statusText: event.err ?? "",
+            httpVersion: "",
+            headers: [],
+            cookies: [],
+            content: {
+              size: event.body?.length ?? 0,
+              mimeType: "text/plain",
+              text: event.body ?? "",
+            },
+            redirectURL: "",
+            headersSize: -1,
+            bodySize: event.body?.length ?? -1,
+          },
+          cache: {},
+          timings: { send: 0, wait: 0, receive: 0 },
+        })),
+      },
+    };
+    return download(
+      "network.har",
+      new Blob([JSON.stringify(har, null, 2)], { type: "application/json" }),
+    );
+  };
+
+  const downloadConsoleLog = () => {
+    const log = consoleEvents
+      .map((event) => {
+        const timestamp = new Date(event.t).toISOString();
+        return `[${timestamp}] ${event.lv.toUpperCase()} ${event.msg}${event.stack ? `\n${event.stack}` : ""}`;
+      })
+      .join("\n\n");
+    return download(
+      "console.log",
+      new Blob([log || "No console errors captured."], { type: "text/plain" }),
+    );
+  };
+
+  const downloadMetadata = () =>
+    download(
+      "metadata.json",
+      new Blob(
+        [
+          JSON.stringify(
+            {
+              title: displayTitle,
+              capturedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
+              durationMs: facts.durationMs,
+              url: facts.url,
+              browser: facts.browser,
+              os: facts.os,
+              extensionVersion: facts.extensionVersion,
+              counts,
+            },
+            null,
+            2,
+          ),
+        ],
+        { type: "application/json" },
+      ),
+    );
+
   const openIssue = () => {
     if (!issue) return;
     setIssueDialogOpen(false);
@@ -350,19 +435,14 @@ function App() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-300 flex-col gap-4 p-5">
+    <div className="mx-auto w-full max-w-300 px-4 pb-8 pt-5 sm:px-6 lg:px-8">
       <IncidentHeader
         title={title}
         onTitleChange={setTitle}
         onTitleBlur={persistTitle}
         facts={facts}
         counts={counts}
-      />
-
-      <ActionBar
         sharing={sharing}
-        template={template}
-        templateState={templateState}
         onCreateIssue={handleCreateIssue}
         onCopyMarkdown={() => void copyMarkdown()}
         onDownloadReport={downloadReport}
@@ -370,24 +450,56 @@ function App() {
         onCopyReplayLink={() => void copyReplayLink()}
       />
 
-      <main className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,28rem)] lg:items-start">
-        <div className="min-w-0">
-          <TimelineCard
-            steps={timeline}
-            t0={t0}
-            replayT0={replayT0}
-            currentTime={currentReplayTime}
-            onSeek={seekReplay}
-          />
-          <EvidencePanel events={events} t0={t0} onSeek={seekReplay} />
-        </div>
+      <main className="min-w-0">
+        <TimelineCard
+          steps={timeline}
+          t0={t0}
+          replayT0={replayT0}
+          currentTime={currentReplayTime}
+          onSeek={seekReplay}
+        />
         <ReplayPanel
           ref={replayRef}
           events={rrwebEvents}
           facts={facts}
+          currentTime={currentReplayTime}
           onCurrentTimeChange={handleReplayTimeChange}
         />
+        <EvidencePanel events={events} t0={t0} onSeek={seekReplay} />
       </main>
+
+      <AttachmentsPanel
+        attachments={[
+          {
+            kind: "report",
+            name: "report.md",
+            detail: "Markdown report",
+            onDownload: downloadReport,
+          },
+          {
+            kind: "network",
+            name: "network.har",
+            detail: `${networkEvents.length} requests`,
+            onDownload: () => void downloadNetworkHar(),
+          },
+          {
+            kind: "console",
+            name: "console.log",
+            detail: `${consoleEvents.length} entries`,
+            onDownload: () => void downloadConsoleLog(),
+          },
+          {
+            kind: "metadata",
+            name: "metadata.json",
+            detail: "Session metadata",
+            onDownload: () => void downloadMetadata(),
+          },
+        ]}
+      />
+
+      <p className="text-center text-[11px] text-muted-foreground">
+        All data is captured automatically by Trail.
+      </p>
 
       <GitHubIssueDialog
         open={issueDialogOpen}
