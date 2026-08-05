@@ -1,6 +1,6 @@
 {
-  "name": "wxt-react-starter",
-  "description": "manifest.json description",
+  "name": "trail-extension",
+  "description": "TRAIL: capture a bug live, turn it into a maintainer-ready GitHub issue.",
   "private": true,
   "version": "0.0.0",
   "type": "module",

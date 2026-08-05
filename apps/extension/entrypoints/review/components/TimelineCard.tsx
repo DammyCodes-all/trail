@@ -304,17 +304,17 @@ export function TimelineCard({
   }, [rows, expanded, absoluteTime]);
 
   // Flat list of what is actually rendered, so grouping, expansion and the
-  // active highlight all agree.
+  // active highlight all agree. The group header row is always present (it
+  // carries the collapse/expand control); sub rows follow it when expanded.
   const renderable = useMemo<RenderItem[]>(() => {
     const out: RenderItem[] = [];
     rows.forEach((row, index) => {
       if (row.kind === "group" && row.steps.length > 1) {
+        out.push({ key: `row-${index}`, row, groupIndex: index });
         if (expanded.has(`row-${index}`)) {
           for (const step of row.steps) {
             out.push({ key: `${index}-${step.t}`, row: step, sub: true });
           }
-        } else {
-          out.push({ key: `row-${index}`, row, groupIndex: index });
         }
       } else if (row.kind === "group") {
         // Singleton interaction groups render as a plain step.

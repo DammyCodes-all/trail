@@ -1,14 +1,16 @@
 {
   "name": "trail",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "TRAIL monorepo: a browser extension that turns a live bug reproduction into a maintainer-ready GitHub issue.",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev:extension": "pnpm --filter trail-extension dev",
+    "build:extension": "pnpm --filter trail-extension build",
+    "verify:extension": "pnpm --filter trail-extension verify",
+    "dev:replay": "pnpm --filter trail-replay-server dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev:all": "pnpm -r --parallel dev"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
