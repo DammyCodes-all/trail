@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Braces,
+  ChevronDown,
   ChevronRight,
   CircleCheck,
   Network,
@@ -56,6 +57,81 @@ function SectionHeader({
   );
 }
 
+function DetailsToggle({
+  expanded,
+  onToggle,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-details-toggle="true"
+      aria-expanded={expanded}
+      aria-label={expanded ? "Hide details" : "Show details"}
+      className="flex w-9 shrink-0 cursor-pointer items-center justify-center self-stretch rounded-sm text-muted-foreground outline-none transition-colors duration-150 hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
+      onClick={onToggle}
+    >
+      <ChevronDown
+        className={cn(
+          "size-4 transition-transform duration-200 ease-out",
+          expanded && "rotate-180",
+        )}
+        aria-hidden="true"
+      />
+    </button>
+  );
+}
+
+function HeaderTable({
+  title,
+  headers,
+}: {
+  title: string;
+  headers: Record<string, string>;
+}) {
+  const entries = Object.entries(headers);
+  if (!entries.length) return null;
+  return (
+    <div>
+      <h4 className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </h4>
+      <dl className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)] gap-x-4 gap-y-1 rounded-sm border border-border/70 bg-background/60 px-3 py-2">
+        {entries.map(([name, value]) => (
+          <div key={name} className="contents">
+            <dt className="wrap-break-word py-0.5 font-mono text-[11px] font-medium text-foreground/80">
+              {name}
+            </dt>
+            <dd
+              className={cn(
+                "wrap-break-word py-0.5 font-mono text-[11px]",
+                value === "[redacted]" ? "text-warn" : "text-muted-foreground",
+              )}
+            >
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function BodyBlock({ title, body }: { title: string; body: string }) {
+  return (
+    <div>
+      <h4 className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </h4>
+      <pre className="max-h-64 overflow-auto whitespace-pre-wrap wrap-break-word rounded-sm border border-border/70 bg-background/60 px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+        {body}
+      </pre>
+    </div>
+  );
+}
+
 function ConsoleRow({
   event,
   t0,
@@ -65,31 +141,44 @@ function ConsoleRow({
   t0: number;
   onSeek: (timestamp: number) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   return (
-    <button
-      type="button"
-      className="grid w-full cursor-pointer grid-cols-[3.5rem_minmax(0,1fr)] gap-3 border-t border-border/70 px-2 py-3 text-left outline-none transition-colors duration-150 hover:bg-muted/60 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
-      onClick={() => onSeek(event.t)}
-    >
-      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-        {formatElapsedTime(event.t - t0)}
-      </span>
-      <span className="min-w-0">
-        <span
-          className={cn(
-            "block text-[13px] font-medium leading-relaxed wrap-break-word",
-            event.lv === "error" ? "text-destructive" : "text-warn",
-          )}
+    <div data-console-row="true" className="border-t border-border/70">
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          className="grid min-w-0 flex-1 cursor-pointer grid-cols-[3.5rem_minmax(0,1fr)] gap-3 px-2 py-3 text-left outline-none transition-colors duration-150 hover:bg-muted/60 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
+          onClick={() => onSeek(event.t)}
         >
-          {event.msg || `Console ${event.lv}`}
-        </span>
-        {event.stack && (
-          <code className="mt-1.5 block max-h-24 overflow-hidden whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-muted-foreground">
-            {event.stack}
-          </code>
-        )}
-      </span>
-    </button>
+          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+            {formatElapsedTime(event.t - t0)}
+          </span>
+          <span className="min-w-0">
+            <span
+              className={cn(
+                "block text-[13px] font-medium leading-relaxed wrap-break-word",
+                expanded ? "" : "line-clamp-2",
+                event.lv === "error" ? "text-destructive" : "text-warn",
+              )}
+            >
+              {event.msg || `Console ${event.lv}`}
+            </span>
+            {!expanded && event.stack && (
+              <span className="mt-1 block font-mono text-[10px] text-muted-foreground">
+                Stack trace
+              </span>
+            )}
+          </span>
+        </button>
+        <DetailsToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
+      </div>
+      {expanded && (
+        <div className="grid gap-3 border-t border-border/70 px-3 py-3 sm:px-4">
+          <BodyBlock title="Message" body={event.msg || `Console ${event.lv}`} />
+          {event.stack ? <BodyBlock title="Stack trace" body={event.stack} /> : null}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -102,40 +191,121 @@ function NetworkRow({
   t0: number;
   onSeek: (timestamp: number) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const critical = event.status === 0 || event.status >= 500;
+  const requestHeaders =
+    event.requestHeaders && Object.keys(event.requestHeaders).length
+      ? event.requestHeaders
+      : null;
+  const responseHeaders =
+    event.responseHeaders && Object.keys(event.responseHeaders).length
+      ? event.responseHeaders
+      : null;
+  const hasDetails = !!(
+    event.body ||
+    event.err ||
+    event.requestBody ||
+    requestHeaders ||
+    responseHeaders
+  );
   return (
-    <button
-      type="button"
-      className="grid w-full cursor-pointer grid-cols-[3.5rem_3.25rem_minmax(0,1fr)_2.5rem] gap-2 border-t border-border/70 px-2 py-3 text-left outline-none transition-colors duration-150 hover:bg-muted/60 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
-      onClick={() => onSeek(event.t)}
-    >
-      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-        {formatElapsedTime(event.t - t0)}
-      </span>
-      <span className="font-mono text-[10px] font-medium text-foreground">
-        {event.method}
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate font-mono text-[11px] text-foreground" title={event.target}>
-          {event.target}
-        </span>
-        {(event.err || event.body) && (
-          <span className="mt-1 block max-h-20 overflow-hidden whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-muted-foreground">
-            {event.err || event.body}
+    <div data-net-row="true" className="border-t border-border/70">
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          className="grid min-w-0 flex-1 cursor-pointer grid-cols-[3.5rem_3.25rem_minmax(0,1fr)_2.5rem] gap-2 px-2 py-3 text-left outline-none transition-colors duration-150 hover:bg-muted/60 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
+          onClick={() => onSeek(event.t)}
+        >
+          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+            {formatElapsedTime(event.t - t0)}
           </span>
-        )}
-      </span>
-      <span
-        className={cn(
-          "justify-self-end rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold",
-          critical
-            ? "bg-destructive/10 text-destructive"
-            : "bg-warn/10 text-warn",
-        )}
-      >
-        {event.status || "ERR"}
-      </span>
-    </button>
+          <span className="font-mono text-[10px] font-medium text-foreground">
+            {event.method}
+          </span>
+          <span className="min-w-0">
+            <span
+              className="block truncate font-mono text-[11px] text-foreground"
+              title={event.target}
+            >
+              {event.target}
+            </span>
+            {(event.err || event.body) && (
+              <span
+                className={cn(
+                  "mt-1 block font-mono text-[10px] leading-relaxed text-muted-foreground",
+                  expanded ? "" : "line-clamp-2",
+                )}
+              >
+                {event.err || event.body}
+              </span>
+            )}
+          </span>
+          <span
+            className={cn(
+              "justify-self-end rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold",
+              critical
+                ? "bg-destructive/10 text-destructive"
+                : "bg-warn/10 text-warn",
+            )}
+          >
+            {event.status || "ERR"}
+          </span>
+        </button>
+        <DetailsToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
+      </div>
+      {expanded && (
+        <div className="grid gap-3 border-t border-border/70 px-3 py-3 sm:px-4">
+          <dl className="grid gap-1.5 text-[11px]">
+            <div className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)] gap-x-4">
+              <dt className="font-mono font-medium uppercase tracking-wider text-muted-foreground">
+                Request
+              </dt>
+              <dd className="wrap-break-word font-mono text-foreground">
+                {event.method} {event.target}
+                <span className="ml-2 text-muted-foreground">
+                  via {event.via} · {formatElapsedTime(event.t - t0)}
+                </span>
+              </dd>
+            </div>
+            <div className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)] gap-x-4">
+              <dt className="font-mono font-medium uppercase tracking-wider text-muted-foreground">
+                Status
+              </dt>
+              <dd
+                className={cn(
+                  "font-mono",
+                  critical ? "text-destructive" : "text-warn",
+                )}
+              >
+                {event.status || "ERR"}
+                {event.err ? ` — ${event.err}` : ""}
+              </dd>
+            </div>
+          </dl>
+          {hasDetails ? (
+            <>
+              {requestHeaders ? <HeaderTable title="Request headers" headers={requestHeaders} /> : null}
+              {responseHeaders ? <HeaderTable title="Response headers" headers={responseHeaders} /> : null}
+              {event.requestBody ? <BodyBlock title="Request body" body={event.requestBody} /> : null}
+              {event.body ? <BodyBlock title="Response body" body={event.body} /> : null}
+            </>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              No headers or body were captured for this request.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ children }: { children: string }) {
+  return (
+    <div className="flex items-center gap-2 border-t border-border px-4 py-4 text-sm text-muted-foreground">
+      <CircleCheck className="size-4 text-success" aria-hidden="true" />
+      {children}
+    </div>
   );
 }
 
@@ -172,10 +342,7 @@ export function EvidencePanel({
                 <NetworkRow key={event.seq} event={event} t0={t0} onSeek={onSeek} />
               ))
             ) : (
-              <div className="flex items-center gap-2 border-t border-border px-4 py-4 text-sm text-muted-foreground">
-                <CircleCheck className="size-4 text-success" aria-hidden="true" />
-                No network failures captured.
-              </div>
+              <EmptyState>No network failures captured.</EmptyState>
             )}
           </CollapsibleContent>
         </Collapsible>
@@ -193,10 +360,7 @@ export function EvidencePanel({
                 <ConsoleRow key={event.seq} event={event} t0={t0} onSeek={onSeek} />
               ))
             ) : (
-              <div className="flex items-center gap-2 border-t border-border px-4 py-4 text-sm text-muted-foreground">
-                <CircleCheck className="size-4 text-success" aria-hidden="true" />
-                No console errors captured.
-              </div>
+              <EmptyState>No console errors captured.</EmptyState>
             )}
           </CollapsibleContent>
         </Collapsible>

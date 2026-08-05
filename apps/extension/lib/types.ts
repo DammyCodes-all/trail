@@ -33,6 +33,11 @@ export interface NetEvent extends BaseTrailEvent {
   err?: string;
   // Response body of the failed request, capped and truncated by the recorder.
   body?: string;
+  // Best-effort request/response metadata of the failed request. Values are
+  // capture-time redacted for sensitive header names (authorization, cookies).
+  requestHeaders?: Record<string, string>;
+  responseHeaders?: Record<string, string>;
+  requestBody?: string;
 }
 
 export interface RrwebEvent extends BaseTrailEvent {

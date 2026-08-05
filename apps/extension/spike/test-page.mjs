@@ -9,13 +9,13 @@ const PAGE1 = `<!doctype html>
   <label for="email">Email</label> <input id="email" type="text" autocomplete="email"><br>
   <label for="pass">Password</label> <input id="pass" type="password" autocomplete="current-password"><br>
   <button id="boom" onclick="throw new Error('boom: price calc failed')">Submit</button>
+  <button id="dbl" onclick="window.__dbl = (window.__dbl || 0) + 1">Tap twice</button>
   <button id="xhr" onclick="var x=new XMLHttpRequest();x.open('GET','/missing-xhr');x.send()">Do XHR</button>
   <a id="next" href="/page2.html">Go to step 2</a>
   <script>
     console.error('simulated load error: cart is empty');
     fetch('/missing', { method: 'POST' }).catch(function () {});
-  </script>
-</body>
+  </script></body>
 </html>`;
 
 const PAGE2 = `<!doctype html>
@@ -29,7 +29,7 @@ const PAGE2 = `<!doctype html>
     console.error('page2 load error: payment gateway unreachable');
     window.__pay = function () {
       console.error('simulated payment failure');
-      fetch('/fail').catch(function () {});
+      fetch('/fail', { headers: { 'Authorization': 'Bearer hunter2' } }).catch(function () {});
     };
   </script>
 </body>
@@ -44,10 +44,16 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html' });
     res.end(PAGE2);
   } else if (url === '/missing' || url === '/missing-xhr') {
-    res.writeHead(404, { 'content-type': 'text/plain' });
+    res.writeHead(404, {
+      'content-type': 'text/plain',
+      'x-trail-test': 'yes',
+    });
     res.end('not found');
   } else if (url === '/fail') {
-    res.writeHead(500, { 'content-type': 'text/plain' });
+    res.writeHead(500, {
+      'content-type': 'text/plain',
+      'x-trail-test': 'yes',
+    });
     res.end('server blew up');
   } else {
     res.writeHead(200, { 'content-type': 'text/plain' });

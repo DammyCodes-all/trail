@@ -193,10 +193,16 @@ function main() {
 
       // page1 interactions (after start)
       await testPage.click('#boom');
+      await testPage.click('#dbl');
+      await testPage.click('#dbl'); // identical adjacent repeat → one timeline group
       console.log('clicked boom');
       await testPage.click('#xhr');
       await testPage.evaluate(() =>
-        fetch('/missing', { method: 'POST' }).catch(() => {}),
+        fetch('/missing', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ qty: 2 }),
+        }).catch(() => {}),
       );
       await testPage.focus('#email');
       await testPage.type('#email', 'a@b.com');
@@ -358,13 +364,264 @@ function main() {
       }));
       assert(!incidentUi.text.includes('High severity'), 'review omits the severity label');
       assert(incidentUi.text.includes('Evidence timeline'), 'review leads with chronological evidence');
-      assert(incidentUi.text.includes('Session replay'), 'review places replay below the timeline');
+      assert(incidentUi.text.includes('Session replay'), 'review shows the session replay');
       assert(incidentUi.text.includes('DOM snapshot'), 'review exposes grouped runtime evidence');
       assert(incidentUi.text.includes('Create GitHub Issue'), 'review has one focused GitHub action');
       assert(!incidentUi.repoVisible, 'repo configuration stays out of the report until requested');
       assert(
         incidentUi.title.startsWith('Submit failed:'),
         'report title connects the triggering action to the captured failure',
+      );
+
+      // Layout: desktop uses a two-column evidence grid — timeline left, replay
+      // sticky on the right; mobile falls back to replay-first single column.
+      await review.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+      await sleep(250);
+      const layout = await review.evaluate(() => {
+        const grid = document.querySelector('[data-evidence-grid]');
+        const replay = document.querySelector('[data-sticky-replay]');
+        const timeline = [...document.querySelectorAll('section')].find((s) =>
+          s.textContent?.includes('Evidence timeline'),
+        );
+        const replayRect = replay?.getBoundingClientRect();
+        const timelineRect = timeline?.getBoundingClientRect();
+        return {
+          columns: grid
+            ? getComputedStyle(grid).gridTemplateColumns.split(' ').length
+            : 0,
+          replayLeft: replayRect ? replayRect.x : -1,
+          timelineLeft: timelineRect ? timelineRect.x : -1,
+        };
+      });
+      assert(
+        layout.columns === 2,
+        `review uses a two-column evidence layout (got ${layout.columns})`,
+      );
+      assert(
+        layout.replayLeft < layout.timelineLeft,
+        'replay sits left of the timeline on desktop',
+      );
+      await review.evaluate(() => window.scrollTo({ top: 500, behavior: 'instant' }));
+      await sleep(400);
+      const stickyTop = await review.evaluate(() => {
+        const el = document.querySelector('[data-sticky-replay]');
+        return el ? el.getBoundingClientRect().top : -1;
+      });
+      assert(
+        stickyTop >= 0 && stickyTop < 120,
+        `replay panel stays pinned near the viewport top while scrolling (top=${stickyTop})`,
+      );
+      await review.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+      await sleep(300);
+      await review.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+      await sleep(250);
+      const mobileLayout = await review.evaluate(() => {
+        const grid = document.querySelector('[data-evidence-grid]');
+        const replay = document.querySelector('[data-sticky-replay]');
+        const timeline = [...document.querySelectorAll('section')].find((s) =>
+          s.textContent?.includes('Evidence timeline'),
+        );
+        const replayRect = replay?.getBoundingClientRect();
+        const timelineRect = timeline?.getBoundingClientRect();
+        return {
+          columns: grid
+            ? getComputedStyle(grid).gridTemplateColumns.split(' ').length
+            : 0,
+          replayAboveTimeline:
+            replayRect !== undefined && timelineRect !== undefined
+              ? replayRect.y < timelineRect.y
+              : false,
+        };
+      });
+      assert(
+        mobileLayout.columns === 1,
+        `mobile falls back to a single column (got ${mobileLayout.columns})`,
+      );
+      assert(
+        mobileLayout.replayAboveTimeline,
+        'mobile orders the replay above the timeline for discoverability',
+      );
+      await review.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+      await sleep(250);
+
+      // Level dots: every timeline row carries a level indicator.
+      const dotCount = await review.evaluate(
+        () => document.querySelectorAll('[data-level]').length,
+      );
+      assert(dotCount > 0, 'timeline rows expose level dots');
+
+      // Segmented quick filters narrow the timeline to the chosen level.
+      const filterButtons = await review.evaluate(() =>
+        [...document.querySelectorAll('button')]
+          .map((b) => b.textContent?.trim())
+          .filter((t) => ['All', 'Errors', 'Network', 'User', 'Console'].includes(t ?? '')),
+      );
+      assert(
+        filterButtons.length === 5,
+        `segmented quick filters render (got ${filterButtons.length})`,
+      );
+      const allRows = await review.evaluate(
+        () => document.querySelectorAll('ol li').length,
+      );
+      await review.evaluate(() => {
+        const btn = [...document.querySelectorAll('button')].find(
+          (b) => b.textContent?.trim() === 'Errors',
+        );
+        btn?.click();
+      });
+      await sleep(150);
+      const errorRows = await review.evaluate(
+        () => document.querySelectorAll('ol li').length,
+      );
+      assert(
+        errorRows > 0 && errorRows < allRows,
+        `Errors filter narrows the timeline (${errorRows} of ${allRows} rows)`,
+      );
+      await review.evaluate(() => {
+        const btn = [...document.querySelectorAll('button')].find(
+          (b) => b.textContent?.trim() === 'All',
+        );
+        btn?.click();
+      });
+      await sleep(150);
+
+      // Repetitive interactions compress into one expandable grouped row.
+      const groupInfo = await review.evaluate(() => {
+        const li = [...document.querySelectorAll('li')].find((el) =>
+          el.textContent?.includes('interactions'),
+        );
+        if (!li) return null;
+        const toggle = li.querySelector('button[aria-expanded]');
+        return {
+          text: li.textContent ?? '',
+          open: toggle?.getAttribute('aria-expanded') ?? null,
+        };
+      });
+      assert(
+        groupInfo !== null && groupInfo.open !== null,
+        'repetitive interactions collapse into a grouped row with a toggle',
+      );
+      assert(
+        groupInfo.text.includes('Tap twice') && groupInfo.text.includes('2 interactions'),
+        'grouped row names the interaction and its count',
+      );
+      const wasOpen = groupInfo.open === 'true';
+      // Force the group closed (auto-expand may have opened it during
+      // playback), then expand it and count the revealed sub-rows.
+      for (let i = 0; i < 3 && wasOpen; i++) {
+        await review.evaluate(() => {
+          const li = [...document.querySelectorAll('li')].find((el) =>
+            el.textContent?.includes('interactions'),
+          );
+          li?.querySelector('button[aria-expanded]')?.click();
+        });
+        await sleep(150);
+      }
+      const rowsBeforeToggle = await review.evaluate(
+        () => document.querySelectorAll('ol li').length,
+      );
+      await review.evaluate(() => {
+        const li = [...document.querySelectorAll('li')].find((el) =>
+          el.textContent?.includes('interactions'),
+        );
+        li?.querySelector('button[aria-expanded]')?.click();
+      });
+      await sleep(200);
+      const rowsAfterToggle = await review.evaluate(
+        () => document.querySelectorAll('ol li').length,
+      );
+      assert(
+        rowsAfterToggle > rowsBeforeToggle,
+        'expanded group reveals the individual interactions',
+      );
+
+      // Network details: collapsed rows are compact; expanding shows headers,
+      // request body and response body — with sensitive values redacted.
+      await review.evaluate(() => {
+        const fail = [...document.querySelectorAll('[data-net-row]')].find((r) =>
+          r.textContent?.includes('/fail'),
+        );
+        fail?.querySelector('[data-details-toggle]')?.click();
+      });
+      await review.waitForFunction(
+        () => {
+          const fail = [...document.querySelectorAll('[data-net-row]')].find((r) =>
+            r.textContent?.includes('/fail'),
+          );
+          return !!fail && fail.textContent?.includes('Response headers');
+        },
+        { timeout: 5000, polling: 100 },
+      );
+      const failDetails = await review.evaluate(() => {
+        const fail = [...document.querySelectorAll('[data-net-row]')].find((r) =>
+          r.textContent?.includes('/fail'),
+        );
+        return fail?.textContent ?? '';
+      });
+      assert(
+        failDetails.includes('authorization'),
+        'expanded failure shows the Authorization header name',
+      );
+      assert(failDetails.includes('[redacted]'), 'sensitive header values are redacted');
+      assert(
+        !failDetails.includes('hunter2'),
+        'redacted header value never leaks the secret',
+      );
+      await review.evaluate(() => {
+        const missing = [...document.querySelectorAll('[data-net-row]')].find((r) =>
+          r.textContent?.includes('/missing'),
+        );
+        missing?.querySelector('[data-details-toggle]')?.click();
+      });
+      await review.waitForFunction(
+        () => {
+          const missing = [...document.querySelectorAll('[data-net-row]')].find((r) =>
+            r.textContent?.includes('/missing'),
+          );
+          return !!missing && missing.textContent?.includes('Request body');
+        },
+        { timeout: 5000, polling: 100 },
+      );
+      const missingDetails = await review.evaluate(() => {
+        const missing = [...document.querySelectorAll('[data-net-row]')].find((r) =>
+          r.textContent?.includes('/missing'),
+        );
+        return missing?.textContent ?? '';
+      });
+      assert(
+        missingDetails.includes('X-Trail-Test'),
+        'response headers of the failed request are captured',
+      );
+      assert(
+        missingDetails.includes('qty') && missingDetails.includes('2'),
+        'request body of the failed request is captured',
+      );
+
+      // Console details: expanding a row reveals the full message and stack.
+      await review.evaluate(() => {
+        const boom = [...document.querySelectorAll('[data-console-row]')].find((r) =>
+          r.textContent?.includes('price calc failed'),
+        );
+        boom?.querySelector('[data-details-toggle]')?.click();
+      });
+      await review.waitForFunction(
+        () => {
+          const boom = [...document.querySelectorAll('[data-console-row]')].find((r) =>
+            r.textContent?.includes('price calc failed'),
+          );
+          return !!boom && boom.textContent?.includes('Stack trace');
+        },
+        { timeout: 5000, polling: 100 },
+      );
+      const consoleDetails = await review.evaluate(() => {
+        const boom = [...document.querySelectorAll('[data-console-row]')].find((r) =>
+          r.textContent?.includes('price calc failed'),
+        );
+        return boom?.textContent ?? '';
+      });
+      assert(
+        consoleDetails.includes('Stack trace') && consoleDetails.includes('boom: price calc failed'),
+        'expanded console row shows the full message and stack trace',
       );
       await review.evaluate(() => {
         const step = [...document.querySelectorAll('button')].find((el) =>

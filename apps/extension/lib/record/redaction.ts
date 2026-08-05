@@ -40,3 +40,18 @@ export const maskInputs = (redact: boolean) => ({
   ...(redact ? MASKED_FREE_TEXT : {}),
   password: true, // always, even when redact is off
 });
+
+// Header names whose values never leave the page. The key stays visible (so a
+// report shows "an Authorization header was sent") but the value is replaced.
+const SENSITIVE_HEADERS =
+  /^authorization$|^cookie$|^set-cookie$|^proxy-authorization$|^www-authenticate$|^x-?api-?key$|^x-?auth-?token$/i;
+
+export const redactHeaders = (
+  headers: Record<string, string>,
+): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    out[name] = SENSITIVE_HEADERS.test(name) ? '[redacted]' : value;
+  }
+  return out;
+};

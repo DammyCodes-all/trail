@@ -292,7 +292,17 @@ function App() {
             method: event.method,
             url: event.target,
             httpVersion: "",
-            headers: [],
+            headers: Object.entries(event.requestHeaders ?? {}).map(
+              ([name, value]) => ({ name, value }),
+            ),
+            ...(event.requestBody
+              ? {
+                  postData: {
+                    mimeType: "application/octet-stream",
+                    text: event.requestBody,
+                  },
+                }
+              : {}),
             queryString: [],
             cookies: [],
             headersSize: -1,
@@ -302,7 +312,9 @@ function App() {
             status: event.status,
             statusText: event.err ?? "",
             httpVersion: "",
-            headers: [],
+            headers: Object.entries(event.responseHeaders ?? {}).map(
+              ([name, value]) => ({ name, value }),
+            ),
             cookies: [],
             content: {
               size: event.body?.length ?? 0,
@@ -451,20 +463,29 @@ function App() {
       />
 
       <main className="min-w-0">
-        <TimelineCard
-          steps={timeline}
-          t0={t0}
-          replayT0={replayT0}
-          currentTime={currentReplayTime}
-          onSeek={seekReplay}
-        />
-        <ReplayPanel
-          ref={replayRef}
-          events={rrwebEvents}
-          facts={facts}
-          currentTime={currentReplayTime}
-          onCurrentTimeChange={handleReplayTimeChange}
-        />
+        <div
+          data-evidence-grid="true"
+          className="grid min-w-0 grid-cols-1 border-border lg:grid-cols-[minmax(0,5fr)_minmax(0,4fr)] lg:gap-x-10 lg:border-b"
+        >
+          <div className="min-w-0">
+            <ReplayPanel
+              ref={replayRef}
+              events={rrwebEvents}
+              facts={facts}
+              currentTime={currentReplayTime}
+              onCurrentTimeChange={handleReplayTimeChange}
+            />
+          </div>
+          <div className="min-w-0">
+            <TimelineCard
+              steps={timeline}
+              t0={t0}
+              replayT0={replayT0}
+              currentTime={currentReplayTime}
+              onSeek={seekReplay}
+            />
+          </div>
+        </div>
         <EvidencePanel events={events} t0={t0} onSeek={seekReplay} />
       </main>
 
