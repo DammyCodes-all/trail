@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -21,9 +21,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { prettyBody } from "@/lib/pretty";
 import type { ConsoleEvent, NetEvent, StoredEvent } from "@/lib/types";
 import { formatElapsedTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
+import { highlightCode } from "../lib/highlight";
 
 function SectionHeader({
   icon: Icon,
@@ -168,16 +170,28 @@ function HeaderTable({
 }
 
 function BodyBlock({ title, body }: { title: string; body: string }) {
+  // Pretty-print JSON/urlencoded bodies, then highlight. Memoized per body so
+  // toggling tabs never re-runs the tokenizer.
+  const html = useMemo(() => {
+    const { text, lang } = prettyBody(body);
+    return highlightCode(text, lang);
+  }, [body]);
   return (
     <div>
       <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
         {title}
       </h4>
-      <pre className="wrap-break-word max-h-64 overflow-auto whitespace-pre-wrap rounded-sm border border-border bg-background/50 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
-        {body}
+      <pre className="wrap-break-word whitespace-pre-wrap rounded-sm border border-border bg-background/50 px-3 py-2.5 font-mono text-[11px] leading-relaxed">
+        <code className="text-foreground" dangerouslySetInnerHTML={{ __html: html }} />
       </pre>
     </div>
   );
+}
+
+// Detail panels scroll inside a capped height so a long body or header list
+// never stretches the row (the tab strip stays pinned above it).
+function ScrollPane({ children }: { children: React.ReactNode }) {
+  return <div className="max-h-80 overflow-y-auto px-4 py-4">{children}</div>;
 }
 
 function ConsoleRow({
@@ -229,18 +243,22 @@ function ConsoleRow({
               ]}
             >
               <TabsPanels>
-                <TabsPanel value="message" keepMounted className="px-4 py-4">
-                  <BodyBlock title="Message" body={event.msg || `Console ${event.lv}`} />
+                <TabsPanel value="message" keepMounted>
+                  <ScrollPane>
+                    <BodyBlock title="Message" body={event.msg || `Console ${event.lv}`} />
+                  </ScrollPane>
                 </TabsPanel>
-                <TabsPanel value="stack" keepMounted className="px-4 py-4">
-                  <BodyBlock title="Stack trace" body={event.stack} />
+                <TabsPanel value="stack" keepMounted>
+                  <ScrollPane>
+                    <BodyBlock title="Stack trace" body={event.stack} />
+                  </ScrollPane>
                 </TabsPanel>
               </TabsPanels>
             </DetailTabs>
           ) : (
-            <div className="px-4 py-4">
+            <ScrollPane>
               <BodyBlock title="Message" body={event.msg || `Console ${event.lv}`} />
-            </div>
+            </ScrollPane>
           )}
         </div>
       )}
@@ -357,22 +375,32 @@ function NetworkRow({
                   </>
                 );
                 if (tabs.length === 1) {
-                  return <div className="grid gap-3 px-4 py-4">{general}</div>;
+                  return (
+                    <ScrollPane>
+                      <div className="grid gap-3">{general}</div>
+                    </ScrollPane>
+                  );
                 }
                 return (
                   <DetailTabs tabs={tabs}>
                     <TabsPanels>
-                      <TabsPanel value="headers" keepMounted className="px-4 py-4">
-                        <div className="grid gap-3">{general}</div>
+                      <TabsPanel value="headers" keepMounted>
+                        <ScrollPane>
+                          <div className="grid gap-3">{general}</div>
+                        </ScrollPane>
                       </TabsPanel>
                       {event.requestBody ? (
-                        <TabsPanel value="payload" keepMounted className="px-4 py-4">
-                          <BodyBlock title="Request body" body={event.requestBody} />
+                        <TabsPanel value="payload" keepMounted>
+                          <ScrollPane>
+                            <BodyBlock title="Request body" body={event.requestBody} />
+                          </ScrollPane>
                         </TabsPanel>
                       ) : null}
                       {event.body ? (
-                        <TabsPanel value="response" keepMounted className="px-4 py-4">
-                          <BodyBlock title="Response body" body={event.body} />
+                        <TabsPanel value="response" keepMounted>
+                          <ScrollPane>
+                            <BodyBlock title="Response body" body={event.body} />
+                          </ScrollPane>
                         </TabsPanel>
                       ) : null}
                     </TabsPanels>

@@ -124,7 +124,13 @@ export function buildSections(
       text: nets
         .map((e) => {
           const line = `- ${e.method} ${e.target} — ${e.status}${e.err ? ` (${e.err})` : ''}`;
-          return e.body ? `${line}\n  \`\`\`\n${e.body}\n  \`\`\`` : line;
+          // Capture stores large bodies for the review UI; the report keeps a
+          // tight cap so issue bodies stay within the tracker's budget.
+          const body =
+            e.body && e.body.length > 4000
+              ? `${e.body.slice(0, 4000)}\n...(truncated)`
+              : e.body;
+          return body ? `${line}\n  \`\`\`\n${body}\n  \`\`\`` : line;
         })
         .join('\n'),
     });

@@ -23,6 +23,19 @@ export function buildTimeline(events: StoredEvent[], redact = true): TimelineSte
   let lastUrl = '';
 
   for (const e of nonRrweb) {
+    // Real nav events are recorded at every document boot and always become a
+    // step — including same-URL refreshes, which the URL-diff synthesis below
+    // can never see. Synthesis remains as a fallback for URL changes that
+    // arrive without a boot event (SPA pushes, legacy events).
+    if (e.k === 'nav') {
+      steps.push({
+        t: e.t,
+        kind: 'nav',
+        text: e.reload ? `Reloaded ${e.url}` : `Navigate to ${e.url}`,
+      });
+      lastUrl = e.url;
+      continue;
+    }
     if (e.url && e.url !== lastUrl) {
       steps.push({ t: e.t, kind: 'nav', text: `Navigate to ${e.url}` });
       lastUrl = e.url;

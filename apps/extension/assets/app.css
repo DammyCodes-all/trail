@@ -75,6 +75,44 @@
   box-shadow: none;
 }
 
+/*
+ * Syntax highlighting for captured bodies (highlight.js output).
+ * Mapped onto TRAIL tokens: keys/attrs = info blue, strings = success green,
+ * numbers = warn amber, literals = foreground, punctuation/tags = subtle.
+ */
+.hljs-attr {
+  color: var(--trail-info);
+}
+
+.hljs-string {
+  color: var(--trail-success);
+}
+
+.hljs-number {
+  color: var(--trail-warn);
+}
+
+.hljs-literal,
+.hljs-keyword {
+  color: var(--trail-text);
+  font-weight: 600;
+}
+
+.hljs-punctuation,
+.hljs-tag {
+  color: var(--trail-text-subtle);
+}
+
+.hljs-name,
+.hljs-meta {
+  color: var(--trail-info);
+}
+
+.hljs-comment {
+  color: var(--trail-text-subtle);
+  font-style: italic;
+}
+
 .replay .rr-player__frame {
   background: var(--trail-bg);
 }
