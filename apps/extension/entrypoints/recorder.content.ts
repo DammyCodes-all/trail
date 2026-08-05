@@ -4,6 +4,7 @@ import { instrumentConsole } from "@/lib/record/console";
 import { instrumentClicks, instrumentInputs } from "@/lib/record/interactions";
 import { instrumentNetwork } from "@/lib/record/network";
 import { createRrweb } from "@/lib/record/rrweb";
+import type { NavEvent } from "@/lib/types";
 
 declare global {
   interface Window {
@@ -75,6 +76,21 @@ export default defineContentScript({
     // ---- rrweb: visual replay only ----
     setActive(true);
     rrweb.start();
+
+    // ---- Landmark: this document load ----
+    // Every boot is a page load in the session tab, so emit it as a real event.
+    // Same-URL refreshes otherwise leave no trace: buildTimeline() synthesizes
+    // nav steps only when the URL changes. Stray-tab boots are dropped by the
+    // background's session gate. navigation.type is sync at document_start;
+    // the modern entry (getEntriesByType) may not be populated yet, so fall back.
+    const reload =
+      (performance.getEntriesByType?.("navigation")[0] as
+        | PerformanceNavigationTiming
+        | undefined)?.type === "reload" ||
+      (performance as unknown as { navigation?: { type: number } }).navigation
+        ?.type === 1;
+    const nav: NavEvent = { k: "nav", t: Date.now(), url: location.href, reload };
+    ctx.emit(nav);
 
     // Announce the boot: a page that loaded mid-session inherits this recorder,
     // and the relay decides whether it belongs here by re-checking the session.

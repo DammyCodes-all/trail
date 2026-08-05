@@ -1,7 +1,18 @@
 export interface BaseTrailEvent {
-  k: 'click' | 'input' | 'console' | 'net' | 'rrweb';
+  k: 'click' | 'input' | 'console' | 'net' | 'nav' | 'rrweb';
   t: number;
   url: string;
+}
+
+// Emitted by the recorder at document boot. Unlike clicks/inputs/console/net
+// (captured), a nav event is a landmark: it makes page loads — including
+// same-URL refreshes — visible on the timeline and in the report.
+export interface NavEvent extends BaseTrailEvent {
+  k: 'nav';
+  // True when the browser reports this load as a reload of the same document
+  // (address-bar refresh, F5, location.reload). False for first loads and
+  // ordinary navigations, including same-URL ones via a link.
+  reload?: boolean;
 }
 
 export interface ClickEvent extends BaseTrailEvent {
@@ -45,7 +56,7 @@ export interface RrwebEvent extends BaseTrailEvent {
   ev: unknown;
 }
 
-export type TrailEvent = ClickEvent | InputEvent | ConsoleEvent | NetEvent | RrwebEvent;
+export type TrailEvent = ClickEvent | InputEvent | ConsoleEvent | NetEvent | NavEvent | RrwebEvent;
 
 export type StoredEvent = TrailEvent & { seq: number };
 
