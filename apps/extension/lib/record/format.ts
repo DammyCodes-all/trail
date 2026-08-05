@@ -27,3 +27,21 @@ export const bodyText = (s: unknown): string | undefined => {
     ? `${str.slice(0, BODY_LIMIT)}\n...(truncated)`
     : str;
 };
+
+// Request bodies sent by the page, capped tighter than responses. Only
+// string-like payloads are captured: Blob/FormData/streams are skipped rather
+// than consumed or read asynchronously.
+export const REQUEST_BODY_LIMIT = 2000;
+export const requestBodyText = (s: unknown): string | undefined => {
+  if (s == null) return undefined;
+  const str =
+    typeof s === "string"
+      ? s
+      : s instanceof URLSearchParams
+        ? s.toString()
+        : undefined;
+  if (str === undefined || !str.trim()) return undefined;
+  return str.length > REQUEST_BODY_LIMIT
+    ? `${str.slice(0, REQUEST_BODY_LIMIT)}\n...(truncated)`
+    : str;
+};

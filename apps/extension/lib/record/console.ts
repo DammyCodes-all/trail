@@ -34,7 +34,7 @@ export const instrumentConsole = (ctx: RecordContext) => {
         t: Date.now(),
         url: pageUrl(),
         msg: e.message,
-        stack: e.error?.stack?.slice(0, 500),
+        stack: e.error?.stack?.slice(0, 2000),
       };
       emit(ev);
     },

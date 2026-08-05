@@ -121,9 +121,10 @@ export const ReplayPanel = forwardRef<
   return (
     <section
       ref={panelRef}
-      className="min-w-0 border-b border-border bg-background py-8 sm:py-10 fullscreen:overflow-auto fullscreen:p-4"
+      className="min-w-0 border-b border-border bg-background py-8 sm:py-10 lg:h-full lg:border-b-0 fullscreen:overflow-auto fullscreen:p-4"
     >
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div data-sticky-replay="true" className="lg:sticky lg:top-6">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-heading text-base font-semibold text-foreground">
           Session replay
         </h2>
@@ -178,6 +179,7 @@ export const ReplayPanel = forwardRef<
       <p className="sr-only">
         Recorded in {facts.browser} on {facts.os}.
       </p>
+      </div>
     </section>
   );
 });
