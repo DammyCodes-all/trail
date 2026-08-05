@@ -277,18 +277,21 @@ export function TimelineCard({
 
   const absoluteTime = replayT0 + currentTime;
 
-  // A collapsed group opens itself once the replay reaches its range.
+  // A collapsed group opens itself once the replay reaches its range — unless
+  // the user just collapsed it. Collapsing wins over auto-expand for the rest
+  // of the pass; leaving the range resets the intent so a fresh pass re-opens.
+  const userCollapsed = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     const due: string[] = [];
     rows.forEach((row, index) => {
-      if (
-        row.kind === "group" &&
-        row.steps.length > 1 &&
-        !expanded.has(`row-${index}`) &&
-        absoluteTime >= row.start - 250 &&
-        absoluteTime <= row.end + 250
-      ) {
-        due.push(`row-${index}`);
+      if (row.kind !== "group" || row.steps.length <= 1) return;
+      const key = `row-${index}`;
+      const inside = absoluteTime >= row.start - 250 && absoluteTime <= row.end + 250;
+      if (inside) {
+        if (!expanded.has(key) && !userCollapsed.current.has(key)) due.push(key);
+      } else {
+        userCollapsed.current.delete(key);
       }
     });
     if (due.length) {
@@ -340,9 +343,11 @@ export function TimelineCard({
   }, [activeIndex]);
 
   const toggleGroup = (index: number) => {
+    const key = `row-${index}`;
+    if (expanded.has(key)) userCollapsed.current.add(key);
+    else userCollapsed.current.delete(key);
     setExpanded((prev) => {
       const next = new Set(prev);
-      const key = `row-${index}`;
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
@@ -432,7 +437,10 @@ export function TimelineCard({
                         active && "bg-accent",
                         !active && "hover:bg-muted/70",
                       )}
-                      onClick={() => onSeek(group.start)}
+                      onClick={() => {
+                        onSeek(group.start);
+                        toggleGroup(groupIndex as number);
+                      }}
                       aria-current={active ? "step" : undefined}
                       aria-expanded={expanded.has(groupKey)}
                     >

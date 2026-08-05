@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Braces,
   ChevronDown,
   ChevronRight,
   CircleCheck,
@@ -8,6 +7,15 @@ import {
   Terminal,
 } from "lucide-react";
 
+import {
+  Tabs,
+  TabsHighlight,
+  TabsHighlightItem,
+  TabsList,
+  TabsPanel,
+  TabsPanels,
+  TabsTab,
+} from "@/components/animate-ui/primitives/base/tabs";
 import {
   Collapsible,
   CollapsibleContent,
@@ -28,27 +36,32 @@ function SectionHeader({
   title: string;
   count?: number;
   open: boolean;
-  tone: "error" | "warn" | "neutral";
+  tone: "error" | "warn";
 }) {
   return (
-    <CollapsibleTrigger className="group flex min-h-14 w-full cursor-pointer items-center gap-3 px-4 py-3 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50">
+    <CollapsibleTrigger className="group flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-3 text-left outline-none transition-colors duration-150 hover:bg-muted/50 active:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring/50">
       <Icon
-        className={cn(
-          "size-4",
-          tone === "error" ? "text-destructive" : "text-warn",
-          tone === "neutral" && "text-muted-foreground",
-        )}
+        className={cn("size-4", tone === "error" ? "text-destructive" : "text-warn")}
         aria-hidden="true"
       />
-      <span className="text-sm font-semibold text-foreground">{title}</span>
+      <span className="font-heading text-sm font-semibold text-foreground">
+        {title}
+      </span>
       {typeof count === "number" ? (
-        <span className="ml-auto rounded-sm bg-muted px-2 py-1 font-mono text-[10px] text-muted-foreground">
+        <span
+          className={cn(
+            "ml-auto rounded-sm px-2 py-1 font-mono text-[10px] font-medium tabular-nums",
+            tone === "error"
+              ? "bg-destructive-soft text-destructive"
+              : "bg-warn-soft text-warn",
+          )}
+        >
           {count}
         </span>
       ) : null}
       <ChevronRight
         className={cn(
-          "size-4 text-muted-foreground transition-transform duration-200 ease-out",
+          "size-4 text-muted-foreground transition-transform duration-150 ease-out",
           open && "rotate-90",
         )}
         aria-hidden="true"
@@ -70,7 +83,7 @@ function DetailsToggle({
       data-details-toggle="true"
       aria-expanded={expanded}
       aria-label={expanded ? "Hide details" : "Show details"}
-      className="flex w-9 shrink-0 cursor-pointer items-center justify-center self-stretch rounded-sm text-muted-foreground outline-none transition-colors duration-150 hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="flex w-9 shrink-0 cursor-pointer items-center justify-center self-stretch rounded-sm text-muted-foreground outline-none transition-colors duration-150 hover:bg-muted/60 hover:text-foreground active:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
       onClick={onToggle}
     >
       <ChevronDown
@@ -81,6 +94,38 @@ function DetailsToggle({
         aria-hidden="true"
       />
     </button>
+  );
+}
+
+function DetailTabs({
+  tabs,
+  children,
+}: {
+  tabs: { id: string; label: string }[];
+  children: React.ReactNode;
+}) {
+  const [tab, setTab] = useState(tabs[0]?.id ?? "");
+  return (
+    <Tabs value={tab} onValueChange={setTab}>
+      <TabsHighlight
+        className="absolute bottom-0 left-0 right-0 h-0.5 rounded-none bg-foreground"
+        transition={{ type: "spring", stiffness: 400, damping: 35 }}
+      >
+        <TabsList className="flex w-full border-b border-border/70 px-4">
+          {tabs.map((t) => (
+            <TabsHighlightItem key={t.id} value={t.id} className="flex-1">
+              <TabsTab
+                value={t.id}
+                className="w-full cursor-pointer px-3 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground outline-none transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 data-[selected]:text-foreground"
+              >
+                {t.label}
+              </TabsTab>
+            </TabsHighlightItem>
+          ))}
+        </TabsList>
+      </TabsHighlight>
+      {children}
+    </Tabs>
   );
 }
 
@@ -95,13 +140,16 @@ function HeaderTable({
   if (!entries.length) return null;
   return (
     <div>
-      <h4 className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
         {title}
       </h4>
-      <dl className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)] gap-x-4 gap-y-1 rounded-sm border border-border/70 bg-background/60 px-3 py-2">
+      <dl className="divide-y divide-border/60 overflow-hidden rounded-sm border border-border bg-background/50">
         {entries.map(([name, value]) => (
-          <div key={name} className="contents">
-            <dt className="wrap-break-word py-0.5 font-mono text-[11px] font-medium text-foreground/80">
+          <div
+            key={name}
+            className="grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-x-4 px-3 py-2"
+          >
+            <dt className="wrap-break-word py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
               {name}
             </dt>
             <dd
@@ -122,10 +170,10 @@ function HeaderTable({
 function BodyBlock({ title, body }: { title: string; body: string }) {
   return (
     <div>
-      <h4 className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
         {title}
       </h4>
-      <pre className="max-h-64 overflow-auto whitespace-pre-wrap wrap-break-word rounded-sm border border-border/70 bg-background/60 px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+      <pre className="wrap-break-word max-h-64 overflow-auto whitespace-pre-wrap rounded-sm border border-border bg-background/50 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
         {body}
       </pre>
     </div>
@@ -143,28 +191,27 @@ function ConsoleRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div data-console-row="true" className="border-t border-border/70">
+    <div data-console-row="true">
       <div className="flex items-stretch">
         <button
           type="button"
-          className="grid min-w-0 flex-1 cursor-pointer grid-cols-[3.5rem_minmax(0,1fr)] gap-3 px-2 py-3 text-left outline-none transition-colors duration-150 hover:bg-muted/60 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="grid min-h-11 min-w-0 flex-1 cursor-pointer grid-cols-[3rem_minmax(0,1fr)] items-start gap-3 px-4 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-muted/40 active:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/50"
           onClick={() => onSeek(event.t)}
         >
-          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span className="pt-0.5 font-mono text-[11px] tabular-nums text-muted-foreground/70">
             {formatElapsedTime(event.t - t0)}
           </span>
           <span className="min-w-0">
             <span
               className={cn(
-                "block text-[13px] font-medium leading-relaxed wrap-break-word",
-                expanded ? "" : "line-clamp-2",
+                "wrap-break-word block font-mono text-[11px] font-medium leading-relaxed line-clamp-2",
                 event.lv === "error" ? "text-destructive" : "text-warn",
               )}
             >
               {event.msg || `Console ${event.lv}`}
             </span>
             {!expanded && event.stack && (
-              <span className="mt-1 block font-mono text-[10px] text-muted-foreground">
+              <span className="mt-1 block font-mono text-[10px] text-subtle-foreground">
                 Stack trace
               </span>
             )}
@@ -173,9 +220,28 @@ function ConsoleRow({
         <DetailsToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
       </div>
       {expanded && (
-        <div className="grid gap-3 border-t border-border/70 px-3 py-3 sm:px-4">
-          <BodyBlock title="Message" body={event.msg || `Console ${event.lv}`} />
-          {event.stack ? <BodyBlock title="Stack trace" body={event.stack} /> : null}
+        <div className="border-t border-border/60">
+          {event.stack ? (
+            <DetailTabs
+              tabs={[
+                { id: "message", label: "Message" },
+                { id: "stack", label: "Stack trace" },
+              ]}
+            >
+              <TabsPanels>
+                <TabsPanel value="message" keepMounted className="px-4 py-4">
+                  <BodyBlock title="Message" body={event.msg || `Console ${event.lv}`} />
+                </TabsPanel>
+                <TabsPanel value="stack" keepMounted className="px-4 py-4">
+                  <BodyBlock title="Stack trace" body={event.stack} />
+                </TabsPanel>
+              </TabsPanels>
+            </DetailTabs>
+          ) : (
+            <div className="px-4 py-4">
+              <BodyBlock title="Message" body={event.msg || `Console ${event.lv}`} />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -209,43 +275,33 @@ function NetworkRow({
     responseHeaders
   );
   return (
-    <div data-net-row="true" className="border-t border-border/70">
+    <div data-net-row="true">
       <div className="flex items-stretch">
         <button
           type="button"
-          className="grid min-w-0 flex-1 cursor-pointer grid-cols-[3.5rem_3.25rem_minmax(0,1fr)_2.5rem] gap-2 px-2 py-3 text-left outline-none transition-colors duration-150 hover:bg-muted/60 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="grid min-h-11 min-w-0 flex-1 cursor-pointer grid-cols-[3rem_minmax(0,1fr)_auto] items-start gap-3 px-4 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-muted/40 active:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/50"
           onClick={() => onSeek(event.t)}
         >
-          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span className="pt-0.5 font-mono text-[11px] tabular-nums text-muted-foreground/70">
             {formatElapsedTime(event.t - t0)}
           </span>
-          <span className="font-mono text-[10px] font-medium text-foreground">
-            {event.method}
-          </span>
           <span className="min-w-0">
-            <span
-              className="block truncate font-mono text-[11px] text-foreground"
-              title={event.target}
-            >
-              {event.target}
+            <span className="block font-mono text-[11px] text-foreground">
+              <span className="mr-2 font-semibold text-foreground">{event.method}</span>
+              <span className="wrap-break-word text-muted-foreground">{event.target}</span>
             </span>
             {(event.err || event.body) && (
-              <span
-                className={cn(
-                  "mt-1 block font-mono text-[10px] leading-relaxed text-muted-foreground",
-                  expanded ? "" : "line-clamp-2",
-                )}
-              >
+              <span className="wrap-break-word mt-1 block font-mono text-[11px] leading-relaxed text-subtle-foreground line-clamp-2">
                 {event.err || event.body}
               </span>
             )}
           </span>
           <span
             className={cn(
-              "justify-self-end rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold",
+              "mt-0.5 justify-self-end rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-semibold",
               critical
-                ? "bg-destructive/10 text-destructive"
-                : "bg-warn/10 text-warn",
+                ? "bg-destructive-soft text-destructive"
+                : "bg-warn-soft text-warn",
             )}
           >
             {event.status || "ERR"}
@@ -254,43 +310,78 @@ function NetworkRow({
         <DetailsToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
       </div>
       {expanded && (
-        <div className="grid gap-3 border-t border-border/70 px-3 py-3 sm:px-4">
-          <dl className="grid gap-1.5 text-[11px]">
-            <div className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)] gap-x-4">
-              <dt className="font-mono font-medium uppercase tracking-wider text-muted-foreground">
-                Request
-              </dt>
-              <dd className="wrap-break-word font-mono text-foreground">
-                {event.method} {event.target}
-                <span className="ml-2 text-muted-foreground">
-                  via {event.via} · {formatElapsedTime(event.t - t0)}
-                </span>
-              </dd>
-            </div>
-            <div className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)] gap-x-4">
-              <dt className="font-mono font-medium uppercase tracking-wider text-muted-foreground">
-                Status
-              </dt>
-              <dd
-                className={cn(
-                  "font-mono",
-                  critical ? "text-destructive" : "text-warn",
-                )}
-              >
-                {event.status || "ERR"}
-                {event.err ? ` — ${event.err}` : ""}
-              </dd>
-            </div>
-          </dl>
+        <div className="border-t border-border/60">
           {hasDetails ? (
             <>
-              {requestHeaders ? <HeaderTable title="Request headers" headers={requestHeaders} /> : null}
-              {responseHeaders ? <HeaderTable title="Response headers" headers={responseHeaders} /> : null}
-              {event.requestBody ? <BodyBlock title="Request body" body={event.requestBody} /> : null}
-              {event.body ? <BodyBlock title="Response body" body={event.body} /> : null}
+              {(() => {
+                const tabs: { id: string; label: string }[] = [
+                  { id: "headers", label: "Headers" },
+                ];
+                if (event.requestBody) tabs.push({ id: "payload", label: "Payload" });
+                if (event.body) tabs.push({ id: "response", label: "Response" });
+                const general = (
+                  <>
+                    <dl className="grid gap-2 text-[11px]">
+                      <div className="grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-x-4">
+                        <dt className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                          Request
+                        </dt>
+                        <dd className="wrap-break-word font-mono text-foreground">
+                          {event.method} {event.target}
+                          <span className="ml-2 text-muted-foreground">
+                            via {event.via} · {formatElapsedTime(event.t - t0)}
+                          </span>
+                        </dd>
+                      </div>
+                      <div className="grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-x-4">
+                        <dt className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                          Status
+                        </dt>
+                        <dd
+                          className={cn(
+                            "font-mono",
+                            critical ? "text-destructive" : "text-warn",
+                          )}
+                        >
+                          {event.status || "ERR"}
+                          {event.err ? ` — ${event.err}` : ""}
+                        </dd>
+                      </div>
+                    </dl>
+                    {requestHeaders ? (
+                      <HeaderTable title="Request headers" headers={requestHeaders} />
+                    ) : null}
+                    {responseHeaders ? (
+                      <HeaderTable title="Response headers" headers={responseHeaders} />
+                    ) : null}
+                  </>
+                );
+                if (tabs.length === 1) {
+                  return <div className="grid gap-3 px-4 py-4">{general}</div>;
+                }
+                return (
+                  <DetailTabs tabs={tabs}>
+                    <TabsPanels>
+                      <TabsPanel value="headers" keepMounted className="px-4 py-4">
+                        <div className="grid gap-3">{general}</div>
+                      </TabsPanel>
+                      {event.requestBody ? (
+                        <TabsPanel value="payload" keepMounted className="px-4 py-4">
+                          <BodyBlock title="Request body" body={event.requestBody} />
+                        </TabsPanel>
+                      ) : null}
+                      {event.body ? (
+                        <TabsPanel value="response" keepMounted className="px-4 py-4">
+                          <BodyBlock title="Response body" body={event.body} />
+                        </TabsPanel>
+                      ) : null}
+                    </TabsPanels>
+                  </DetailTabs>
+                );
+              })()}
             </>
           ) : (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="px-4 py-4 text-[11px] text-subtle-foreground">
               No headers or body were captured for this request.
             </p>
           )}
@@ -302,7 +393,7 @@ function NetworkRow({
 
 function EmptyState({ children }: { children: string }) {
   return (
-    <div className="flex items-center gap-2 border-t border-border px-4 py-4 text-sm text-muted-foreground">
+    <div className="flex items-center gap-2.5 px-4 py-4 text-sm text-muted-foreground">
       <CircleCheck className="size-4 text-success" aria-hidden="true" />
       {children}
     </div>
@@ -320,14 +411,12 @@ export function EvidencePanel({
 }) {
   const consoles = events.filter((event): event is StoredEvent & ConsoleEvent => event.k === "console");
   const requests = events.filter((event): event is StoredEvent & NetEvent => event.k === "net");
-  const rrwebCount = events.filter((event) => event.k === "rrweb").length;
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [networkOpen, setNetworkOpen] = useState(false);
-  const [domOpen, setDomOpen] = useState(false);
 
   return (
     <section className="border-b border-border py-8 sm:py-10">
-      <div className="overflow-hidden rounded-sm border border-border bg-card/40">
+      <div className="overflow-hidden rounded-sm border border-border bg-card/30">
         <Collapsible open={networkOpen} onOpenChange={setNetworkOpen}>
           <SectionHeader
             icon={Network}
@@ -338,9 +427,11 @@ export function EvidencePanel({
           />
           <CollapsibleContent>
             {requests.length ? (
-              requests.map((event) => (
-                <NetworkRow key={event.seq} event={event} t0={t0} onSeek={onSeek} />
-              ))
+              <div className="divide-y divide-border/60">
+                {requests.map((event) => (
+                  <NetworkRow key={event.seq} event={event} t0={t0} onSeek={onSeek} />
+                ))}
+              </div>
             ) : (
               <EmptyState>No network failures captured.</EmptyState>
             )}
@@ -356,27 +447,14 @@ export function EvidencePanel({
           />
           <CollapsibleContent>
             {consoles.length ? (
-              consoles.map((event) => (
-                <ConsoleRow key={event.seq} event={event} t0={t0} onSeek={onSeek} />
-              ))
+              <div className="divide-y divide-border/60">
+                {consoles.map((event) => (
+                  <ConsoleRow key={event.seq} event={event} t0={t0} onSeek={onSeek} />
+                ))}
+              </div>
             ) : (
               <EmptyState>No console errors captured.</EmptyState>
             )}
-          </CollapsibleContent>
-        </Collapsible>
-        <Collapsible open={domOpen} onOpenChange={setDomOpen}>
-          <SectionHeader
-            icon={Braces}
-            title="DOM snapshot"
-            open={domOpen}
-            tone="neutral"
-          />
-          <CollapsibleContent>
-            <div className="border-t border-border px-4 py-4 text-sm text-muted-foreground">
-              {rrwebCount
-                ? `${rrwebCount} rrweb frames include the captured DOM snapshots used by the replay.`
-                : "No DOM snapshot frames were captured."}
-            </div>
           </CollapsibleContent>
         </Collapsible>
       </div>
