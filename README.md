@@ -21,7 +21,7 @@ TRAIL does the remembering for you. No SDK, no app instrumentation, no account. 
 - Generates a deterministic Markdown report plus a prefilled GitHub new-issue URL. No AI calls anywhere in the path.
 - Maps the report onto the target repo's actual GitHub issue templates.
 - Saves every report to history. Reopening one restores the full review screen: replay, timeline, exported report.
-- Shares a session as a link. Paste it into another TRAIL popup and it imports into that person's history with the same review UI. Nothing uploads until you hit Share.
+- Shares a session as a link. Paste it into another TRAIL popup and it imports into that person's history with the same review UI. Nothing uploads until you hit Share. Re-sharing an unchanged session reuses the existing link — the payload is hashed locally (title edits don't count), so it never re-uploads to blob storage.
 
 ## Tech stack
 

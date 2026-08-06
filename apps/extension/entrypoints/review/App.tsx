@@ -22,6 +22,12 @@ import {
   type IssueTemplate,
 } from "@/lib/templates";
 import { buildTimeline } from "@/lib/timeline";
+import {
+  getCachedShare,
+  hashSession,
+  rememberShare,
+  stableShareJson,
+} from "@/lib/share-cache";
 import type {
   SharedReportPayload,
   StoredEvent,
@@ -106,6 +112,12 @@ function App() {
             throw new Error("not a TRAIL session");
           }
           const seq = await importSharedReport(payload, shareUrl);
+          // Sync the share cache: the recipient now holds the same session, so
+          // re-sharing it should reuse the incoming link instead of uploading
+          // the payload to blob storage a second time.
+          void hashSession(stableShareJson(payload))
+            .then((hash) => rememberShare(hash, shareUrl))
+            .catch(() => {});
           location.replace(
             `${location.origin}${location.pathname}?report=${seq}`,
           );
@@ -288,19 +300,25 @@ function App() {
   };
 
   const copyMarkdown = async () => {
+    await copyText(markdown);
+    sileo.success({ title: "Markdown copied to clipboard" });
+  };
+
+  const copyText = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(markdown);
+      await navigator.clipboard.writeText(text);
+      return true;
     } catch {
       const ta = document.createElement("textarea");
-      ta.value = markdown;
+      ta.value = text;
       ta.style.position = "fixed";
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
       ta.remove();
+      return true;
     }
-    sileo.success({ title: "Markdown copied to clipboard" });
   };
 
   const download = async (filename: string, blob: Blob) => {
@@ -317,34 +335,6 @@ function App() {
     download(
       "trail-report.md",
       new Blob([markdown], { type: "text/markdown" }),
-    );
-
-  const downloadReplay = () =>
-    download(
-      "trail-replay.json",
-      new Blob(
-        [
-          JSON.stringify(
-            {
-              v: 2,
-              title: displayTitle,
-              exportedAt: Date.now(),
-              report: {
-                title: displayTitle,
-                startedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
-                endedAt: report?.endedAt ?? events.at(-1)?.t ?? Date.now(),
-                eventCount: events.length,
-                counts,
-                url: events[0]?.url ?? "",
-              },
-              events,
-            },
-            null,
-            2,
-          ),
-        ],
-        { type: "application/json" },
-      ),
     );
 
   const networkEvents = events.filter((event) => event.k === "net");
@@ -476,25 +466,42 @@ function App() {
   // storage. The payload carries the full report so a reviewer's extension can
   // rebuild the exact same review UI (timeline, evidence, replay) from the
   // link. Clipboard failures never block the link from being generated.
+  //
+  // A content hash of the session is remembered alongside each generated link
+  // (chrome.storage.local, see lib/share-cache.ts). Re-sharing an unchanged
+  // session reuses the existing link and never uploads to blob storage again;
+  // only new events (or any other payload change) hash differently and upload
+  // fresh. Title edits don't count — the title is excluded from the hash.
   const copyReplayLink = () => {
     if (sharing === "uploading") return;
     setSharing("uploading");
-    const session = () =>
-      JSON.stringify({
-        v: 2,
+    const payload = {
+      v: 2,
+      title: displayTitle,
+      exportedAt: Date.now(),
+      report: {
         title: displayTitle,
-        exportedAt: Date.now(),
-        report: {
-          title: displayTitle,
-          startedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
-          endedAt: report?.endedAt ?? events.at(-1)?.t ?? Date.now(),
-          eventCount: events.length,
-          counts,
-          url: events[0]?.url ?? "",
-        },
-        events,
-      });
-    const upload = async (): Promise<{ link: string; copied: boolean }> => {
+        startedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
+        endedAt: report?.endedAt ?? events.at(-1)?.t ?? Date.now(),
+        eventCount: events.length,
+        counts,
+        url: events[0]?.url ?? "",
+      },
+      events,
+    };
+    const upload = async (): Promise<{
+      link: string;
+      copied: boolean;
+      reused: boolean;
+    }> => {
+      // exportedAt is excluded from the hash input: it changes every call and
+      // would defeat reuse of the same session's link.
+      const hash = await hashSession(stableShareJson(payload));
+      const cached = await getCachedShare(hash);
+      if (cached?.startsWith(REPLAY_SERVER_URL)) {
+        setReplayLink(cached);
+        return { link: cached, copied: await copyText(cached), reused: true };
+      }
       let res: Response;
       try {
         res = await fetch(`${REPLAY_SERVER_URL}/api/replays/presign`, {
@@ -514,7 +521,7 @@ function App() {
         putRes = await fetch(uploadUrl, {
           method: "PUT",
           headers: { "content-type": "application/json" },
-          body: session(),
+          body: JSON.stringify(payload),
         });
       } catch (err) {
         throw new Error(err instanceof Error ? err.message : "network error");
@@ -522,12 +529,8 @@ function App() {
       if (!putRes.ok) throw new Error(`HTTP ${putRes.status}`);
       const link = `${REPLAY_SERVER_URL}/api/replays/${id}`;
       setReplayLink(link);
-      try {
-        await navigator.clipboard.writeText(link);
-        return { link, copied: true };
-      } catch {
-        return { link, copied: false };
-      }
+      void rememberShare(hash, link);
+      return { link, copied: await copyText(link), reused: false };
     };
     sileo
       .promise(upload(), {
@@ -582,8 +585,6 @@ function App() {
         sharing={sharing}
         onCreateIssue={handleCreateIssue}
         onCopyMarkdown={() => void copyMarkdown()}
-        onDownloadReport={downloadReport}
-        onDownloadReplay={downloadReplay}
         onCopyReplayLink={() => void copyReplayLink()}
       />
 

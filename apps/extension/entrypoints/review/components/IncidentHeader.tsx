@@ -1,10 +1,8 @@
 import {
   ChevronDown,
-  Clapperboard,
   Clock3,
   Copy,
   ExternalLink,
-  FileText,
   Link2,
   ListChecks,
   Loader2,
@@ -20,7 +18,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TrailLogo } from "@/components/ui/trail-logo";
@@ -77,8 +74,6 @@ export function IncidentHeader({
   sharing,
   onCreateIssue,
   onCopyMarkdown,
-  onDownloadReport,
-  onDownloadReplay,
   onCopyReplayLink,
 }: {
   title: string;
@@ -89,8 +84,6 @@ export function IncidentHeader({
   sharing: "idle" | "uploading";
   onCreateIssue: () => void;
   onCopyMarkdown: () => void;
-  onDownloadReport: () => void;
-  onDownloadReplay: () => void;
   onCopyReplayLink: () => void;
 }) {
   return (
@@ -125,15 +118,6 @@ export function IncidentHeader({
               <DropdownMenuItem onClick={onCopyMarkdown}>
                 <Copy aria-hidden="true" />
                 Copy Markdown
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDownloadReport}>
-                <FileText aria-hidden="true" />
-                Download Report
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onDownloadReplay}>
-                <Clapperboard aria-hidden="true" />
-                Download Replay
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onCopyReplayLink} disabled={sharing === "uploading"}>
                 {sharing === "uploading" ? (

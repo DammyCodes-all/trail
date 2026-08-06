@@ -20,6 +20,11 @@ export const MSG_START_RECORDER = 'trail:start-recorder';
 export const REDACT_KEY = 'trail:autoRedact';
 export const REPO_KEY = 'trail:repo';
 
+// chrome.storage.local key for the share-link cache (hash -> share link).
+// Re-sharing an already-shared session reuses its link instead of uploading
+// the payload to blob storage a second time.
+export const SHARE_CACHE_KEY = 'trail:shareCache';
+
 // Base URL of the replay share server (see replay-server/). Points at the local
 // twin by default; production builds override via WXT_PUBLIC_REPLAY_SERVER_URL
 // (a WXT_PUBLIC_ var, inlined at build time — see the WXT env docs).
