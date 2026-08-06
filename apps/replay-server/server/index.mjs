@@ -18,6 +18,19 @@ const json = (res, code, data) => {
 const server = http.createServer(async (req, res) => {
   const path = new URL(req.url, `http://localhost:${PORT}`).pathname;
 
+  if (req.method === 'GET' && path === '/') {
+    json(res, 200, {
+      name: 'trail-replay-server',
+      version: '1.0.0',
+      storage: isBlobMode() ? 'vercel-blob' : 'file',
+      routes: {
+        'POST /api/replays': 'store a shared session, returns { id }',
+        'GET /api/replays/<id>': 'fetch a stored session',
+      },
+    });
+    return;
+  }
+
   if (req.method === 'POST' && path === '/api/replays') {
     const chunks = [];
     let total = 0;
