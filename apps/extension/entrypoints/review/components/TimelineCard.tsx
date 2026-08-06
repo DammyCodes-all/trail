@@ -359,6 +359,13 @@ export function TimelineCard({
   const followRafRef = useRef(0);
   const steeringRef = useRef(false);
   const lastWrittenRef = useRef(-1);
+  // Never auto-scroll on initial load: the page must open at the top and only
+  // move once the replay is played or the user seeks. `seenTimeRef` marks the
+  // mount and distinguishes "time changed" (a seek) from re-renders (filter
+  // changes, group expansion) that must not scroll the page.
+  const seenTimeRef = useRef<number | null>(null);
+  const timeRef = useRef(currentTime);
+  timeRef.current = currentTime;
   const [steering, setSteering] = useState(false);
   const [followNonce, setFollowNonce] = useState(0);
 
@@ -425,6 +432,18 @@ export function TimelineCard({
     if (steeringRef.current) return;
     const el = rowEls.current[activeIndex];
     if (!el) return;
+
+    // The first run is the mount: land at the top of the page and never
+    // scroll. After that, only move when playing or when the replay time
+    // changed (a seek the user initiated) — filter changes and group
+    // expansions shift indices without changing time and must not scroll.
+    const time = timeRef.current;
+    const firstRun = seenTimeRef.current === null;
+    const timeChanged = seenTimeRef.current !== time;
+    seenTimeRef.current = time;
+    if (firstRun) return;
+    if (!isPlaying && !timeChanged) return;
+
     if (lastFollowedRef.current === activeIndex) return;
     lastFollowedRef.current = activeIndex;
 

@@ -23,6 +23,7 @@ import {
 } from "@/lib/templates";
 import { buildTimeline } from "@/lib/timeline";
 import {
+  forgetShare,
   getCachedShare,
   hashSession,
   rememberShare,
@@ -45,6 +46,13 @@ import { LoadingSkeleton } from "./components/LoadingSkeleton";
 import { ReplayPanel } from "./components/ReplayPanel";
 import { TimelineCard } from "./components/TimelineCard";
 import type { ReplayPlayerHandle } from "./ReplayPlayer";
+
+type ShareResult = { link: string; copied: boolean; reused: boolean };
+
+// Concurrent share attempts for the same session (e.g. rapid double-clicks)
+// share one upload instead of hitting blob storage twice. Module scope so it
+// survives across clicks; separate tabs are out of reach without messaging.
+const shareInFlight = new Map<string, Promise<ShareResult>>();
 
 function App() {
   const reportId =
@@ -460,6 +468,27 @@ function App() {
     }
   };
 
+  // Everything the share payload embeds about the session except the title:
+  // memoized separately so renaming doesn't re-serialize multi-MB events.
+  const shareReportBase = useMemo(
+    () => ({
+      startedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
+      endedAt: report?.endedAt ?? events.at(-1)?.t ?? Date.now(),
+      eventCount: events.length,
+      counts,
+      url: events[0]?.url ?? "",
+    }),
+    [report, events, counts],
+  );
+  // The hash input stringifies the whole session, so it's memoized per events
+  // reference — a per-click serialization would be wasteful on cache hits too.
+  // stableShareJson excludes the title (editable) and the memoized base never
+  // contains it, so renaming a session doesn't change its hash.
+  const stableShareInput = useMemo(
+    () => stableShareJson({ v: 2, report: shareReportBase, events }),
+    [shareReportBase, events],
+  );
+
   // Upload the session to the replay server and hand back the share link.
   // Uploads go through a presigned PUT URL: Vercel caps function bodies at
   // ~4.5MB and full sessions blow past that, so the payload goes straight to
@@ -472,65 +501,83 @@ function App() {
   // session reuses the existing link and never uploads to blob storage again;
   // only new events (or any other payload change) hash differently and upload
   // fresh. Title edits don't count — the title is excluded from the hash.
+  //
+  // Reused links are probed (status-only fetch, body cancelled) before being
+  // trusted: a cache entry can outlive its blob, and a confirmed 4xx/5xx
+  // clears the entry and uploads fresh. If the probe itself fails the network
+  // the entry is kept — better a possibly-stale link than destroying a valid
+  // one during an outage.
   const copyReplayLink = () => {
     if (sharing === "uploading") return;
     setSharing("uploading");
-    const payload = {
-      v: 2,
-      title: displayTitle,
-      exportedAt: Date.now(),
-      report: {
-        title: displayTitle,
-        startedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
-        endedAt: report?.endedAt ?? events.at(-1)?.t ?? Date.now(),
-        eventCount: events.length,
-        counts,
-        url: events[0]?.url ?? "",
-      },
-      events,
-    };
-    const upload = async (): Promise<{
-      link: string;
-      copied: boolean;
-      reused: boolean;
-    }> => {
-      // exportedAt is excluded from the hash input: it changes every call and
-      // would defeat reuse of the same session's link.
-      const hash = await hashSession(stableShareJson(payload));
-      const cached = await getCachedShare(hash);
-      if (cached?.startsWith(REPLAY_SERVER_URL)) {
-        setReplayLink(cached);
-        return { link: cached, copied: await copyText(cached), reused: true };
-      }
-      let res: Response;
-      try {
-        res = await fetch(`${REPLAY_SERVER_URL}/api/replays/presign`, {
-          method: "POST",
+    const upload = async (): Promise<ShareResult> => {
+      const hash = await hashSession(stableShareInput);
+      const running = shareInFlight.get(hash);
+      if (running) return running;
+      const run = (async (): Promise<ShareResult> => {
+        const cached = await getCachedShare(hash);
+        if (cached?.startsWith(REPLAY_SERVER_URL)) {
+          try {
+            const probe = await fetch(cached);
+            await probe.body?.cancel().catch(() => {});
+            if (probe.ok) {
+              setReplayLink(cached);
+              return { link: cached, copied: await copyText(cached), reused: true };
+            }
+            await forgetShare(hash);
+          } catch {
+            setReplayLink(cached);
+            return { link: cached, copied: await copyText(cached), reused: true };
+          }
+        }
+        let res: Response;
+        try {
+          res = await fetch(`${REPLAY_SERVER_URL}/api/replays/presign`, {
+            method: "POST",
+          });
+        } catch (err) {
+          throw new Error(err instanceof Error ? err.message : "network error");
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const { id, uploadUrl } = (await res.json()) as {
+          id?: string;
+          uploadUrl?: string;
+        };
+        if (!id || !uploadUrl) throw new Error("no presign");
+        let putRes: Response;
+        try {
+          putRes = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              v: 2,
+              title: displayTitle,
+              exportedAt: Date.now(),
+              report: { title: displayTitle, ...shareReportBase },
+              events,
+            }),
+          });
+        } catch (err) {
+          throw new Error(err instanceof Error ? err.message : "network error");
+        }
+        if (!putRes.ok) throw new Error(`HTTP ${putRes.status}`);
+        const link = `${REPLAY_SERVER_URL}/api/replays/${id}`;
+        setReplayLink(link);
+        // Awaited so the entry exists before the success toast — closing the
+        // tab right after sharing must not lose the link. A storage failure
+        // is not worth failing the share over.
+        try {
+          await rememberShare(hash, link);
+        } catch {}
+        return { link, copied: await copyText(link), reused: false };
+      })();
+      shareInFlight.set(hash, run);
+      void run
+        .catch(() => {})
+        .finally(() => {
+          if (shareInFlight.get(hash) === run) shareInFlight.delete(hash);
         });
-      } catch (err) {
-        throw new Error(err instanceof Error ? err.message : "network error");
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const { id, uploadUrl } = (await res.json()) as {
-        id?: string;
-        uploadUrl?: string;
-      };
-      if (!id || !uploadUrl) throw new Error("no presign");
-      let putRes: Response;
-      try {
-        putRes = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      } catch (err) {
-        throw new Error(err instanceof Error ? err.message : "network error");
-      }
-      if (!putRes.ok) throw new Error(`HTTP ${putRes.status}`);
-      const link = `${REPLAY_SERVER_URL}/api/replays/${id}`;
-      setReplayLink(link);
-      void rememberShare(hash, link);
-      return { link, copied: await copyText(link), reused: false };
+      return run;
     };
     sileo
       .promise(upload(), {

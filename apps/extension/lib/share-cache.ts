@@ -25,23 +25,39 @@ export function stableShareJson(payload: {
 }
 
 // Content hash for a share payload. Callers must feed a serialization that is
-// stable across shares (i.e. excluding exportedAt), so the same session always
-// hashes the same and its link can be reused instead of re-uploaded.
+// stable across shares (i.e. excluding exportedAt and the title), so the same
+// session always hashes the same and its link can be reused instead of
+// re-uploaded. The `v1:` prefix versions the schema: if the payload shape ever
+// changes, old cache entries simply stop matching and re-upload once.
 export async function hashSession(input: string): Promise<string> {
   const digest = await crypto.subtle.digest(
     'SHA-256',
     new TextEncoder().encode(input),
   );
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replace(/=+$/, '');
+  return (
+    'v1:' +
+    btoa(String.fromCharCode(...new Uint8Array(digest)))
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
+      .replace(/=+$/, '')
+  );
 }
 
 export async function getCachedShare(hash: string): Promise<string | undefined> {
   const { [SHARE_CACHE_KEY]: cache } =
     await browser.storage.local.get(SHARE_CACHE_KEY);
   return (cache as Record<string, CachedShare> | undefined)?.[hash]?.link;
+}
+
+// Drop an entry — used when probing shows the link no longer resolves, so the
+// next share uploads fresh instead of serving a dead link.
+export async function forgetShare(hash: string): Promise<void> {
+  const { [SHARE_CACHE_KEY]: cache } =
+    await browser.storage.local.get(SHARE_CACHE_KEY);
+  if (!cache) return;
+  const next = { ...(cache as Record<string, CachedShare>) };
+  delete next[hash];
+  await browser.storage.local.set({ [SHARE_CACHE_KEY]: next });
 }
 
 // Record a generated share link. The cache is capped at MAX_CACHED entries,
