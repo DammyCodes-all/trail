@@ -81,6 +81,19 @@ export interface TrailReport {
   eventCount: number;
   counts: TrailCounts;
   url: string;
+  // Set on reports imported from a shared link: the share URL it came from.
+  // Used to dedupe re-imports and to show provenance.
+  source?: string;
+}
+
+// The session shape the extension uploads to the replay server and downloads
+// as a replay file. `v` gates the shape so importers can reject foreign JSON.
+export interface SharedReportPayload {
+  v: number;
+  title?: string;
+  exportedAt?: number;
+  report: Omit<TrailReport, 'seq'>;
+  events: StoredEvent[];
 }
 
 export interface SessionEvents {

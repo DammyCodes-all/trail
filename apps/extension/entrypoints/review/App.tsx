@@ -5,6 +5,7 @@ import {
   getAllEvents,
   getReport,
   getSessionEvents,
+  importSharedReport,
   updateReportTitle,
 } from "@/lib/db";
 import { buildIssueUrl } from "@/lib/github";
@@ -21,7 +22,13 @@ import {
   type IssueTemplate,
 } from "@/lib/templates";
 import { buildTimeline } from "@/lib/timeline";
-import type { StoredEvent, TrailCounts, TrailReport } from "@/lib/types";
+import type {
+  SharedReportPayload,
+  StoredEvent,
+  TrailCounts,
+  TrailReport,
+} from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import { Toaster, toast } from "@/components/ui/toast";
 
 import { AttachmentsPanel } from "./components/AttachmentsPanel";
@@ -36,10 +43,12 @@ import type { ReplayPlayerHandle } from "./ReplayPlayer";
 function App() {
   const reportId =
     Number(new URLSearchParams(location.search).get("report")) || undefined;
+  const shareUrl = new URLSearchParams(location.search).get("share");
 
   const [report, setReport] = useState<TrailReport | null>(null);
   const [events, setEvents] = useState<StoredEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [shareError, setShareError] = useState("");
   // Typed values are always redacted from the timeline and report — capture-time
   // masking is the primary line of defense; this is the permanent backstop.
   const redact = true;
@@ -61,6 +70,53 @@ function App() {
       const { [REPO_KEY]: savedRepo } =
         await browser.storage.local.get(REPO_KEY);
       setRepo(typeof savedRepo === "string" ? savedRepo : "");
+
+      // Shared link mode: fetch the session from the replay server, import it
+      // into local history, then hand off to the plain ?report= reopen path —
+      // the reviewer gets the exact same review UI, persisted automatically.
+      if (shareUrl) {
+        let parsed: URL;
+        try {
+          parsed = new URL(shareUrl);
+        } catch {
+          setShareError("That doesn't look like a TRAIL share link.");
+          setLoading(false);
+          return;
+        }
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          setShareError("Only http(s) TRAIL share links can be opened.");
+          setLoading(false);
+          return;
+        }
+        if (!/^\/api\/replays\/[A-Za-z0-9.-]{1,64}$/.test(parsed.pathname)) {
+          setShareError("That doesn't look like a TRAIL share link.");
+          setLoading(false);
+          return;
+        }
+        try {
+          const res = await fetch(shareUrl);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const payload = (await res.json()) as SharedReportPayload;
+          if (
+            payload?.v !== 2 ||
+            !Array.isArray(payload.events) ||
+            !payload.report
+          ) {
+            throw new Error("not a TRAIL session");
+          }
+          const seq = await importSharedReport(payload, shareUrl);
+          location.replace(
+            `${location.origin}${location.pathname}?report=${seq}`,
+          );
+          return; // the reload re-runs the effect through the ?report= path
+        } catch {
+          setShareError(
+            "Couldn't load the shared replay. The link may be invalid or the replay server may be unreachable.",
+          );
+        }
+        setLoading(false);
+        return;
+      }
 
       if (reportId) {
         const rep = await getReport(reportId);
@@ -268,7 +324,20 @@ function App() {
       new Blob(
         [
           JSON.stringify(
-            { title: base.title, repo, exportedAt: Date.now(), events },
+            {
+              v: 2,
+              title: displayTitle,
+              exportedAt: Date.now(),
+              report: {
+                title: displayTitle,
+                startedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
+                endedAt: report?.endedAt ?? events.at(-1)?.t ?? Date.now(),
+                eventCount: events.length,
+                counts,
+                url: events[0]?.url ?? "",
+              },
+              events,
+            },
             null,
             2,
           ),
@@ -401,6 +470,8 @@ function App() {
   };
 
   // Upload the session to the replay server and hand back the share link.
+  // The payload carries the full report so a reviewer's extension can rebuild
+  // the exact same review UI (timeline, evidence, replay) from the link.
   // Clipboard failures never block the link from being generated.
   const copyReplayLink = async () => {
     if (sharing === "uploading") return;
@@ -410,18 +481,24 @@ function App() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          v: 2,
           title: displayTitle,
           exportedAt: Date.now(),
-          // rrweb events only: the share page feeds this straight to
-          // rrweb-player, which expects eventWithTime[] — not the storage
-          // wrapper format.
-          events: rrwebEvents,
+          report: {
+            title: displayTitle,
+            startedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
+            endedAt: report?.endedAt ?? events.at(-1)?.t ?? Date.now(),
+            eventCount: events.length,
+            counts,
+            url: events[0]?.url ?? "",
+          },
+          events,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { id?: string };
       if (!data.id) throw new Error("no id");
-      const link = `${REPLAY_SERVER_URL}/r/${data.id}`;
+      const link = `${REPLAY_SERVER_URL}/api/replays/${data.id}`;
       setReplayLink(link);
       try {
         await navigator.clipboard.writeText(link);
@@ -441,6 +518,25 @@ function App() {
       setSharing("idle");
     }
   };
+
+  if (shareError) {
+    return (
+      <div className="grid min-h-screen place-items-center px-6">
+        <div className="max-w-md text-center">
+          <h1 className="font-heading text-xl font-semibold text-foreground">
+            Shared replay unavailable
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">{shareError}</p>
+          <Button
+            className="mt-6 min-h-10 rounded-sm bg-white px-4 py-2.5 text-black hover:bg-white/90"
+            onClick={() => void browser.tabs.getCurrent().then((t) => t && browser.tabs.remove(t.id!))}
+          >
+            Close tab
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return <LoadingSkeleton />;
