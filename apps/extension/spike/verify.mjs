@@ -7,8 +7,10 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXT_DIR = path.resolve(__dirname, '..', '.output', 'chrome-mv3');
+const REPLAY_SRV = path.resolve(__dirname, '..', '..', 'replay-server', 'server', 'index.mjs');
 const PORT = 8899;
 const BASE = `http://localhost:${PORT}`;
+const REPLAY_BASE = 'http://localhost:8898';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -31,6 +33,22 @@ function findChrome() {
     }
   }
   return '/usr/bin/google-chrome';
+}
+
+// The extension points at localhost:8898 by default (REPLAY_SERVER_URL). Spawn
+// the local twin; if something already listens there (e.g. pnpm dev:replay),
+// reuse it — the health probe succeeds either way.
+async function waitForReplayServer() {
+  for (let i = 0; i < 50; i++) {
+    try {
+      const res = await fetch(`${REPLAY_BASE}/api/replays/__health__`);
+      if (res.status === 404) return true; // route exists → server is up
+    } catch {
+      // not up yet
+    }
+    await sleep(200);
+  }
+  return false;
 }
 
 async function launch() {
@@ -144,6 +162,7 @@ async function killServiceWorker(page) {
 
 function main() {
   let testPageSrv;
+  let replaySrv;
   let browser;
   return new Promise(async (resolve) => {
     try {
@@ -152,6 +171,12 @@ function main() {
         stdio: 'ignore',
       });
       await sleep(800);
+
+      // ---- replay share server (local twin) ----
+      replaySrv = spawn(process.execPath, [REPLAY_SRV], { stdio: 'ignore' });
+      const replayUp = await waitForReplayServer();
+      assert(replayUp, 'replay share server reachable on 8898');
+      console.log(`replay server up: ${REPLAY_BASE}`);
 
       browser = await launch();
       const extId = await getExtensionId(browser);
@@ -365,7 +390,7 @@ function main() {
       assert(!incidentUi.text.includes('High severity'), 'review omits the severity label');
       assert(incidentUi.text.includes('Evidence timeline'), 'review leads with chronological evidence');
       assert(incidentUi.text.includes('Session replay'), 'review shows the session replay');
-      assert(incidentUi.text.includes('DOM snapshot'), 'review exposes grouped runtime evidence');
+      assert(incidentUi.text.includes('Network') && incidentUi.text.includes('Console'), 'review exposes grouped runtime evidence');
       assert(incidentUi.text.includes('Create GitHub Issue'), 'review has one focused GitHub action');
       assert(!incidentUi.repoVisible, 'repo configuration stays out of the report until requested');
       assert(
@@ -702,6 +727,14 @@ function main() {
         'reopened report has the final Pay now step — the stop tail is in the snapshot',
       );
       console.log('reopen check PASS');
+      // Close the phase-3 review tabs so SPIKE 2's stop leaves exactly one
+      // review target for the share flow to pick up.
+      for (const t of browser.targets()) {
+        if (t.type() === 'page' && t.url().includes('review.html')) {
+          const p = await t.page();
+          await p?.close().catch(() => {});
+        }
+      }
       await testPage.close();
 
       // ============================================================
@@ -753,8 +786,184 @@ function main() {
       assert(after.some((e) => e.k === 'net'), 'expected event AFTER SW kill');
       console.log('SPIKE 2 PASS');
 
+      // ============================================================
+      // SPIKE 3 — share a session, paste-import it, auto-save to history
+      // ============================================================
+      console.log('\n=== SPIKE 3: replay share + paste-import ===');
+
+      // The review tab SPIKE 2's stop opened is now the only review.html target.
+      const shareReviewTarget = await browser.waitForTarget(
+        (t) => t.type() === 'page' && t.url().includes('review.html'),
+        { timeout: 10000 },
+      );
+      const shareReview = await shareReviewTarget.page();
+      await shareReview.waitForFunction(() => window.__trailMarkdown, {
+        timeout: 10000,
+        polling: 100,
+      });
+
+      // Share ▾ → Copy Replay Link → the link hook must fill.
+      await shareReview.evaluate(() => {
+        const share = [...document.querySelectorAll('button')].find((b) =>
+          b.textContent?.trim().startsWith('Share'),
+        );
+        share?.click();
+      });
+      await shareReview.waitForSelector('[data-slot="dropdown-menu-content"]', {
+        timeout: 5000,
+        polling: 100,
+      });
+      await shareReview.evaluate(() => {
+        const item = [...document.querySelectorAll('[data-slot="dropdown-menu-item"]')].find((i) =>
+          i.textContent?.includes('Copy Replay Link'),
+        );
+        item?.click();
+      });
+      await shareReview.waitForFunction(
+        () => String(window.__trailReplayLink || '').startsWith(`${REPLAY_BASE}/api/replays/`),
+        { timeout: 15000, polling: 100 },
+      );
+      const link = await shareReview.evaluate(() => window.__trailReplayLink);
+      console.log('share link:', link);
+      assert(
+        new RegExp(`^${REPLAY_BASE}/api/replays/[A-Za-z0-9.-]{1,64}$`).test(link),
+        'share link points at the replay JSON route',
+      );
+      const reviewHooks3 = await shareReview.evaluate(() => ({
+        timeline: window.__trailTimeline,
+        markdown: window.__trailMarkdown,
+        replayCount: window.__trailReplayCount,
+      }));
+
+      // The link must serve the full session: versioned, report + all kinds.
+      const payload = await shareReview.evaluate(async (l) => {
+        const r = await fetch(l);
+        return { status: r.status, body: await r.json() };
+      }, link);
+      assert(payload.status === 200, 'share link serves the session JSON');
+      assert(payload.body.v === 2, 'shared payload is versioned (v: 2)');
+      assert(
+        typeof payload.body.report?.title === 'string' && payload.body.report.title.length > 0,
+        'shared payload carries the report metadata',
+      );
+      const kinds = {};
+      for (const e of payload.body.events) kinds[e.k] = (kinds[e.k] ?? 0) + 1;
+      console.log('payload event kinds:', kinds);
+      assert(
+        kinds.rrweb > 0 && kinds.click > 0 && kinds.console > 0 && kinds.net > 0,
+        'shared payload carries the full session (rrweb + click + console + net)',
+      );
+      const rrwebFirst = payload.body.events.find((e) => e.k === 'rrweb');
+      assert(
+        typeof rrwebFirst?.ev?.timestamp === 'number',
+        'rrweb events carry player-ready timestamps',
+      );
+
+      // The public player routes are gone.
+      const gone = await shareReview.evaluate(async () => {
+        const a = await fetch(`${REPLAY_BASE}/r/anything`);
+        const b = await fetch(`${REPLAY_BASE}/api/replays/anything.json`);
+        return { page: a.status, json: b.status };
+      });
+      assert(
+        gone.page === 404 && gone.json === 404,
+        `public player routes removed (/r/ and .json — got ${gone.page}/${gone.json})`,
+      );
+
+      // Paste the link into a fresh popup → review tab auto-imports the session.
+      popup = await openPopup(browser, extId);
+      const beforeImport = await popup.evaluate(
+        () => document.querySelectorAll('.report').length,
+      );
+      await popup.type('#share-link', link);
+      await popup.click('#open-shared');
+      const sharedTarget = await browser.waitForTarget(
+        (t) => t.type() === 'page' && t.url().includes('review.html?share='),
+        { timeout: 10000 },
+      );
+      const shared = await sharedTarget.page();
+      await shared.waitForFunction(
+        () => location.search.startsWith('?report='),
+        { timeout: 20000, polling: 100 },
+      );
+      const importedSeq = await shared.evaluate(() =>
+        new URLSearchParams(location.search).get('report'),
+      );
+      await shared.waitForFunction(() => Array.isArray(window.__trailTimeline), {
+        timeout: 15000,
+        polling: 100,
+      });
+      const importedHooks = await shared.evaluate(() => ({
+        timeline: window.__trailTimeline,
+        markdown: window.__trailMarkdown,
+        replayCount: window.__trailReplayCount,
+        title: window.__trailTitle,
+      }));
+      assert(
+        JSON.stringify(importedHooks.timeline) === JSON.stringify(reviewHooks3.timeline),
+        'imported review shows the identical timeline',
+      );
+      assert(
+        importedHooks.markdown === reviewHooks3.markdown,
+        'imported review shows the identical report',
+      );
+      assert(
+        importedHooks.replayCount > 0 && importedHooks.replayCount === reviewHooks3.replayCount,
+        'imported review replays the same frames',
+      );
+      assert(importedHooks.title.length > 0, 'imported report keeps its title');
+      console.log('imported seq:', importedSeq, '| title:', importedHooks.title);
+      await shared.close();
+
+      // Auto-save: history gained exactly one row; re-paste dedupes.
+      popup = await openPopup(browser, extId);
+      const afterImport = await popup.evaluate(
+        () => document.querySelectorAll('.report').length,
+      );
+      assert(
+        afterImport === beforeImport + 1,
+        `auto-save adds exactly one history row (${beforeImport} → ${afterImport})`,
+      );
+      await popup.type('#share-link', link);
+      await popup.click('#open-shared');
+      const dupTarget = await browser.waitForTarget(
+        (t) => t.type() === 'page' && t.url().includes('review.html?share='),
+        { timeout: 10000 },
+      );
+      const dup = await dupTarget.page();
+      await dup.waitForFunction(() => location.search.startsWith('?report='), {
+        timeout: 20000,
+        polling: 100,
+      });
+      const dupSeq = await dup.evaluate(() =>
+        new URLSearchParams(location.search).get('report'),
+      );
+      assert(
+        dupSeq === importedSeq,
+        `re-importing the same link resolves to the same saved report (${dupSeq} vs ${importedSeq})`,
+      );
+      await dup.close();
+      popup = await openPopup(browser, extId);
+      const afterDup = await popup.evaluate(
+        () => document.querySelectorAll('.report').length,
+      );
+      assert(
+        afterDup === beforeImport + 1,
+        `re-paste does not duplicate history (${afterDup})`,
+      );
+
+      // Invalid link rejected in the popup before any tab opens.
+      await popup.type('#share-link', 'https://example.com/not-a-trail-link');
+      await popup.click('#open-shared');
+      const shareError = await popup.evaluate(() =>
+        document.querySelector('#share-error')?.textContent ?? '',
+      );
+      assert(shareError.length > 0, 'popup rejects a non-TRAIL link inline');
+      console.log('SPIKE 3 PASS');
+
       await browser.close();
       testPageSrv.kill();
+      replaySrv?.kill();
       console.log('\nALL SPIKES PASS');
       resolve(true);
     } catch (err) {
@@ -763,6 +972,9 @@ function main() {
       } catch {}
       try {
         testPageSrv?.kill();
+      } catch {}
+      try {
+        replaySrv?.kill();
       } catch {}
       console.error('\nFAILURE:', err.message);
       process.exitCode = 1;

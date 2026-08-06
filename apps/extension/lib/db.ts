@@ -1,6 +1,6 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import { DB_NAME, EVENTS_STORE, REPORTS_STORE, SESSIONS_STORE } from './constants.ts';
-import type { SessionEvents, StoredEvent, TrailReport } from './types.ts';
+import type { SessionEvents, SharedReportPayload, StoredEvent, TrailReport } from './types.ts';
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
@@ -83,4 +83,32 @@ export async function getSessionEvents(reportId: number): Promise<StoredEvent[]>
   const db = await getDb();
   const s = await db.get(SESSIONS_STORE, reportId);
   return (s as SessionEvents | undefined)?.events ?? [];
+}
+
+// Import a session fetched from a shared link into local history so it shows
+// up in the popup like any other report. Returns the local report seq. A
+// report already imported from the same share URL is returned untouched — the
+// import is idempotent, so pasting the same link twice never duplicates.
+export async function importSharedReport(
+  payload: SharedReportPayload,
+  source: string,
+): Promise<number> {
+  const existing = await getReports();
+  const dup = existing.find((r) => r.source === source);
+  if (dup) return dup.seq;
+
+  const fallback = payload.report ?? {};
+  const report: Omit<TrailReport, 'seq'> = {
+    title: fallback.title || payload.title || 'Shared report',
+    repo: fallback.repo ?? '',
+    startedAt: fallback.startedAt ?? payload.exportedAt ?? Date.now(),
+    endedAt: fallback.endedAt ?? Date.now(),
+    eventCount: fallback.eventCount ?? payload.events.length,
+    counts: fallback.counts ?? { click: 0, input: 0, console: 0, net: 0 },
+    url: fallback.url ?? payload.events[0]?.url ?? '',
+    source,
+  };
+  const seq = await saveReport(report);
+  await saveSessionEvents(seq, payload.events);
+  return seq;
 }

@@ -51,15 +51,15 @@ apps/extension        The extension itself (WXT + React + rrweb)
   entrypoints/        background SW, recorder, relay, overlay, popup, review tab
   lib/record/         console, network, interaction, rrweb, redaction instrumenters
   lib/                db (IndexedDB), report, github, timeline, facts, overlay physics
-apps/replay-server    Replay share server: store a session, serve a player page
+apps/replay-server    Replay share server: store a session, serve it back as JSON
   server/index.mjs    Local twin, file-backed storage, port 8898
-  api/                Vercel functions: POST /api/replays, GET /api/replays/<id>.json
-  lib/player.js       The share page, rebuilt with rrweb-player
+  api/                Vercel functions: POST /api/replays, GET /api/replays/<id>
+  lib/storage.js      Vercel Blob (token set) or local files (.data/)
 apps/web              Next.js landing page (still the scaffold; Phase 5, deferred)
 packages/tokens       @trail/tokens — design tokens as CSS
 ```
 
-The replay share server works in two modes: with `BLOB_READ_WRITE_TOKEN` set it stores sessions in Vercel Blob (the serverless path); without it, it writes files to `.data/` locally. Same routes either way: `POST /api/replays` returns `{ id }`, and `/r/<id>` is the shareable player page.
+The replay share server works in two modes: with `BLOB_READ_WRITE_TOKEN` set it stores sessions in Vercel Blob (the serverless path); without it, it writes files to `.data/` locally. Same routes either way: `POST /api/replays` returns `{ id }`, and `GET /api/replays/<id>` serves the session JSON. Sharing is extension-to-extension: the reporter copies `https://<server>/api/replays/<id>`, and whoever receives it pastes it into the TRAIL popup — the review tab then imports the session straight into their history with the same review UI (replay, timeline, evidence) and no public web player page. The storage seam is one file (`lib/storage.js`), so swapping Vercel Blob for an S3-compatible store later touches nothing else.
 
 ## Local setup
 
@@ -74,7 +74,7 @@ pnpm install
 From there, three processes:
 
 1. **The extension.** `pnpm dev:extension` builds and launches Chrome with the unpacked extension loaded. Look for the TRAIL popup in the toolbar. Start a report, reproduce a bug on any page, stop — the review tab opens with the replay and timeline.
-2. **The replay server.** `pnpm dev:replay` runs the local twin on http://localhost:8898. Only needed if you want shareable replay links while developing. The extension points at it by default (`REPLAY_SERVER_URL` in `apps/extension/lib/constants.ts`), so there's no config to touch.
+2. **The replay server.** `pnpm dev:replay` runs the local twin on http://localhost:8898. Needed for shareable replay links while developing — the extension points at it by default (`REPLAY_SERVER_URL` in `apps/extension/lib/constants.ts`), so there's no config to touch. Recipients paste the link into their TRAIL popup; the session is fetched from the link's own host, so both sides can run different servers.
 3. **The landing page** (optional). `pnpm dev:web` serves the Next.js scaffold on http://localhost:3000.
 
 Everything runs against local storage: reports live in the extension's IndexedDB, shared replays land in `apps/replay-server/.data/`. No accounts, no API keys.
