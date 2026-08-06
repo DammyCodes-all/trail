@@ -15,7 +15,7 @@ import {
   buildSections,
   suggestTitle,
 } from "@/lib/report";
-import { suggestRepo } from "@/lib/repo";
+import { suggestRepo, normalizeRepo } from "@/lib/repo";
 import {
   fetchIssueTemplate,
   shapeSections,
@@ -231,7 +231,7 @@ function App() {
     let cancelled = false;
     const timer = setTimeout(() => {
       setTemplateState("checking");
-      void fetchIssueTemplate(r).then((t) => {
+      void fetchIssueTemplate(normalizeRepo(r)).then((t) => {
         if (cancelled) return;
         setTemplate(t);
         setTemplateState(t ? "found" : "none");
@@ -269,7 +269,9 @@ function App() {
   );
   const issue = useMemo(
     () =>
-      repo ? buildIssueUrl(repo, displayTitle, sections, labelsList) : null,
+      repo
+        ? buildIssueUrl(normalizeRepo(repo), displayTitle, sections, labelsList)
+        : null,
     [repo, displayTitle, sections, labelsList],
   );
 
@@ -444,6 +446,17 @@ function App() {
   const openIssue = () => {
     if (!issue) return;
     setIssueDialogOpen(false);
+    if (issue.dropped.length > 0) {
+      // The report can't fit in the prefilled link: copy the full report so
+      // the user can paste it into the issue body after GitHub opens.
+      void copyText(markdown).then(() => {
+        sileo.success({
+          title: "Report copied to clipboard",
+          description:
+            "It was too long for the link — open GitHub and paste it into the issue body.",
+        });
+      });
+    }
     void browser.tabs.create({ url: issue.url });
   };
 
@@ -705,6 +718,7 @@ function App() {
         labels={labels}
         onLabelsChange={setLabels}
         issueReady={!!issue}
+        reportTooLong={issue ? issue.dropped.length > 0 : false}
         template={template}
         templateState={templateState}
         onOpenIssue={openIssue}

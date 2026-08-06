@@ -155,6 +155,11 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
         eventCount: events.length,
         counts,
         url: events[0]?.url ?? "",
+        errorCount: events.filter((e) => e.k === "console" && e.lv === "error")
+          .length,
+        failedRequestCount: events.filter(
+          (e) => e.k === "net" && (e.status === 0 || e.status >= 400),
+        ).length,
       });
       // Snapshot the events so the report can be reopened after the next recording
       // clears the live store (history detail view).
