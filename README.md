@@ -61,6 +61,8 @@ packages/tokens       @trail/tokens — design tokens as CSS
 
 The replay share server works in two modes: with `BLOB_READ_WRITE_TOKEN` set it stores sessions in Vercel Blob (the serverless path); without it, it writes files to `.data/` locally. Same routes either way: `POST /api/replays` returns `{ id }`, and `GET /api/replays/<id>` serves the session JSON. Sharing is extension-to-extension: the reporter copies `https://<server>/api/replays/<id>`, and whoever receives it pastes it into the TRAIL popup — the review tab then imports the session straight into their history with the same review UI (replay, timeline, evidence) and no public web player page. The storage seam is one file (`lib/storage.js`), so swapping Vercel Blob for an S3-compatible store later touches nothing else.
 
+Nothing leaves the reporter's machine until they explicitly share: recording and reports live only in the extension's local IndexedDB, and the first upload to the server (Vercel Blob in production) happens exactly when the reporter clicks **Share → Copy Replay Link**. There is no background sync, no silent upload.
+
 ## Local setup
 
 You need pnpm 11+ (the repo pins `^11.16.0` via `devEngines`, and pnpm installs the right version automatically if it's missing) and Node 20.9+ — Next 16 requires at least that. Chrome or Firefox for the extension.

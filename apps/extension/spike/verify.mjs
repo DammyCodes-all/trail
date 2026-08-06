@@ -560,6 +560,21 @@ function main() {
         'expanded group reveals the individual interactions',
       );
 
+      // Evidence sections start collapsed (refactor: Network/Console are
+      // collapsible and closed by default), so open both before expanding rows.
+      await review.evaluate(() => {
+        const titles = ['Network', 'Console'];
+        for (const title of titles) {
+          const btn = [...document.querySelectorAll('button')].find((b) =>
+            [...b.querySelectorAll('span.font-heading')].some(
+              (s) => s.textContent?.trim() === title,
+            ),
+          );
+          btn?.click();
+        }
+      });
+      await sleep(400);
+
       // Network details: collapsed rows are compact; expanding shows headers,
       // request body and response body — with sensitive values redacted.
       await review.evaluate(() => {
@@ -584,7 +599,7 @@ function main() {
         return fail?.textContent ?? '';
       });
       assert(
-        failDetails.includes('authorization'),
+        failDetails.includes('Authorization'),
         'expanded failure shows the Authorization header name',
       );
       assert(failDetails.includes('[redacted]'), 'sensitive header values are redacted');
@@ -594,14 +609,34 @@ function main() {
       );
       await review.evaluate(() => {
         const missing = [...document.querySelectorAll('[data-net-row]')].find((r) =>
-          r.textContent?.includes('/missing'),
+          r.textContent?.includes('/missing') && r.textContent?.includes('POST'),
         );
         missing?.querySelector('[data-details-toggle]')?.click();
+      });
+      // Details open in the Headers tab; switch to Payload where the request
+      // body lives (tab panels render only the selected tab).
+      await review.waitForFunction(
+        () => {
+          const missing = [...document.querySelectorAll('[data-net-row]')].find((r) =>
+            r.textContent?.includes('/missing') && r.textContent?.includes('POST'),
+          );
+          return !!missing && missing.textContent?.includes('Payload');
+        },
+        { timeout: 5000, polling: 100 },
+      );
+      await review.evaluate(() => {
+        const missing = [...document.querySelectorAll('[data-net-row]')].find((r) =>
+          r.textContent?.includes('/missing') && r.textContent?.includes('POST'),
+        );
+        const tab = [...(missing?.querySelectorAll('[data-slot="tabs-tab"]') ?? [])].find(
+          (t) => t.textContent?.trim() === 'Payload',
+        );
+        tab?.click();
       });
       await review.waitForFunction(
         () => {
           const missing = [...document.querySelectorAll('[data-net-row]')].find((r) =>
-            r.textContent?.includes('/missing'),
+            r.textContent?.includes('/missing') && r.textContent?.includes('POST'),
           );
           return !!missing && missing.textContent?.includes('Request body');
         },
@@ -609,12 +644,12 @@ function main() {
       );
       const missingDetails = await review.evaluate(() => {
         const missing = [...document.querySelectorAll('[data-net-row]')].find((r) =>
-          r.textContent?.includes('/missing'),
+          r.textContent?.includes('/missing') && r.textContent?.includes('POST'),
         );
         return missing?.textContent ?? '';
       });
       assert(
-        missingDetails.includes('X-Trail-Test'),
+        missingDetails.includes('x-trail-test'),
         'response headers of the failed request are captured',
       );
       assert(

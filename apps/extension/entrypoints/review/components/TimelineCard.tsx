@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ChevronDown,
   Globe2,
@@ -248,12 +254,14 @@ export function TimelineCard({
   replayT0,
   currentTime,
   onSeek,
+  isPlaying = false,
 }: {
   steps: TimelineStep[];
   t0: number;
   replayT0: number;
   currentTime: number;
   onSeek: (timestamp: number) => void;
+  isPlaying?: boolean;
 }) {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -336,11 +344,140 @@ export function TimelineCard({
       break;
     }
   }
+  const activeItem = activeIndex >= 0 ? renderable[activeIndex] : undefined;
+
+  // Follow-scroll: keep the active row at a fixed reading position (30% down
+  // the viewport) so the timeline scrolls up in rhythm with the replay. The
+  // user is always in control: any scroll input (wheel, touch, scroll keys,
+  // scrollbar drag) disengages follow for good until they click "Jump to
+  // latest". While playing on a desktop layout the follow glides with an
+  // eased rAF loop that retargets from wherever it is; paused/scrub row
+  // changes snap (the user initiated the jump), and reduced motion snaps
+  // instead of gliding. A play/pause toggle that doesn't move the row never
+  // scrolls.
+  const lastFollowedRef = useRef<number | null>(null);
+  const followRafRef = useRef(0);
+  const steeringRef = useRef(false);
+  const lastWrittenRef = useRef(-1);
+  const [steering, setSteering] = useState(false);
+  const [followNonce, setFollowNonce] = useState(0);
+
+  const cancelFollow = useCallback(() => {
+    cancelAnimationFrame(followRafRef.current);
+    followRafRef.current = 0;
+  }, []);
+
+  // Mark our own scrolls so the window scroll listener doesn't read them as
+  // user steering.
+  const scrollToY = useCallback((y: number) => {
+    lastWrittenRef.current = y;
+    window.scrollTo(0, y);
+  }, []);
+
+  const disengage = useCallback(() => {
+    steeringRef.current = true;
+    setSteering(true);
+    cancelFollow();
+  }, [cancelFollow]);
 
   useEffect(() => {
+    const scrollKeys = new Set([
+      "ArrowUp",
+      "ArrowDown",
+      "PageUp",
+      "PageDown",
+      "Home",
+      "End",
+      " ",
+    ]);
+    const onWheel = () => disengage();
+    const onTouchStart = () => disengage();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!scrollKeys.has(event.key)) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        target.closest(
+          "button, input, textarea, select, [contenteditable='true']",
+        )
+      ) {
+        return;
+      }
+      disengage();
+    };
+    const onScroll = () => {
+      if (Math.abs(window.scrollY - lastWrittenRef.current) <= 1) return;
+      disengage();
+    };
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [disengage]);
+
+  useEffect(() => {
+    if (steeringRef.current) return;
     const el = rowEls.current[activeIndex];
-    el?.scrollIntoView({ block: "nearest" });
-  }, [activeIndex]);
+    if (!el) return;
+    if (lastFollowedRef.current === activeIndex) return;
+    lastFollowedRef.current = activeIndex;
+
+    const target = Math.max(
+      0,
+      Math.min(
+        el.getBoundingClientRect().top + window.scrollY - window.innerHeight * 0.3,
+        document.documentElement.scrollHeight - window.innerHeight,
+      ),
+    );
+
+    const glide =
+      isPlaying &&
+      window.matchMedia("(min-width: 1024px)").matches &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (!glide) {
+      cancelFollow();
+      scrollToY(target);
+      return;
+    }
+
+    // Deadband: don't glide for a row already near the reading position —
+    // constant micro-pulls are what made the follow feel like a hijack.
+    if (Math.abs(window.scrollY - target) < window.innerHeight * 0.2) return;
+
+    cancelFollow();
+    const step = () => {
+      const next = window.scrollY + (target - window.scrollY) * 0.22;
+      if (Math.abs(target - next) < 0.5) {
+        scrollToY(target);
+        followRafRef.current = 0;
+        return;
+      }
+      scrollToY(next);
+      followRafRef.current = requestAnimationFrame(step);
+    };
+    followRafRef.current = requestAnimationFrame(step);
+  }, [activeIndex, isPlaying, followNonce, cancelFollow, scrollToY]);
+
+  const jumpToLatest = () => {
+    lastFollowedRef.current = null;
+    steeringRef.current = false;
+    setSteering(false);
+    setFollowNonce((nonce) => nonce + 1);
+  };
+
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(followRafRef.current);
+    },
+    [],
+  );
 
   const toggleGroup = (index: number) => {
     const key = `row-${index}`;
@@ -494,6 +631,22 @@ export function TimelineCard({
           No events match this filter.
         </p>
       )}
+      {steering && isPlaying && renderable.length ? (
+        <div className="pointer-events-none sticky bottom-3 z-10 mt-3 flex justify-center">
+          <button
+            type="button"
+            onClick={jumpToLatest}
+            className="pointer-events-auto flex h-9 items-center gap-2 rounded-sm border border-border-strong bg-background/90 px-3 text-xs font-medium text-foreground shadow-sm backdrop-blur transition-colors duration-150 hover:bg-background"
+          >
+            Jump to latest
+            {activeItem ? (
+              <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                {formatElapsedTime(rowTime(activeItem.row) - t0)}
+              </span>
+            ) : null}
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -63,6 +63,7 @@ function App() {
   const [replayLink, setReplayLink] = useState("");
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [currentReplayTime, setCurrentReplayTime] = useState(0);
+  const [replayPlaying, setReplayPlaying] = useState(false);
   const replayRef = useRef<ReplayPlayerHandle>(null);
 
   useEffect(() => {
@@ -570,6 +571,7 @@ function App() {
               facts={facts}
               currentTime={currentReplayTime}
               onCurrentTimeChange={handleReplayTimeChange}
+              onPlayingChange={setReplayPlaying}
             />
           </div>
           <div className="min-w-0">
@@ -579,6 +581,7 @@ function App() {
               replayT0={replayT0}
               currentTime={currentReplayTime}
               onSeek={seekReplay}
+              isPlaying={replayPlaying}
             />
           </div>
         </div>

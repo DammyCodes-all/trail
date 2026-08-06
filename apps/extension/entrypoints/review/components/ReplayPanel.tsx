@@ -25,9 +25,16 @@ export const ReplayPanel = forwardRef<
     facts: ReportFacts;
     currentTime: number;
     onCurrentTimeChange: (timeOffset: number) => void;
+    onPlayingChange?: (playing: boolean) => void;
   }
 >(function ReplayPanel(
-  { events, facts, currentTime, onCurrentTimeChange },
+  {
+    events,
+    facts,
+    currentTime,
+    onCurrentTimeChange,
+    onPlayingChange,
+  },
   forwardedRef,
 ) {
   const replayRef = useRef<ReplayPlayerHandle>(null);
@@ -42,6 +49,12 @@ export const ReplayPanel = forwardRef<
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const onPlayingChangeRef = useRef(onPlayingChange);
+  onPlayingChangeRef.current = onPlayingChange;
+  useEffect(() => {
+    onPlayingChangeRef.current?.(isPlaying);
+  }, [isPlaying]);
 
   useImperativeHandle(
     forwardedRef,
