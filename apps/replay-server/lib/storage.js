@@ -21,9 +21,14 @@ export function isBlobMode() {
   return Boolean(TOKEN);
 }
 
-// Token format: vercel_blob_rw_<storeId>_<secret> — the store id is the
-// subdomain of every blob URL (lowercased; DNS case-insensitive).
-const storeId = () => TOKEN.split('_')[3]?.toLowerCase() ?? '';
+// Token format: vercel_blob_rw_<storeId>_<secret>. Newer stores carry a
+// `store_` prefix (vercel_blob_rw_store_<base62>_<secret>); the CDN subdomain
+// is the store id without the prefix, lowercased (DNS is case-insensitive).
+const storeId = () => {
+  const parts = TOKEN.split('_');
+  const id = parts[3] === 'store' ? parts.slice(3, 5).join('_') : parts[3];
+  return id.replace(/^store_/, '').toLowerCase();
+};
 
 export async function put(id, data) {
   const body = typeof data === 'string' ? data : JSON.stringify(data);

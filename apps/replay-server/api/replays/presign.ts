@@ -21,7 +21,10 @@ export async function POST(): Promise<Response> {
     });
     const { presignedUrl } = await presignUrl(
       { clientSigningToken, delegationToken },
-      { operation: 'put', pathname, access: 'public' },
+      // addRandomSuffix must be false: reads reconstruct the blob path from
+      // the id alone (replays/<id>.json), and the default random suffix would
+      // make the stored pathname unreachable.
+      { operation: 'put', pathname, access: 'public', addRandomSuffix: false },
     );
     return Response.json({ id, uploadUrl: presignedUrl });
   } catch (err) {
