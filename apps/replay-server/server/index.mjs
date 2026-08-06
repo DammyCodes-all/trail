@@ -1,11 +1,9 @@
 // Local twin of the Vercel functions: same routes, file-backed storage.
 //   POST /api/replays           → { id }
-//   GET  /api/replays/<id>.json → session JSON
-//   GET  /r/<id>                → player page
+//   GET  /api/replays/<id>      → session JSON
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { put, get, isBlobMode } from '../lib/storage.js';
-import { playerHtml } from '../lib/player.js';
 
 const PORT = Number(process.env.REPLAY_PORT ?? 8898);
 const MAX_BODY = 30 * 1024 * 1024; // 30MB replay cap
@@ -54,7 +52,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const dataMatch = path.match(/^\/api\/replays\/([A-Za-z0-9.-]+)\.json$/);
+  const dataMatch = path.match(/^\/api\/replays\/([A-Za-z0-9.-]+)$/);
   if (req.method === 'GET' && dataMatch && ID_RE.test(dataMatch[1])) {
     const data = await get(dataMatch[1]);
     if (!data) {
@@ -63,13 +61,6 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify(data));
-    return;
-  }
-
-  const pageMatch = path.match(/^\/r\/([A-Za-z0-9.-]+)$/);
-  if (req.method === 'GET' && pageMatch && ID_RE.test(pageMatch[1])) {
-    res.writeHead(200, { 'content-type': 'text/html' });
-    res.end(playerHtml(pageMatch[1]));
     return;
   }
 

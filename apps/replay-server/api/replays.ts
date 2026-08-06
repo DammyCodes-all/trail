@@ -1,5 +1,5 @@
-// POST /api/replays — accept a session { title, exportedAt, events }, store it,
-// return { id }. The share link is <origin>/r/<id>.
+// POST /api/replays — accept a shared session { v, title, exportedAt, report,
+// events }, store it, return { id }. The share link is <origin>/api/replays/<id>.
 import { randomUUID } from 'node:crypto';
 import { put } from '../lib/storage.js';
 
