@@ -5,3 +5,6 @@ packages:
 allowBuilds:
   sharp: false
   unrs-resolver: false
+
+minimumReleaseAgeExclude:
+  - '@vercel/blob@2.7.0'

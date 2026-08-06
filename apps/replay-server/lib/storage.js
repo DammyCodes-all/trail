@@ -2,27 +2,34 @@
 // production path — serverless has no disk), otherwise local files (dev and the
 // E2E spike). The API surface — put(id, data) / get(id) — is all either side
 // needs, so a future switch to Postgres/KV touches only this file.
+//
+// Blobs are public with deterministic paths: the read-write token embeds the
+// store id, so a blob's URL is always
+// https://<store>.public.blob.vercel-storage.com/replays/<id>.json — no SDK
+// call needed to read. Shares are secret-link style: the id is a random UUID
+// nobody can guess, and the full share link is the capability.
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getDownloadUrl, put as blobPut } from '@vercel/blob';
+import { put as blobPut } from '@vercel/blob';
 
 const TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
 const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.data');
-// Signed download URLs are valid for an hour; the extension fetches the
-// session immediately after the share link resolves, so that's plenty.
-const READ_TTL_MS = 60 * 60 * 1000;
 
 export function isBlobMode() {
   return Boolean(TOKEN);
 }
 
+// Token format: vercel_blob_rw_<storeId>_<secret> — the store id is the
+// subdomain of every blob URL (lowercased; DNS case-insensitive).
+const storeId = () => TOKEN.split('_')[3]?.toLowerCase() ?? '';
+
 export async function put(id, data) {
   const body = typeof data === 'string' ? data : JSON.stringify(data);
   if (TOKEN) {
     await blobPut(`replays/${id}.json`, body, {
-      access: 'private',
+      access: 'public',
       addRandomSuffix: false,
       contentType: 'application/json',
       token: TOKEN,
@@ -37,10 +44,9 @@ export async function put(id, data) {
 export async function get(id) {
   if (TOKEN) {
     try {
-      const url = await getDownloadUrl(TOKEN, `replays/${id}.json`, {
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-      });
-      const res = await fetch(url);
+      const res = await fetch(
+        `https://${storeId()}.public.blob.vercel-storage.com/replays/${id}.json`,
+      );
       if (!res.ok) return null;
       return res.json();
     } catch {
