@@ -10,6 +10,9 @@ import { getDownloadUrl, put as blobPut } from '@vercel/blob';
 
 const TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
 const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.data');
+// Signed download URLs are valid for an hour; the extension fetches the
+// session immediately after the share link resolves, so that's plenty.
+const READ_TTL_MS = 60 * 60 * 1000;
 
 export function isBlobMode() {
   return Boolean(TOKEN);
@@ -19,7 +22,7 @@ export async function put(id, data) {
   const body = typeof data === 'string' ? data : JSON.stringify(data);
   if (TOKEN) {
     await blobPut(`replays/${id}.json`, body, {
-      access: 'public',
+      access: 'private',
       addRandomSuffix: false,
       contentType: 'application/json',
       token: TOKEN,
@@ -34,7 +37,9 @@ export async function put(id, data) {
 export async function get(id) {
   if (TOKEN) {
     try {
-      const url = await getDownloadUrl(TOKEN, `replays/${id}.json`);
+      const url = await getDownloadUrl(TOKEN, `replays/${id}.json`, {
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      });
       const res = await fetch(url);
       if (!res.ok) return null;
       return res.json();

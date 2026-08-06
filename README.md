@@ -1,71 +1,40 @@
 # TRAIL
 
-TRAIL is a browser extension that turns a bug you just hit into a maintainer-ready GitHub issue. You record the reproduction like a screencast, and TRAIL writes the report: the exact sequence of clicks, what was typed, the console errors, the failed requests, and a playable session replay — all pulled from the browser instead of from your memory.
+TRAIL is a browser extension that turns a bug you just hit into a maintainer-ready GitHub issue. Record the reproduction like a screencast, and TRAIL writes the report: the exact click sequence, what was typed, the console errors, the failed requests, and a playable session replay. All pulled from the browser, none of it from your memory.
 
 Built for ReverieHacks 2026, Software Development track.
 
-## Why it exists
+## The problem
 
-Bug reports without reproduction steps are the default, not the exception. The reporter doesn't remember the exact click order, never opens the console, and can't tell you what "environment" means. The maintainer replies "please provide a minimal reproduction," the reporter can't, and the issue sits open for months.
+Bug reports without reproduction steps are the default, not the exception. The reporter doesn't remember the click order, never opens the console, and can't tell you what "environment" means. The maintainer asks for a minimal reproduction. The reporter can't produce one. The issue sits open for months.
 
-TRAIL sits on the reporter's side and does the remembering for them. No SDK, no app instrumentation, no account — the extension works on any page you visit, and the report comes out pre-shaped for GitHub.
+TRAIL does the remembering for you. No SDK, no app instrumentation, no account. It works on any page you visit, and the report comes out pre-shaped for GitHub.
 
-## How it works
+## Demo
 
-1. **Open the extension.** The popup shows your report history, or an empty state if you haven't made one yet. Start Report is always visible.
+![Demo](demo.gif) <!-- replace: a GIF or screenshot of recording a bug, the review screen, and the prefilled GitHub issue -->
 
-2. **Set up.** One toggle: auto-redact, on by default. Passwords, emails, and card-number-shaped inputs are excluded at capture time — rrweb masks them at the source, so sensitive values are never recorded, not recorded-then-hidden. Hit Begin Recording.
+## What TRAIL does
 
-3. **Reproduce the bug.** Interact with the page normally. A small draggable overlay shows live counts of clicks, console errors, and failed requests, so you can see capture is happening. In the background, rrweb records the full session while patched `console`/`fetch`/`XHR` hooks capture the diagnostics.
+- Records the whole session: clicks, typing, console errors, failed requests, and a playable replay.
+- Masks passwords, emails, and card numbers at capture time. Sensitive values never reach disk, not "recorded then hidden."
+- Generates a deterministic Markdown report plus a prefilled GitHub new-issue URL. No AI calls anywhere in the path.
+- Maps the report onto the target repo's actual GitHub issue templates.
+- Saves every report to history. Reopening one restores the full review screen: replay, timeline, exported report.
+- Shares a session as a link. Paste it into another TRAIL popup and it imports into that person's history with the same review UI. Nothing uploads until you hit Share.
 
-4. **Stop.** Capture ends immediately.
+## Tech stack
 
-5. **Review.** A full-tab review screen opens with the replay on the left and a generated timeline on the right: `Navigated to /checkout → Typed in Email field → Clicked Submit → Console error → POST /api/submit failed, 500`. A backstop toggle redacts anything still flagged as sensitive after the fact.
+- WXT + React for the extension
+- rrweb for session replay
+- IndexedDB for local history
+- Vercel Blob for shared replays, local files in dev
+- Next.js scaffold for the landing page
+- Puppeteer for end-to-end verification
 
-6. **Export.** Enter the target repo (owner/repo, remembered between reports). TRAIL fetches the repo's GitHub issue templates and maps the report onto the actual template fields. Output is a deterministic Markdown report — no AI call anywhere in this path — plus a prefilled GitHub new-issue URL, with clipboard and `.md` download as fallbacks.
+## Getting started
 
-7. **Submit.** The prefilled GitHub page opens in a new tab. You review and submit it in GitHub's own UI. TRAIL never touches your GitHub account.
-
-8. **Later.** The report is saved to history. Reopening it restores the same review screen: replay, timeline, exported report.
-
-## Extension architecture
-
-The tricky part is that a browser extension's content script lives in an isolated world — patches to `console.error` or `window.fetch` there patch copies of the functions the page never calls. So the recorder is split in two:
-
-- **`recorder.content.ts`** registers in the **MAIN world** (`world: "MAIN"`, `document_start`), where patching the real page functions works. It wraps console, unhandled rejections, fetch/XHR, clicks, and inputs, and starts rrweb with `maskInputOptions` and `blockClass` for pre-capture redaction. Everything it captures is emitted as `window.postMessage({ __trail__: true, ... })`.
-- **`relay.content.ts`** runs in the isolated world, listens for that postMessage, and batches events to the background service worker about once a second.
-
-The service worker (`entrypoints/background.ts`) is deliberately stateless: it writes batches straight to IndexedDB and keeps only counts and session metadata in `chrome.storage.session`. That way, when Chrome kills the service worker mid-recording (which it will), the events already captured survive and the recording keeps going.
-
-One wrinkle worth knowing about: the recorder registers twice — `registerContentScripts` covers future navigations, `executeScript` covers the already-open page. Multi-page reproductions work because of the pair.
-
-Two build-time details:
-
-- rrweb's bundle contains the Unicode non-character U+FFFE, which Chrome's content-script loader rejects as not UTF-8. A custom WXT plugin (`escapeNonAscii` in `wxt.config.ts`) escapes every non-ASCII byte to `\uXXXX` sequences, which are runtime-identical.
-- GitHub's `issues/new` nginx 414s around 8 KB of URL. `lib/github.ts` builds the body to a fixed 7600-char budget, cutting sections in priority order and appending a "truncated" note when needed. The full report always lands on the clipboard.
-
-## Repo layout
-
-```
-apps/extension        The extension itself (WXT + React + rrweb)
-  entrypoints/        background SW, recorder, relay, overlay, popup, review tab
-  lib/record/         console, network, interaction, rrweb, redaction instrumenters
-  lib/                db (IndexedDB), report, github, timeline, facts, overlay physics
-apps/replay-server    Replay share server: store a session, serve it back as JSON
-  server/index.mjs    Local twin, file-backed storage, port 8898
-  api/                Vercel functions: POST /api/replays, GET /api/replays/<id>
-  lib/storage.js      Vercel Blob (token set) or local files (.data/)
-apps/web              Next.js landing page (still the scaffold; Phase 5, deferred)
-packages/tokens       @trail/tokens — design tokens as CSS
-```
-
-The replay share server works in two modes: with `BLOB_READ_WRITE_TOKEN` set it stores sessions in Vercel Blob (the serverless path); without it, it writes files to `.data/` locally. Same routes either way: `POST /api/replays` returns `{ id }`, and `GET /api/replays/<id>` serves the session JSON. Sharing is extension-to-extension: the reporter copies `https://<server>/api/replays/<id>`, and whoever receives it pastes it into the TRAIL popup — the review tab then imports the session straight into their history with the same review UI (replay, timeline, evidence) and no public web player page. The storage seam is one file (`lib/storage.js`), so swapping Vercel Blob for an S3-compatible store later touches nothing else.
-
-Nothing leaves the reporter's machine until they explicitly share: recording and reports live only in the extension's local IndexedDB, and the first upload to the server (Vercel Blob in production) happens exactly when the reporter clicks **Share → Copy Replay Link**. There is no background sync, no silent upload.
-
-## Local setup
-
-You need pnpm 11+ (the repo pins `^11.16.0` via `devEngines`, and pnpm installs the right version automatically if it's missing) and Node 20.9+ — Next 16 requires at least that. Chrome or Firefox for the extension.
+You need pnpm 11+ and Node 20.9+. The repo pins pnpm via `devEngines`, so it installs the right version automatically. Chrome or Firefox for the extension.
 
 ```sh
 git clone <repo>
@@ -73,22 +42,68 @@ cd trail
 pnpm install
 ```
 
-From there, three processes:
+Three processes, all local:
 
-1. **The extension.** `pnpm dev:extension` builds and launches Chrome with the unpacked extension loaded. Look for the TRAIL popup in the toolbar. Start a report, reproduce a bug on any page, stop — the review tab opens with the replay and timeline.
-2. **The replay server.** `pnpm dev:replay` runs the local twin on http://localhost:8898. Needed for shareable replay links while developing — the extension points at it by default (`REPLAY_SERVER_URL` in `apps/extension/lib/constants.ts`), so there's no config to touch. Recipients paste the link into their TRAIL popup; the session is fetched from the link's own host, so both sides can run different servers.
+1. **The extension.** `pnpm dev:extension` builds and launches Chrome with the unpacked extension loaded. Start a report, reproduce a bug, stop. The review tab opens with the replay and timeline.
+2. **The replay server.** `pnpm dev:replay` runs on http://localhost:8898. Needed for shareable links. The extension points at it by default, so there's nothing to configure. Recipients paste a link into their own popup; the session is fetched from the link's own host, so both sides can run different servers.
 3. **The landing page** (optional). `pnpm dev:web` serves the Next.js scaffold on http://localhost:3000.
 
-Everything runs against local storage: reports live in the extension's IndexedDB, shared replays land in `apps/replay-server/.data/`. No accounts, no API keys.
+Everything runs against local storage: reports in the extension's IndexedDB, shared replays in `apps/replay-server/.data/`. No accounts, no API keys. Two env vars exist, neither needed for local dev: `BLOB_READ_WRITE_TOKEN` flips the share server to Vercel Blob for production (sessions are stored as private blobs and read server-side via short-lived signed URLs, so clients never touch the store directly), and `WXT_PUBLIC_REPLAY_SERVER_URL` points a production extension build at the deployed server instead of the local twin (put it in `apps/extension/.env`, which is gitignored).
 
-To check a change: `pnpm verify:extension` runs the typecheck, a production build, and a Puppeteer spike that drives a real page through the whole capture path.
+To check a change: `pnpm verify:extension` runs the typecheck, a production build, and a Puppeteer spike that drives a real page through the whole capture path. For a manual install: `pnpm build:extension`, then load `.output/chrome-mv3` from `chrome://extensions`. Want all three at once? `pnpm dev:all`.
 
-For a manual install: `pnpm build:extension`, then load `.output/chrome-mv3` as an unpacked extension from `chrome://extensions`.
+## How it works
 
-Want all three processes at once? `pnpm dev:all` runs them in parallel.
+1. **Open the extension.** The popup shows report history, or an empty state if you haven't made one yet. Start Report is always visible.
+2. **Set up.** One toggle: auto-redact, on by default. Passwords, emails, and card-number-shaped inputs are excluded at capture time. rrweb masks them at the source, so sensitive values are never recorded, not recorded-then-hidden. Hit Begin Recording.
+3. **Reproduce the bug.** Interact with the page normally. A small draggable overlay shows live counts of clicks, console errors, and failed requests, so you can see capture is happening. In the background, rrweb records the session while patched console/fetch/XHR hooks capture the diagnostics.
+4. **Stop.** Capture ends immediately.
+5. **Review.** A full-tab review screen opens with the replay on the left and a generated timeline on the right: `Navigated to /checkout → Typed in Email field → Clicked Submit → Console error → POST /api/submit failed, 500`. A backstop toggle redacts anything still flagged as sensitive after the fact.
+6. **Export.** Enter the target repo (owner/repo, remembered between reports). TRAIL fetches the repo's GitHub issue templates and maps the report onto the actual template fields. Output is a deterministic Markdown report, plus a prefilled GitHub new-issue URL, with clipboard and `.md` download as fallbacks.
+7. **Submit.** The prefilled GitHub page opens in a new tab. You review and submit it in GitHub's own UI. TRAIL never touches your GitHub account.
+8. **Later.** The report is saved to history. Reopening it restores the same review screen.
 
-## Non-goals
+### How it's built
+
+A browser extension's content script lives in an isolated world, so patches to `console.error` or `window.fetch` there patch copies of functions the page never calls. The recorder is split in two:
+
+- **`recorder.content.ts`** registers in the MAIN world (`world: "MAIN"`, `document_start`), where patching the real page functions works. It wraps console, unhandled rejections, fetch/XHR, clicks, and inputs, and starts rrweb with `maskInputOptions` and `blockClass` for pre-capture redaction. Everything it captures is emitted as `window.postMessage({ __trail__: true, ... })`.
+- **`relay.content.ts`** runs in the isolated world, listens for that postMessage, and batches events to the background service worker about once a second.
+
+The service worker is deliberately stateless: it writes batches straight to IndexedDB and keeps only counts and session metadata in `chrome.storage.session`. When Chrome kills the service worker mid-recording, which it will, the events already captured survive and the recording keeps going.
+
+Two build-time details worth knowing:
+
+- rrweb's bundle contains the Unicode non-character U+FFFE, which Chrome's content-script loader rejects as not UTF-8. A custom WXT plugin (`escapeNonAscii` in `wxt.config.ts`) escapes every non-ASCII byte to `\uXXXX` sequences, which are runtime-identical.
+- GitHub's `issues/new` nginx 414s around 8 KB of URL. `lib/github.ts` builds the body to a fixed 7600-char budget, cutting sections in priority order and appending a "truncated" note when needed. The full report always lands on the clipboard.
+
+Repo layout:
+
+```
+apps/extension        The extension itself (WXT + React + rrweb)
+apps/replay-server    Replay share server: store a session, serve it back as JSON
+apps/web              Next.js landing page (still the scaffold)
+packages/tokens       @trail/tokens — design tokens as CSS
+```
+
+## Roadmap
+
+- A real landing page (currently the Next.js scaffold)
+- AI duplicate-issue detection
+- Direct GitHub API submission
+- Linear/Jira support
+
+## Known limitations
 
 - No cross-origin iframe recording (`allFrames: false`).
-- No AI in the core path — the report is fully deterministic.
-- Click-to-select individual elements to exclude, AI duplicate-issue detection, direct GitHub API submission, and Linear/Jira support are stretch goals, only after the core path is solid.
+- No AI in the core path. The report is structured and deterministic by design, which is also the trade-off: no natural-language summary.
+- Shared sessions cap at 30 MB on the server.
+- GitHub new-issue URLs 414 past roughly 8 KB, so very long reports get truncated in the URL. The full report is always on the clipboard.
+
+## License
+
+TBD.
+
+## Contact
+
+Built with ❤️ by Olagunju AL-ameen(@dev_aluminate). Find me at [X/Twitter](https://x.com/dev_aluminate) and [portfolio](https://thealuminate.dev/).

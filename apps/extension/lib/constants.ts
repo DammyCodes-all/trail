@@ -21,5 +21,7 @@ export const REDACT_KEY = 'trail:autoRedact';
 export const REPO_KEY = 'trail:repo';
 
 // Base URL of the replay share server (see replay-server/). Points at the local
-// twin by default; swap in the Vercel deployment URL for production.
-export const REPLAY_SERVER_URL = 'http://localhost:8898';
+// twin by default; production builds override via WXT_PUBLIC_REPLAY_SERVER_URL
+// (a WXT_PUBLIC_ var, inlined at build time — see the WXT env docs).
+export const REPLAY_SERVER_URL =
+  import.meta.env.WXT_PUBLIC_REPLAY_SERVER_URL ?? 'http://localhost:8898';
