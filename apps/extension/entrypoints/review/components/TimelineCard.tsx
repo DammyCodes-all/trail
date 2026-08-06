@@ -359,6 +359,11 @@ export function TimelineCard({
   const followRafRef = useRef(0);
   const steeringRef = useRef(false);
   const lastWrittenRef = useRef(-1);
+  // The first play of the session jumps to the timeline — the page opens at
+  // the top (see the follow effect) and the reporter should watch the replay
+  // unfold. Later plays respect the user's position instead of hijacking.
+  const playedOnceRef = useRef(false);
+  const cardRef = useRef<HTMLElement | null>(null);
   // Never auto-scroll on initial load: the page must open at the top and only
   // move once the replay is played or the user seeks. `seenTimeRef` marks the
   // mount and distinguishes "time changed" (a seek) from re-renders (filter
@@ -484,6 +489,43 @@ export function TimelineCard({
     followRafRef.current = requestAnimationFrame(step);
   }, [activeIndex, isPlaying, followNonce, cancelFollow, scrollToY]);
 
+  // First play: glide to the timeline card. Same motion language as follow —
+  // rAF lerp on desktop, instant snap otherwise.
+  useEffect(() => {
+    if (!isPlaying || playedOnceRef.current) return;
+    playedOnceRef.current = true;
+    const card = cardRef.current;
+    if (!card) return;
+    const target = Math.max(
+      0,
+      Math.min(
+        card.getBoundingClientRect().top +
+          window.scrollY -
+          window.innerHeight * 0.12,
+        document.documentElement.scrollHeight - window.innerHeight,
+      ),
+    );
+    const glide =
+      window.matchMedia("(min-width: 1024px)").matches &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    cancelFollow();
+    if (!glide) {
+      scrollToY(target);
+      return;
+    }
+    const step = () => {
+      const next = window.scrollY + (target - window.scrollY) * 0.22;
+      if (Math.abs(target - next) < 0.5) {
+        scrollToY(target);
+        followRafRef.current = 0;
+        return;
+      }
+      scrollToY(next);
+      followRafRef.current = requestAnimationFrame(step);
+    };
+    followRafRef.current = requestAnimationFrame(step);
+  }, [isPlaying, cancelFollow, scrollToY]);
+
   const jumpToLatest = () => {
     lastFollowedRef.current = null;
     steeringRef.current = false;
@@ -515,7 +557,10 @@ export function TimelineCard({
   };
 
   return (
-    <section className="min-w-0 border-b border-border py-8 sm:py-10 lg:border-b-0">
+    <section
+      ref={cardRef}
+      className="min-w-0 border-b border-border py-8 sm:py-10 lg:border-b-0"
+    >
       <header className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <h2 className="font-heading text-base font-semibold text-foreground">
           Evidence timeline

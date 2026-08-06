@@ -81,6 +81,11 @@ export interface TrailReport {
   eventCount: number;
   counts: TrailCounts;
   url: string;
+  // Derived at save time so the popup history can show what went wrong without
+  // loading the session's (multi-MB) event snapshot. Optional because reports
+  // saved before these existed fall back to the raw event count.
+  errorCount?: number;
+  failedRequestCount?: number;
   // Set on reports imported from a shared link: the share URL it came from.
   // Used to dedupe re-imports and to show provenance.
   source?: string;

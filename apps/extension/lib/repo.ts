@@ -49,3 +49,41 @@ export function suggestRepo(urls: string[]): string | null {
   }
   return null;
 }
+
+// Accept any of the ways users express a repo: a full GitHub link
+// (https://github.com/acme/widget/issues/3), a bare owner/repo, or a
+// github.com/owner/repo shorthand. Returns the canonical `owner/repo`, or the
+// input unchanged when it can't be recognized (the user may still be typing).
+export function normalizeRepo(value: string): string {
+  const raw = value.trim();
+  if (!raw) return raw;
+
+  let candidate = '';
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const u = new URL(raw);
+      const host = u.hostname.toLowerCase();
+      if (host !== 'github.com' && host !== 'www.github.com') return raw;
+      const parts = u.pathname
+        .replace(/^\/+/, '')
+        .replace(/\/+$/, '')
+        .split('/')
+        .filter(Boolean);
+      if (parts.length >= 2) candidate = `${parts[0]}/${parts[1]}`;
+      else return raw;
+    } catch {
+      return raw;
+    }
+  } else {
+    candidate = raw
+      .replace(/^(?:www\.)?github\.com\//i, '')
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '')
+      .split('/')
+      .slice(0, 2)
+      .join('/');
+  }
+
+  candidate = candidate.replace(/\.git$/i, '');
+  return REPO_RE.test(candidate) ? candidate : raw;
+}
