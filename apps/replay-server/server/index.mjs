@@ -1,12 +1,13 @@
 // Local twin of the Vercel functions: same routes, file-backed storage.
-//   POST /api/replays           → { id }
-//   GET  /api/replays/<id>      → session JSON
+//   POST /api/replays/presign       → { id, uploadUrl } (uploads via PUT)
+//   PUT  /api/replays/upload/<id>   → store the session body
+//   GET  /api/replays/<id>          → session JSON
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { put, get, isBlobMode } from '../lib/storage.js';
 
 const PORT = Number(process.env.REPLAY_PORT ?? 8898);
-const MAX_BODY = 30 * 1024 * 1024; // 30MB replay cap
+const MAX_BODY = 50 * 1024 * 1024; // matches Blob's per-blob cap
 
 const ID_RE = /^[A-Za-z0-9.-]{1,64}$/;
 
@@ -24,14 +25,25 @@ const server = http.createServer(async (req, res) => {
       version: '1.0.0',
       storage: isBlobMode() ? 'vercel-blob' : 'file',
       routes: {
-        'POST /api/replays': 'store a shared session, returns { id }',
+        'POST /api/replays/presign': 'get a presigned upload URL, returns { id, uploadUrl }',
+        'PUT <uploadUrl>': 'upload the session directly (Blob or this server in dev)',
         'GET /api/replays/<id>': 'fetch a stored session',
       },
     });
     return;
   }
 
-  if (req.method === 'POST' && path === '/api/replays') {
+  if (req.method === 'POST' && path === '/api/replays/presign') {
+    const id = randomUUID();
+    json(res, 200, {
+      id,
+      uploadUrl: `http://localhost:${PORT}/api/replays/upload/${id}`,
+    });
+    return;
+  }
+
+  const uploadMatch = path.match(/^\/api\/replays\/upload\/([A-Za-z0-9.-]+)$/);
+  if (req.method === 'PUT' && uploadMatch && ID_RE.test(uploadMatch[1])) {
     const chunks = [];
     let total = 0;
     for await (const chunk of req) {
@@ -54,14 +66,13 @@ const server = http.createServer(async (req, res) => {
       json(res, 400, { error: 'events array required' });
       return;
     }
-    const id = randomUUID();
     try {
-      await put(id, data);
+      await put(uploadMatch[1], data);
     } catch (err) {
       json(res, 500, { error: `storage failed: ${err.message}` });
       return;
     }
-    json(res, 200, { id });
+    json(res, 200, { id: uploadMatch[1] });
     return;
   }
 

@@ -471,42 +471,56 @@ function App() {
   };
 
   // Upload the session to the replay server and hand back the share link.
-  // The payload carries the full report so a reviewer's extension can rebuild
-  // the exact same review UI (timeline, evidence, replay) from the link.
-  // Clipboard failures never block the link from being generated.
+  // Uploads go through a presigned PUT URL: Vercel caps function bodies at
+  // ~4.5MB and full sessions blow past that, so the payload goes straight to
+  // storage. The payload carries the full report so a reviewer's extension can
+  // rebuild the exact same review UI (timeline, evidence, replay) from the
+  // link. Clipboard failures never block the link from being generated.
   const copyReplayLink = () => {
     if (sharing === "uploading") return;
     setSharing("uploading");
+    const session = () =>
+      JSON.stringify({
+        v: 2,
+        title: displayTitle,
+        exportedAt: Date.now(),
+        report: {
+          title: displayTitle,
+          startedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
+          endedAt: report?.endedAt ?? events.at(-1)?.t ?? Date.now(),
+          eventCount: events.length,
+          counts,
+          url: events[0]?.url ?? "",
+        },
+        events,
+      });
     const upload = async (): Promise<{ link: string; copied: boolean }> => {
       let res: Response;
       try {
-        res = await fetch(`${REPLAY_SERVER_URL}/api/replays`, {
+        res = await fetch(`${REPLAY_SERVER_URL}/api/replays/presign`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            v: 2,
-            title: displayTitle,
-            exportedAt: Date.now(),
-            report: {
-              title: displayTitle,
-              startedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
-              endedAt: report?.endedAt ?? events.at(-1)?.t ?? Date.now(),
-              eventCount: events.length,
-              counts,
-              url: events[0]?.url ?? "",
-            },
-            events,
-          }),
         });
       } catch (err) {
-        throw new Error(
-          err instanceof Error ? err.message : "network error",
-        );
+        throw new Error(err instanceof Error ? err.message : "network error");
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as { id?: string };
-      if (!data.id) throw new Error("no id");
-      const link = `${REPLAY_SERVER_URL}/api/replays/${data.id}`;
+      const { id, uploadUrl } = (await res.json()) as {
+        id?: string;
+        uploadUrl?: string;
+      };
+      if (!id || !uploadUrl) throw new Error("no presign");
+      let putRes: Response;
+      try {
+        putRes = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: session(),
+        });
+      } catch (err) {
+        throw new Error(err instanceof Error ? err.message : "network error");
+      }
+      if (!putRes.ok) throw new Error(`HTTP ${putRes.status}`);
+      const link = `${REPLAY_SERVER_URL}/api/replays/${id}`;
       setReplayLink(link);
       try {
         await navigator.clipboard.writeText(link);

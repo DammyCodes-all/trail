@@ -10,5 +10,10 @@ export function GET(): Response {
     name: "trail-replay-server",
     version: "1.0.0",
     storage: isBlobMode() ? "vercel-blob" : "file",
+    routes: {
+      "POST /api/replays/presign": "get a presigned upload URL, returns { id, uploadUrl }",
+      "PUT <uploadUrl>": "upload the session directly (Blob, up to 50MB)",
+      "GET /api/replays/<id>": "fetch a stored session",
+    },
   });
 }
