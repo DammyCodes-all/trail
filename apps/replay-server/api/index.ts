@@ -1,14 +1,12 @@
 // GET / — server info. Handy for confirming a deployment is live and which
 // storage mode it runs in (isBlobMode() is true when BLOB_READ_WRITE_TOKEN
-// is set in the function env).
+// is set in the function env). Named exports opt into Vercel's Web fetch-style
+// function API; a default export runs in Node (req, res) mode instead.
 import { isBlobMode } from '../lib/storage.js';
 
 export const config = { runtime: 'nodejs' };
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== 'GET') {
-    return new Response('method not allowed', { status: 405 });
-  }
+export function GET(): Response {
   return Response.json({
     name: 'trail-replay-server',
     version: '1.0.0',

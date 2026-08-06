@@ -1,5 +1,7 @@
 // POST /api/replays — accept a shared session { v, title, exportedAt, report,
 // events }, store it, return { id }. The share link is <origin>/api/replays/<id>.
+// Named exports (POST/GET) opt into Vercel's Web fetch-style function API; a
+// default export runs in Node (req, res) mode where req.text() doesn't exist.
 import { randomUUID } from 'node:crypto';
 import { put } from '../lib/storage.js';
 
@@ -7,11 +9,8 @@ const MAX_BODY = 30 * 1024 * 1024;
 
 export const config = { runtime: 'nodejs' };
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== 'POST') {
-    return new Response('method not allowed', { status: 405 });
-  }
-  const raw = await req.text();
+export async function POST(request: Request): Promise<Response> {
+  const raw = await request.text();
   if (raw.length > MAX_BODY) {
     return new Response('replay too large', { status: 413 });
   }
