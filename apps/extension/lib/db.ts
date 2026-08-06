@@ -72,6 +72,20 @@ export async function updateReportTitle(seq: number, title: string): Promise<voi
   await db.put(REPORTS_STORE, { ...report, title });
 }
 
+// Backfill the derived summary fields on reports saved before they existed
+// (see TrailReport.errorCount). Idempotent: once written, the popup's backfill
+// skips the report and the fields ride along with it forever.
+export async function updateReportSummary(
+  seq: number,
+  errorCount: number,
+  failedRequestCount: number,
+): Promise<void> {
+  const db = await getDb();
+  const report = await db.get(REPORTS_STORE, seq);
+  if (!report) return;
+  await db.put(REPORTS_STORE, { ...report, errorCount, failedRequestCount });
+}
+
 // Snapshot a finished session's events so a report can be reopened after the live
 // events store is cleared by the next recording.
 export async function saveSessionEvents(reportId: number, events: StoredEvent[]): Promise<void> {
@@ -106,6 +120,15 @@ export async function importSharedReport(
     eventCount: fallback.eventCount ?? payload.events.length,
     counts: fallback.counts ?? { click: 0, input: 0, console: 0, net: 0 },
     url: fallback.url ?? payload.events[0]?.url ?? '',
+    errorCount:
+      fallback.errorCount ??
+      payload.events.filter((e) => e.k === 'console' && e.lv === 'error')
+        .length,
+    failedRequestCount:
+      fallback.failedRequestCount ??
+      payload.events.filter(
+        (e) => e.k === 'net' && (e.status === 0 || e.status >= 400),
+      ).length,
     source,
   };
   const seq = await saveReport(report);

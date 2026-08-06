@@ -310,7 +310,7 @@ importers:
   apps/replay-server:
     dependencies:
       '@vercel/blob':
-        specifier: ^2.7.0
+        specifier: ^2.6.1
         version: 2.7.0
 
   apps/web:
