@@ -23,6 +23,7 @@ export function GitHubIssueDialog({
   issueReady,
   template,
   templateState,
+  reportTooLong,
   onOpenIssue,
 }: {
   open: boolean;
@@ -34,6 +35,7 @@ export function GitHubIssueDialog({
   issueReady: boolean;
   template: IssueTemplate | null;
   templateState: "idle" | "checking" | "found" | "none";
+  reportTooLong: boolean;
   onOpenIssue: () => void;
 }) {
   return (
@@ -52,14 +54,15 @@ export function GitHubIssueDialog({
             <Input
               id="trail-repo"
               className="repo font-mono"
-              placeholder="owner/repo"
+              placeholder="https://github.com/acme/widget"
               value={repo}
               onChange={(event) => onRepoChange(event.target.value)}
               spellCheck={false}
               autoComplete="off"
             />
             <p className="text-xs text-muted-foreground">
-              Use the repository name, for example <code className="font-mono">acme/widget</code>.
+              Paste the full repository link — for example{" "}
+              <code className="font-mono">https://github.com/acme/widget</code>.
             </p>
           </div>
           <div className="grid gap-2">
@@ -88,6 +91,16 @@ export function GitHubIssueDialog({
             <p className="flex items-center gap-2 rounded-md border border-warn/20 bg-warn-soft px-3 py-2 text-xs text-warn">
               <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" />
               No bug template found. Trail will use its standard report format.
+            </p>
+          )}
+          {reportTooLong && (
+            <p className="flex items-start gap-2 rounded-md border border-warn/20 bg-warn-soft px-3 py-2 text-xs text-warn">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                Your report is longer than what GitHub’s issue link can hold.
+                Don’t worry — Trail copies the full report to your clipboard, so
+                you can paste it into the issue body after GitHub opens.
+              </span>
             </p>
           )}
         </div>

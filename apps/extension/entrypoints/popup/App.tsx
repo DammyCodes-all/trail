@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { MSG_START, MSG_STATUS, MSG_STOP, REDACT_KEY } from "@/lib/constants";
-import { getAllEvents, getReports } from "@/lib/db";
+import { getAllEvents, getReports, getSessionEvents, updateReportSummary } from "@/lib/db";
 import type { StoredEvent, TrailCounts, TrailReport } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,8 +47,40 @@ function App() {
     void browser.storage.local.get(REDACT_KEY).then((r) => {
       if (typeof r[REDACT_KEY] === "boolean") setAutoRedact(r[REDACT_KEY]);
     });
-    void getReports().then(setReports);
+    void getReports().then((reps) => {
+      setReports(reps);
+      void backfillSummaries(reps);
+    });
   }, []);
+
+  // Reports saved before errorCount/failedRequestCount existed lack the
+  // summary the list shows. Derive it from each session snapshot once and
+  // persist; capped per popup open so a large history never chokes a single
+  // load — remaining reports backfill on the next open.
+  const backfillSummaries = async (reps: TrailReport[]) => {
+    const missing = reps
+      .filter(
+        (r) =>
+          r.errorCount === undefined || r.failedRequestCount === undefined,
+      )
+      .slice(0, 8);
+    for (const r of missing) {
+      try {
+        const events = await getSessionEvents(r.seq);
+        if (!events.length) continue;
+        const errorCount = events.filter(
+          (e) => e.k === "console" && e.lv === "error",
+        ).length;
+        const failedRequestCount = events.filter(
+          (e) => e.k === "net" && (e.status === 0 || e.status >= 400),
+        ).length;
+        await updateReportSummary(r.seq, errorCount, failedRequestCount);
+      } catch {
+        // best-effort backfill
+      }
+    }
+    void getReports().then(setReports);
+  };
 
   const toggleRedact = async (value: boolean) => {
     setAutoRedact(value);
@@ -154,7 +186,7 @@ function App() {
         >
           <div className="flex shrink-0 flex-col gap-2">
             <p className="text-[11px] tracking-tight text-muted-foreground">
-              Bug reports that replay themselves.
+              Stop explaining bugs. Start showing them.
             </p>
             <Button
               className="h-11 w-full"
@@ -179,10 +211,11 @@ function App() {
                 id="open-shared"
                 className="h-9 shrink-0 rounded-md px-3"
                 variant="outline"
+                disabled={!shareLink.trim()}
                 onClick={() => openSharedLink(shareLink)}
               >
                 <Link2 data-icon="inline-start" aria-hidden="true" />
-                Open
+                Open report
               </Button>
             </div>
             {shareError && (
