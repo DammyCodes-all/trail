@@ -29,7 +29,7 @@ import type {
   TrailReport,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Toaster, toast } from "@/components/ui/toast";
+import { sileo, Toaster } from "sileo";
 
 import { AttachmentsPanel } from "./components/AttachmentsPanel";
 import { EvidencePanel } from "./components/EvidencePanel";
@@ -300,14 +300,14 @@ function App() {
       document.execCommand("copy");
       ta.remove();
     }
-    toast.add({ type: "success", title: "Markdown copied to clipboard" });
+    sileo.success({ title: "Markdown copied to clipboard" });
   };
 
   const download = async (filename: string, blob: Blob) => {
     const url = URL.createObjectURL(blob);
     try {
       await browser.downloads.download({ url, filename });
-      toast.add({ type: "success", title: `Downloaded ${filename}` });
+      sileo.success({ title: `Downloaded ${filename}` });
     } finally {
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     }
@@ -474,28 +474,35 @@ function App() {
   // The payload carries the full report so a reviewer's extension can rebuild
   // the exact same review UI (timeline, evidence, replay) from the link.
   // Clipboard failures never block the link from being generated.
-  const copyReplayLink = async () => {
+  const copyReplayLink = () => {
     if (sharing === "uploading") return;
     setSharing("uploading");
-    try {
-      const res = await fetch(`${REPLAY_SERVER_URL}/api/replays`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          v: 2,
-          title: displayTitle,
-          exportedAt: Date.now(),
-          report: {
+    const upload = async (): Promise<{ link: string; copied: boolean }> => {
+      let res: Response;
+      try {
+        res = await fetch(`${REPLAY_SERVER_URL}/api/replays`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            v: 2,
             title: displayTitle,
-            startedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
-            endedAt: report?.endedAt ?? events.at(-1)?.t ?? Date.now(),
-            eventCount: events.length,
-            counts,
-            url: events[0]?.url ?? "",
-          },
-          events,
-        }),
-      });
+            exportedAt: Date.now(),
+            report: {
+              title: displayTitle,
+              startedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
+              endedAt: report?.endedAt ?? events.at(-1)?.t ?? Date.now(),
+              eventCount: events.length,
+              counts,
+              url: events[0]?.url ?? "",
+            },
+            events,
+          }),
+        });
+      } catch (err) {
+        throw new Error(
+          err instanceof Error ? err.message : "network error",
+        );
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { id?: string };
       if (!data.id) throw new Error("no id");
@@ -503,21 +510,28 @@ function App() {
       setReplayLink(link);
       try {
         await navigator.clipboard.writeText(link);
-        toast.add({
-          type: "success",
-          title: "Replay link copied to clipboard",
-        });
+        return { link, copied: true };
       } catch {
-        toast.add({ type: "info", title: `Replay link ready: ${link}` });
+        return { link, copied: false };
       }
-    } catch {
-      toast.add({
-        type: "error",
-        title: `Replay server unreachable at ${REPLAY_SERVER_URL}`,
-      });
-    } finally {
-      setSharing("idle");
-    }
+    };
+    sileo
+      .promise(upload(), {
+        loading: { title: "Uploading replay…" },
+        success: ({ link, copied }) => ({
+          title: copied
+            ? "Replay link copied to clipboard"
+            : "Replay link ready",
+          description: link,
+        }),
+        error: (err) => ({
+          title: "Replay link failed",
+          description: `${REPLAY_SERVER_URL} — ${err instanceof Error ? err.message : String(err)}`,
+          duration: 8000,
+        }),
+      })
+      .catch(() => {})
+      .finally(() => setSharing("idle"));
   };
 
   if (shareError) {
@@ -634,7 +648,7 @@ function App() {
         onOpenIssue={openIssue}
       />
 
-      <Toaster />
+      <Toaster position="top-right" theme="dark" />
     </div>
   );
 }

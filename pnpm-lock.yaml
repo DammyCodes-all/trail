@@ -266,6 +266,9 @@ importers:
       shadcn:
         specifier: ^4.16.1
         version: 4.16.1(supports-color@7.2.0)(typescript@5.9.3)
+      sileo:
+        specifier: ^0.1.5
+        version: 0.1.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
@@ -4059,6 +4062,12 @@ packages:
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
+
+  sileo@0.1.5:
+    resolution: {integrity: sha512-Fc/3VNFWgQlZttkyvAdnPlzWrLTaii6FIas7nMivlx3uGuKpuNNRZGtSgNRFqTHFn70ZxEjKYxsBIO0nQlDGAg==}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
 
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
@@ -8615,6 +8624,14 @@ snapshots:
   signal-exit@3.0.7: {}
 
   signal-exit@4.1.0: {}
+
+  sileo@0.1.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
+    dependencies:
+      motion: 12.43.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react: 19.2.4
+      react-dom: 19.2.4(react@19.2.4)
+    transitivePeerDependencies:
+      - '@emotion/is-prop-valid'
 
   sisteransi@1.0.5: {}
 
