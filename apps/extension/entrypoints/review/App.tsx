@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { eventWithTime } from "@rrweb/types";
-import { REPLAY_SERVER_URL, REPO_KEY } from "@/lib/constants";
+import { AI_ENABLED_KEY, REPLAY_SERVER_URL, REPO_KEY } from "@/lib/constants";
 import {
   getAllEvents,
   getReport,
@@ -17,12 +17,16 @@ import {
 } from "@/lib/report";
 import { suggestRepo, normalizeRepo } from "@/lib/repo";
 import {
+  fetchAllIssueTemplates,
   fetchIssueTemplate,
   shapeSections,
   type IssueTemplate,
 } from "@/lib/templates";
 import { buildTimeline } from "@/lib/timeline";
-import { stableShareJson } from "@/lib/share-cache";
+import { hashSession, stableShareJson } from "@/lib/share-cache";
+import { buildSessionDigest, generateEnhancements, type AIStatus } from "@/lib/ai";
+import { applyAI, type AIResult } from "@/lib/ai-merge";
+import { aiCacheKey, getCachedAIResult, rememberAIResult } from "@/lib/ai-cache";
 import { isShareLink, rememberIncomingShare, shareSession } from "@/lib/share";
 import {
   buildConsoleLog,
@@ -66,11 +70,20 @@ function App() {
   const redact = true;
   const [repo, setRepo] = useState("");
   const [template, setTemplate] = useState<IssueTemplate | null>(null);
+  const [allTemplates, setAllTemplates] = useState<IssueTemplate[]>([]);
   const [templateState, setTemplateState] = useState<
     "idle" | "checking" | "found" | "none"
   >("idle");
   const [title, setTitle] = useState("");
   const [labels, setLabels] = useState("");
+  // AI report enhancements: opt-out toggle (default on) + generation state.
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [aiState, setAiState] = useState<AIStatus>("idle");
+  const [aiResult, setAiResult] = useState<AIResult | null>(null);
+  // Guards the AI generation run (stale-run token) and title seeding (never
+  // clobber a title the user typed themselves).
+  const aiGenToken = useRef(0);
+  const titleEditedRef = useRef(false);
   const [sharing, setSharing] = useState<"idle" | "uploading">("idle");
   const [replayLink, setReplayLink] = useState("");
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
@@ -151,6 +164,15 @@ function App() {
     setTitle(report?.title ?? "");
   }, [report]);
 
+  // Persisted AI opt-out preference (default on).
+  useEffect(() => {
+    void browser.storage.local
+      .get(AI_ENABLED_KEY)
+      .then(({ [AI_ENABLED_KEY]: value }) => {
+        if (typeof value === "boolean") setAiEnabled(value);
+      });
+  }, []);
+
   // Phase 5: suggest a repo from the recorded pages when the field is empty.
   // Prefill only — not persisted — so the user can dismiss it by typing.
   const repoSuggestedOnce = useRef(false);
@@ -188,21 +210,28 @@ function App() {
 
   // Phase 4: when a repo is typed, detect its issue template (debounced). Any
   // failure (no template, private repo, offline) resolves to null → generic body.
+  // Templates are fetched once: the deterministic pick derives from the same
+  // parsed list the AI path feeds to the model.
   useEffect(() => {
     const r = repo.trim();
     if (!r) {
       setTemplate(null);
+      setAllTemplates([]);
       setTemplateState("idle");
       return;
     }
     let cancelled = false;
     const timer = setTimeout(() => {
       setTemplateState("checking");
-      void fetchIssueTemplate(normalizeRepo(r)).then((t) => {
+      void (async () => {
+        const all = await fetchAllIssueTemplates(normalizeRepo(r));
+        if (cancelled) return;
+        setAllTemplates(all);
+        const t = await fetchIssueTemplate(normalizeRepo(r), all);
         if (cancelled) return;
         setTemplate(t);
         setTemplateState(t ? "found" : "none");
-      });
+      })();
     }, 600);
     return () => {
       cancelled = true;
@@ -210,13 +239,27 @@ function App() {
     };
   }, [repo]);
 
-  // Template frontmatter labels prefill the labels field — but only while the
-  // user hasn't typed their own.
+  // AI title seeds the editable field only while the user hasn't typed — the
+  // same guard the repo suggestion uses, so AI never clobbers a mid-edit.
   useEffect(() => {
-    if (template?.labels?.length && !labels.trim()) {
-      setLabels(template.labels.join(", "));
+    if (aiResult?.title && !titleEditedRef.current) setTitle(aiResult.title);
+  }, [aiResult]);
+
+  const handleTitleChange = (value: string) => {
+    titleEditedRef.current = true;
+    setTitle(value);
+  };
+
+  // Template frontmatter labels prefill the labels field — but only while the
+  // user hasn't typed their own. AI label suggestions merge in alongside.
+  useEffect(() => {
+    if (!labels.trim()) {
+      const merged = [
+        ...new Set([...(template?.labels ?? []), ...(aiResult?.labels ?? [])]),
+      ];
+      if (merged.length) setLabels(merged.join(", "));
     }
-  }, [template, labels]);
+  }, [template, aiResult, labels]);
 
   const base = report ?? {
     title: "Bug report",
@@ -231,10 +274,11 @@ function App() {
     .filter(Boolean);
   const sections = useMemo(() => {
     const baseSections = buildSections(base, events, { redact }, timeline);
+    if (aiResult) return applyAI(baseSections, aiResult, template);
     return template
       ? shapeSections(template, baseSections).sections
       : baseSections;
-  }, [base, events, redact, template, timeline]);
+  }, [base, events, redact, template, timeline, aiResult]);
   const markdown = useMemo(
     () => buildMarkdownFromSections(displayTitle, sections),
     [displayTitle, sections],
@@ -259,6 +303,7 @@ function App() {
     w.__trailTemplate = template?.name ?? null;
     w.__trailTemplateState = templateState;
     w.__trailTitle = displayTitle;
+    w.__trailAIState = aiState;
     w.__trailReplayLink = replayLink;
     w.__trailReplayTime = currentReplayTime;
     w.__trailSuggestedRepo = repoSuggestedOnce.current ? repo : null;
@@ -270,6 +315,7 @@ function App() {
     template,
     templateState,
     displayTitle,
+    aiState,
     replayLink,
     currentReplayTime,
     repo,
@@ -382,6 +428,70 @@ function App() {
     [shareReportBase, events],
   );
 
+  // AI enhancements: build a redaction-safe digest of the session and ask the
+  // replay server's Featherless proxy for title/summary/steps/template mapping
+  // and labels. Runs when the report loads (title/summary/steps need no repo)
+  // and re-runs when the repo changes (template mapping + labels). Any failure
+  // degrades to the deterministic pipeline; the token guard drops stale runs.
+  // Declared after stableShareInput: the cache key hashes the same stable
+  // session serialization the share flow uses.
+  useEffect(() => {
+    if (loading || !events.length) return;
+    if (!aiEnabled) {
+      ++aiGenToken.current;
+      setAiResult(null);
+      setAiState("disabled");
+      return;
+    }
+    const token = ++aiGenToken.current;
+    const run = async () => {
+      setAiState("generating");
+      const repoNorm = normalizeRepo(repo);
+      const key = aiCacheKey(await hashSession(stableShareInput), repoNorm);
+      const cached = await getCachedAIResult(key);
+      if (token !== aiGenToken.current) return;
+      if (cached) {
+        setAiResult(cached);
+        setAiState("ready");
+        return;
+      }
+      const summary = report ?? {
+        startedAt: events[0]?.t ?? 0,
+        endedAt: events.at(-1)?.t ?? 0,
+        url: events[0]?.url ?? "",
+      };
+      const digest = buildSessionDigest(
+        summary,
+        events,
+        timeline,
+        facts,
+        allTemplates,
+        repoNorm,
+      );
+      const outcome = await generateEnhancements(digest, allTemplates, repoNorm);
+      if (token !== aiGenToken.current) return;
+      if (outcome.ok && outcome.result) {
+        setAiResult(outcome.result);
+        void rememberAIResult(key, outcome.result);
+        setAiState("ready");
+      } else {
+        setAiResult(null);
+        setAiState(outcome.status);
+      }
+    };
+    void run();
+  }, [
+    loading,
+    events,
+    aiEnabled,
+    report,
+    repo,
+    allTemplates,
+    stableShareInput,
+    timeline,
+    facts,
+  ]);
+
   // Upload the session to the replay server and hand back the share link. The
   // pipeline (presign → PUT → probe → cache → in-flight dedupe) lives in
   // lib/share.ts; this component only wires it to state and toasts.
@@ -444,7 +554,7 @@ function App() {
     <div className="mx-auto w-full max-w-300 px-4 pb-8 pt-5 sm:px-6 lg:px-8">
       <IncidentHeader
         title={title}
-        onTitleChange={setTitle}
+        onTitleChange={handleTitleChange}
         onTitleBlur={persistTitle}
         facts={facts}
         counts={counts}
@@ -527,6 +637,12 @@ function App() {
         reportTooLong={issue ? issue.dropped.length > 0 : false}
         template={template}
         templateState={templateState}
+        aiEnabled={aiEnabled}
+        onAiEnabledChange={(value) => {
+          setAiEnabled(value);
+          void browser.storage.local.set({ [AI_ENABLED_KEY]: value });
+        }}
+        aiState={aiState}
         onOpenIssue={openIssue}
       />
 
