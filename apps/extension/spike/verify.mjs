@@ -341,6 +341,21 @@ function main() {
         reviewHooks.timeline.every((s) => s.kind !== 'input' || s.text !== 'Type into '),
         'review timeline never shows an unnamed typed field',
       );
+      // AI enhancements: the spike's replay server runs without a
+      // FEATHERLESS_API_KEY, so the enhancement call must resolve to
+      // server-off and the report stays fully deterministic — the AI path can
+      // never produce worse output than the deterministic one.
+      await review.waitForFunction(
+        () => window.__trailAIState === 'server-off',
+        { timeout: 15000, polling: 100 },
+      );
+      const fallbackMarkdown = await review.evaluate(() => window.__trailMarkdown);
+      assert(
+        fallbackMarkdown.includes('## Steps to Reproduce') &&
+          fallbackMarkdown.includes('## Environment'),
+        'deterministic report sections survive an unavailable AI path',
+      );
+      console.log('AI fallback PASS');
       assert(reviewHooks.replayCount > 0, 'review has rrweb replay frames');
       const playerReady = await review.evaluate(() => window.__trailPlayerReady === true);
       assert(playerReady, 'rrweb-player Svelte component mounted');
