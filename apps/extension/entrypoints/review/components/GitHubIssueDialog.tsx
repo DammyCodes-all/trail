@@ -1,4 +1,4 @@
-import { Check, Loader2, TriangleAlert } from "lucide-react";
+import { Check, Info, Loader2, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,12 +12,26 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { IssueTemplate } from "@/lib/templates";
 import type { AIStatus } from "@/lib/ai";
 
-const AI_STATUS_LINE: Record<Exclude<AIStatus, "generating" | "ready">, string> = {
-  idle: "",
-  disabled: "AI is off — Trail uses its deterministic report format.",
+// Static explanation of what the AI pass sends and never sees. Shown on
+// hover of the info icon; the digest is built from console messages, failed
+// requests, and the click/typing timeline, capture-time redacted.
+const AI_INFO =
+  "Trail sends a redacted digest (console errors, failed requests, click and typing timeline) to its server to draft the report. Typed values never leave the browser.";
+
+// Live status, shown inline (not in the tooltip) so failures are visible
+// without hovering.
+const AI_INLINE: Partial<Record<AIStatus, string>> = {
+  generating: "Writing the report with AI...",
+  disabled: "AI is off. Trail uses its deterministic report format.",
   "server-off":
     "AI is disabled on the Trail server. Using the deterministic report.",
   unavailable:
@@ -77,10 +91,6 @@ export function GitHubIssueDialog({
               spellCheck={false}
               autoComplete="off"
             />
-            <p className="text-xs text-muted-foreground">
-              Paste the full repository link — for example{" "}
-              <code className="font-mono">https://github.com/acme/widget</code>.
-            </p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="trail-labels">Labels <span className="font-normal text-muted-foreground">(optional)</span></Label>
@@ -93,15 +103,23 @@ export function GitHubIssueDialog({
             />
           </div>
           <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-            <div className="grid gap-0.5">
+            <div className="flex items-center gap-1.5">
               <Label htmlFor="trail-ai" className="text-sm font-medium">
                 AI-written report
               </Label>
-              <p className="text-xs text-muted-foreground">
-                Trail sends a redacted session digest to its server for a
-                natural-language report. Off always falls back to the
-                deterministic format.
-              </p>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger
+                    aria-label="About AI-written report"
+                    className="text-muted-foreground outline-none hover:text-foreground"
+                  >
+                    <Info className="size-3.5" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="start">
+                    {AI_INFO}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             <Switch
               id="trail-ai"
@@ -111,24 +129,18 @@ export function GitHubIssueDialog({
             />
           </div>
           {aiState === "generating" && (
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <p className="-mt-2 flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-              Writing the report with AI...
+              {AI_INLINE[aiState]}
             </p>
           )}
-          {aiState === "ready" && (
-            <p className="flex items-center gap-2 rounded-md border border-success/20 bg-success-soft px-3 py-2 text-xs text-success">
-              <Check className="size-3.5 shrink-0" aria-hidden="true" />
-              AI wrote the report. Turn it off anytime to fall back to the
-              deterministic format.
-            </p>
-          )}
-          {(aiState === "disabled" ||
-            aiState === "server-off" ||
-            aiState === "unavailable") && (
-              <p className="flex items-center gap-2 rounded-md border border-warn/20 bg-warn-soft px-3 py-2 text-xs text-warn">
-                <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                {AI_STATUS_LINE[aiState]}
+          {aiEnabled &&
+            (aiState === "disabled" ||
+              aiState === "server-off" ||
+              aiState === "unavailable") && (
+              <p className="-mt-2 flex items-center gap-2 text-xs text-warn">
+                <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" />
+                {AI_INLINE[aiState]}
               </p>
             )}
           {templateState === "checking" && (
@@ -138,14 +150,13 @@ export function GitHubIssueDialog({
             </p>
           )}
           {templateState === "found" && template && (
-            <p className="flex items-center gap-2 rounded-md border border-success/20 bg-success-soft px-3 py-2 text-xs text-success">
+            <p className="flex items-center gap-2 text-xs text-success">
               <Check className="size-3.5 shrink-0" aria-hidden="true" />
               Report will follow {template.name} ({template.filename}).
             </p>
           )}
           {templateState === "none" && repo.trim() && (
-            <p className="flex items-center gap-2 rounded-md border border-warn/20 bg-warn-soft px-3 py-2 text-xs text-warn">
-              <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" />
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
               No bug template found. Trail will use its standard report format.
             </p>
           )}
@@ -154,7 +165,7 @@ export function GitHubIssueDialog({
               <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               <span>
                 Your report is longer than what GitHub’s issue link can hold.
-                Don’t worry — Trail copies the full report to your clipboard, so
+                Don’t worry. Trail copies the full report to your clipboard, so
                 you can paste it into the issue body after GitHub opens.
               </span>
             </p>

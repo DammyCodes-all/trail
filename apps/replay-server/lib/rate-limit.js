@@ -7,7 +7,10 @@
 
 import { RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
 
-const POINTS = 3; // requests allowed
+// The review page fires up to three enhancement calls on open (events load,
+// repo suggestion, template fetch), so the window must fit a full open plus
+// headroom for a repo change without tripping mid-session.
+const POINTS = 12; // requests allowed
 const DURATION_SECONDS = 60; // per window
 
 export const aiEnhanceLimiter = new RateLimiterMemory({
