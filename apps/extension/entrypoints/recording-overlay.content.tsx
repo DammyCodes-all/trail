@@ -12,6 +12,8 @@ import {
   MSG_OVERLAY_UPDATE,
   MSG_STOP,
 } from "@/lib/constants";
+import { totalCounts } from "@/lib/summary";
+import { formatElapsedTime } from "@/lib/time";
 import type { TrailCounts } from "@/lib/types";
 import {
   bounded,
@@ -42,23 +44,10 @@ type OverlayMessage = Partial<OverlayStatus> & {
 
 const ZERO_COUNTS: TrailCounts = { click: 0, input: 0, console: 0, net: 0 };
 
-const countTotal = (counts: TrailCounts) =>
-  counts.click + counts.input + counts.console + counts.net;
-
 const normalizeCounts = (counts?: Partial<TrailCounts>): TrailCounts => ({
-  click: counts?.click ?? 0,
-  input: counts?.input ?? 0,
-  console: counts?.console ?? 0,
-  net: counts?.net ?? 0,
+  ...ZERO_COUNTS,
+  ...(counts ?? {}),
 });
-
-const formatElapsed = (startedAt?: number, now = Date.now()) => {
-  if (!startedAt) return "00:00";
-  const totalSeconds = Math.max(0, Math.floor((now - startedAt) / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-};
 
 function RecordingOverlay() {
   const [status, setStatus] = React.useState<OverlayStatus>({
@@ -148,8 +137,7 @@ function RecordingOverlay() {
       }
       const nextStatus: OverlayStatus = {
         recording: response.recording === true,
-        counts: normalizeCounts(response.counts),
-        startedAt:
+        counts: normalizeCounts(response.counts),        startedAt:
           typeof response.startedAt === "number"
             ? response.startedAt
             : undefined,
@@ -159,8 +147,7 @@ function RecordingOverlay() {
           current.recording &&
           nextStatus.recording &&
           current.startedAt === nextStatus.startedAt &&
-          countTotal(nextStatus.counts) < countTotal(current.counts)
-        ) {
+          totalCounts(nextStatus.counts) < totalCounts(current.counts)        ) {
           return current;
         }
 
@@ -308,7 +295,7 @@ function RecordingOverlay() {
           <span>REC</span>
         </span>
         <span className="trail-overlay__time">
-          {formatElapsed(status.startedAt, now)}
+          {status.startedAt ? formatElapsedTime(now - status.startedAt) : "00:00"}
         </span>
         <button
           type="button"

@@ -12,6 +12,7 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
+    "test": "vitest run",
     "test:page": "node spike/test-page.mjs",
     "verify": "tsc --noEmit && wxt build && node spike/verify.mjs",
     "postinstall": "wxt prepare"
@@ -49,6 +50,7 @@
     "@wxt-dev/module-react": "^1.1.5",
     "puppeteer-core": "^25.4.0",
     "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
     "web-ext": "^10.5.0",
     "wxt": "^0.21.3"
   }
