@@ -9,7 +9,7 @@
 const FEATHERLESS_BASE =
   process.env.AI_BASE_URL ?? "https://api.featherless.ai/v1";
 const MODEL = process.env.AI_MODEL ?? "deepseek-ai/DeepSeek-V4-Flash-0731";
-const TIMEOUT_MS = 25_000;
+const MAX_ATTEMPTS = 2; // one retry covers transient 5xx / empty completions
 const MAX_TOKENS = 1600;
 const TEMPERATURE = 0.3;
 
@@ -41,9 +41,11 @@ const SYSTEM_PROMPT = [
 // text. The extension owns parsing and validation — this is a dumb pipe.
 // Resolves { ok: true, content } on success, { ok: false, status, error }
 // otherwise; never throws.
+//
+// No timeout: Featherless queues first requests behind a loading model and can
+// take a while before the first token. We wait. One retry covers transient 5xx
+// and empty completions; the per-IP rate limiter caps abuse.
 export async function proxyEnhance({ digest, templates, repo }) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const payload = JSON.stringify({
     model: MODEL,
     temperature: TEMPERATURE,
@@ -64,40 +66,43 @@ export async function proxyEnhance({ digest, templates, repo }) {
   });
   const logSize = () =>
     `payload ${payload.length} chars (~${charsToTokens(payload.length)} tokens)`;
-  try {
-    const res = await fetch(`${FEATHERLESS_BASE}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${process.env.FEATHERLESS_API_KEY}`,
-        "http-referer": "https://github.com/DammyCodes-all/trail",
-        "x-title": "TRAIL",
-      },
-      signal: controller.signal,
-      body: payload,
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const res = await fetch(`${FEATHERLESS_BASE}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${process.env.FEATHERLESS_API_KEY}`,
+          "http-referer": "https://github.com/DammyCodes-all/trail",
+          "x-title": "TRAIL",
+        },
+        body: payload,
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error(
+          `[ai-proxy] attempt ${attempt} upstream ${res.status}, ${logSize()}: ${body.slice(0, 500)}`,
+        );
+        if (res.status >= 500 && attempt < MAX_ATTEMPTS) continue; // transient
+        return { ok: false, status: 502, error: `upstream_${res.status}` };
+      }
+      const data = await res.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== "string" || !content.trim()) {
+        console.error(`[ai-proxy] attempt ${attempt} empty completion, ${logSize()}`);
+        if (attempt < MAX_ATTEMPTS) continue;
+        return { ok: false, status: 502, error: "empty_completion" };
+      }
+      return { ok: true, content };
+    } catch (err) {
       console.error(
-        `[ai-proxy] upstream ${res.status}, ${logSize()}: ${body.slice(0, 500)}`,
+        `[ai-proxy] attempt ${attempt} error, ${logSize()}: ${
+          err?.message ?? String(err)
+        }`,
       );
-      return { ok: false, status: 502, error: `upstream_${res.status}` };
+      if (attempt < MAX_ATTEMPTS) continue;
+      return { ok: false, status: 502, error: "upstream_error" };
     }
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (typeof content !== "string" || !content.trim()) {
-      console.error(`[ai-proxy] empty completion, ${logSize()}`);
-      return { ok: false, status: 502, error: "empty_completion" };
-    }
-    return { ok: true, content };
-  } catch (err) {
-    console.error(
-      `[ai-proxy] upstream ${controller.signal.aborted ? "timeout" : "error"}, ${logSize()}: ${
-        err?.message ?? String(err)
-      }`,
-    );
-    return { ok: false, status: 504, error: "upstream_timeout" };
-  } finally {
-    clearTimeout(timer);
   }
+  return { ok: false, status: 502, error: "upstream_error" };
 }

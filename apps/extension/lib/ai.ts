@@ -38,7 +38,6 @@ const MAX_MSG_CHARS = 1000;
 const MAX_BODY_CHARS = 1500;
 const MAX_STEP_CHARS = 300;
 const TOTAL_EVIDENCE_BUDGET = 10_000;
-const CLIENT_TIMEOUT_MS = 30_000;
 
 const truncate = (s: string, n: number): string =>
   s.length <= n ? s : `${s.slice(0, n)}…(truncated)`;
@@ -161,13 +160,10 @@ export async function generateEnhancements(
   templates: IssueTemplate[],
   repo: string,
 ): Promise<EnhanceOutcome> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
   try {
     const res = await fetch(`${REPLAY_SERVER_URL}/api/ai/enhance`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      signal: controller.signal,
       body: JSON.stringify({ digest, templates, repo }),
     });
     if (res.status === 501) return { ok: false, status: 'server-off' };
@@ -179,7 +175,5 @@ export async function generateEnhancements(
     return { ok: true, status: 'ready', result };
   } catch {
     return { ok: false, status: 'unavailable' };
-  } finally {
-    clearTimeout(timer);
   }
 }
