@@ -21,6 +21,7 @@ import {
 } from "@/components/animate-ui/components/base/tabs";
 import type { TimelineStep } from "@/lib/timeline";
 import { formatElapsedTime } from "@/lib/time";
+import { severityOfStatus } from "@/lib/summary";
 import { cn } from "@/lib/utils";
 
 const iconByKind = {
@@ -31,11 +32,17 @@ const iconByKind = {
   net: WifiOff,
 } as const;
 
+// The timeline's tone comes from the same severity model the report summary
+// and the evidence panel use: console errors are failures, console warnings
+// and 4xx requests are moderate, 5xx/network-level failures are critical.
 function toneFor(step: TimelineStep) {
   if (step.kind === "console" && step.level === "error") return "error";
-  if (step.kind === "console" || step.kind === "net") {
-    return (step.status ?? 0) >= 500 ? "error" : "warn";
+  if (step.kind === "net") {
+    return severityOfStatus(step.status ?? 0) === "critical"
+      ? "error"
+      : "warn";
   }
+  if (step.kind === "console") return "warn";
   return "neutral";
 }
 
@@ -386,6 +393,36 @@ export function TimelineCard({
     window.scrollTo(0, y);
   }, []);
 
+  // The one glide implementation: an rAF lerp toward a target scroll
+  // position, snapping the final frame. `animate` is the caller's intent —
+  // live follow and the first-play jump glide, user seeks snap. Both
+  // follow-scroll and the jump land here so the motion language can't drift.
+  const glideTo = useCallback(
+    (target: number, animate: boolean) => {
+      cancelFollow();
+      const glide =
+        animate &&
+        window.matchMedia("(min-width: 1024px)").matches &&
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!glide) {
+        scrollToY(target);
+        return;
+      }
+      const step = () => {
+        const next = window.scrollY + (target - window.scrollY) * 0.22;
+        if (Math.abs(target - next) < 0.5) {
+          scrollToY(target);
+          followRafRef.current = 0;
+          return;
+        }
+        scrollToY(next);
+        followRafRef.current = requestAnimationFrame(step);
+      };
+      followRafRef.current = requestAnimationFrame(step);
+    },
+    [cancelFollow, scrollToY],
+  );
+
   const disengage = useCallback(() => {
     steeringRef.current = true;
     setSteering(true);
@@ -460,34 +497,16 @@ export function TimelineCard({
       ),
     );
 
-    const glide =
-      isPlaying &&
-      window.matchMedia("(min-width: 1024px)").matches &&
-      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (!glide) {
-      cancelFollow();
-      scrollToY(target);
+    // Deadband: don't glide for a row already near the reading position —
+    // constant micro-pulls are what made the follow feel like a hijack.
+    // Seeks (paused row clicks) snap instead of gliding.
+    if (isPlaying && Math.abs(window.scrollY - target) < window.innerHeight * 0.2) {
+      lastFollowedRef.current = activeIndex;
       return;
     }
 
-    // Deadband: don't glide for a row already near the reading position —
-    // constant micro-pulls are what made the follow feel like a hijack.
-    if (Math.abs(window.scrollY - target) < window.innerHeight * 0.2) return;
-
-    cancelFollow();
-    const step = () => {
-      const next = window.scrollY + (target - window.scrollY) * 0.22;
-      if (Math.abs(target - next) < 0.5) {
-        scrollToY(target);
-        followRafRef.current = 0;
-        return;
-      }
-      scrollToY(next);
-      followRafRef.current = requestAnimationFrame(step);
-    };
-    followRafRef.current = requestAnimationFrame(step);
-  }, [activeIndex, isPlaying, followNonce, cancelFollow, scrollToY]);
+    glideTo(target, isPlaying);
+  }, [activeIndex, isPlaying, followNonce, glideTo]);
 
   // First play: glide to the timeline card. Same motion language as follow —
   // rAF lerp on desktop, instant snap otherwise.
@@ -505,26 +524,8 @@ export function TimelineCard({
         document.documentElement.scrollHeight - window.innerHeight,
       ),
     );
-    const glide =
-      window.matchMedia("(min-width: 1024px)").matches &&
-      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    cancelFollow();
-    if (!glide) {
-      scrollToY(target);
-      return;
-    }
-    const step = () => {
-      const next = window.scrollY + (target - window.scrollY) * 0.22;
-      if (Math.abs(target - next) < 0.5) {
-        scrollToY(target);
-        followRafRef.current = 0;
-        return;
-      }
-      scrollToY(next);
-      followRafRef.current = requestAnimationFrame(step);
-    };
-    followRafRef.current = requestAnimationFrame(step);
-  }, [isPlaying, cancelFollow, scrollToY]);
+    glideTo(target, true);
+  }, [isPlaying, glideTo]);
 
   const jumpToLatest = () => {
     lastFollowedRef.current = null;

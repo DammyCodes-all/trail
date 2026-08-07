@@ -22,6 +22,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { prettyBody } from "@/lib/pretty";
+import { severityOfStatus } from "@/lib/summary";
 import type { ConsoleEvent, NetEvent, StoredEvent } from "@/lib/types";
 import { formatElapsedTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -276,7 +277,7 @@ function NetworkRow({
   onSeek: (timestamp: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const critical = event.status === 0 || event.status >= 500;
+  const critical = severityOfStatus(event.status) === "critical";
   const requestHeaders =
     event.requestHeaders && Object.keys(event.requestHeaders).length
       ? event.requestHeaders

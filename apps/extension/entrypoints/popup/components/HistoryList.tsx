@@ -255,8 +255,11 @@ function DeleteButton({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this report?</AlertDialogTitle>
           <AlertDialogDescription>
-            “{title}” and its saved replay will be permanently removed. This
-            can’t be undone.
+            <span className="break-words font-medium text-foreground">
+              “{title}”
+            </span>{" "}
+            and its saved replay will be permanently removed. This can’t be
+            undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

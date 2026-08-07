@@ -25,13 +25,12 @@ import {
 import { suggestTitle } from "@/lib/report";
 import {
   clearCounts,
-  DEFAULT_COUNTS,
   getCounts,
   getSession,
   setCounts,
   setSession,
-  totalCounts,
 } from "@/lib/session";
+import { countEvents, countSummary, totalCounts, ZERO_COUNTS } from "@/lib/summary";
 import type { TrailCounts, TrailSession } from "@/lib/types";
 
 // Serializes MSG_BATCH handling: handlers share read-modify-write on counts, and
@@ -51,7 +50,7 @@ function pushOverlayStatus(
     .sendMessage(session.tabId, {
       type: MSG_OVERLAY_UPDATE,
       recording,
-      counts: recording ? counts : DEFAULT_COUNTS,
+      counts: recording ? counts : ZERO_COUNTS,
       startedAt: session.startedAt,
       version: nextOverlayVersion(),
     })
@@ -82,7 +81,7 @@ async function startRecording(
     };
   }
   await clearEvents();
-  await setCounts(DEFAULT_COUNTS);
+  await setCounts(ZERO_COUNTS);
   const session: TrailSession = { tabId: id, startedAt: Date.now() };
 
   try {
@@ -112,7 +111,7 @@ async function startRecording(
     .sendMessage(id, { type: MSG_START_RECORDER })
     .catch(() => {});
 
-  pushOverlayStatus(session, DEFAULT_COUNTS);
+  pushOverlayStatus(session, ZERO_COUNTS);
 
   browser.action.setBadgeBackgroundColor({ color: "#ff6a00" });
   browser.action.setBadgeText({ text: "0" });
@@ -139,7 +138,7 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
   const counts = await getCounts();
   await setSession(null);
   await clearCounts();
-  if (session) pushOverlayStatus(session, DEFAULT_COUNTS, false);
+  if (session) pushOverlayStatus(session, ZERO_COUNTS, false);
   browser.action.setBadgeText({ text: "" });
 
   // Save a report entry for the popup's history list. Best-effort: never fail a
@@ -147,6 +146,7 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
   if (session) {
     try {
       const events = await getAllEvents();
+      const summary = countSummary(events);
       const seq = await saveReport({
         title: suggestTitle(events),
         repo: "",
@@ -155,11 +155,8 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
         eventCount: events.length,
         counts,
         url: events[0]?.url ?? "",
-        errorCount: events.filter((e) => e.k === "console" && e.lv === "error")
-          .length,
-        failedRequestCount: events.filter(
-          (e) => e.k === "net" && (e.status === 0 || e.status >= 400),
-        ).length,
+        errorCount: summary.errorCount,
+        failedRequestCount: summary.failedRequestCount,
       });
       // Snapshot the events so the report can be reopened after the next recording
       // clears the live store (history detail view).
@@ -215,22 +212,12 @@ export default defineBackground(() => {
           }
           await addEvents(msg.batch);
           const counts = await getCounts();
-          let countsChanged = false;
-          for (const d of msg.batch as Array<{ k: string }>) {
-            if (d.k === "click") {
-              counts.click++;
-              countsChanged = true;
-            } else if (d.k === "input") {
-              counts.input++;
-              countsChanged = true;
-            } else if (d.k === "console") {
-              counts.console++;
-              countsChanged = true;
-            } else if (d.k === "net") {
-              counts.net++;
-              countsChanged = true;
-            }
-          }
+          const added = countEvents(msg.batch as Array<{ k: string }>);
+          counts.click += added.click;
+          counts.input += added.input;
+          counts.console += added.console;
+          counts.net += added.net;
+          const countsChanged = totalCounts(added) > 0;
           await setCounts(counts);
           if (countsChanged) pushOverlayStatus(session, counts);
           browser.action.setBadgeText({ text: String(totalCounts(counts)) });
@@ -279,7 +266,7 @@ export default defineBackground(() => {
         } catch (err) {
           sendResponse({
             recording: false,
-            counts: DEFAULT_COUNTS,
+            counts: ZERO_COUNTS,
             error: (err as Error).message,
           });
         }
@@ -295,14 +282,14 @@ export default defineBackground(() => {
           const recording = !!session && sender.tab?.id === session.tabId;
           sendResponse({
             recording,
-            counts: recording ? await getCounts() : DEFAULT_COUNTS,
+            counts: recording ? await getCounts() : ZERO_COUNTS,
             startedAt: recording ? session.startedAt : undefined,
             version,
           });
         } catch (err) {
           sendResponse({
             recording: false,
-            counts: DEFAULT_COUNTS,
+            counts: ZERO_COUNTS,
             version,
             error: (err as Error).message,
           });
