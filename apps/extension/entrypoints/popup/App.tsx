@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { MSG_START, MSG_STATUS, MSG_STOP, REDACT_KEY } from "@/lib/constants";
 import { getAllEvents, getReports, getSessionEvents, updateReportSummary } from "@/lib/db";
+import { isShareLink } from "@/lib/share";
+import { countSummary, ZERO_COUNTS } from "@/lib/summary";
 import type { StoredEvent, TrailCounts, TrailReport } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,8 +17,6 @@ import { SetupScreen } from "./components/SetupScreen";
 
 type Status = { recording: boolean; counts: TrailCounts } | null;
 type View = "home" | "setup" | "recording";
-
-const SHARE_LINK_RE = /^https?:\/\/.+\/api\/replays\/[A-Za-z0-9.-]{1,64}$/;
 
 function App() {
   const [status, setStatus] = useState<Status>(null);
@@ -68,12 +68,7 @@ function App() {
       try {
         const events = await getSessionEvents(r.seq);
         if (!events.length) continue;
-        const errorCount = events.filter(
-          (e) => e.k === "console" && e.lv === "error",
-        ).length;
-        const failedRequestCount = events.filter(
-          (e) => e.k === "net" && (e.status === 0 || e.status >= 400),
-        ).length;
+        const { errorCount, failedRequestCount } = countSummary(events);
         await updateReportSummary(r.seq, errorCount, failedRequestCount);
       } catch {
         // best-effort backfill
@@ -130,7 +125,7 @@ function App() {
   // session and saves it to this profile's history automatically.
   const openSharedLink = (value: string) => {
     const link = value.trim();
-    if (!SHARE_LINK_RE.test(link)) {
+    if (!isShareLink(link)) {
       setShareError("Paste a TRAIL share link (https://…/api/replays/…).");
       return;
     }
@@ -148,7 +143,7 @@ function App() {
       events;
   }, [events]);
 
-  const counts = status?.counts ?? { click: 0, input: 0, console: 0, net: 0 };
+  const counts = status?.counts ?? ZERO_COUNTS;
   const recording = status?.recording ?? false;
 
   return (
