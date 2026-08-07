@@ -22,13 +22,16 @@ import {
   type IssueTemplate,
 } from "@/lib/templates";
 import { buildTimeline } from "@/lib/timeline";
+import { stableShareJson } from "@/lib/share-cache";
+import { isShareLink, rememberIncomingShare, shareSession } from "@/lib/share";
 import {
-  forgetShare,
-  getCachedShare,
-  hashSession,
-  rememberShare,
-  stableShareJson,
-} from "@/lib/share-cache";
+  buildConsoleLog,
+  buildHar,
+  buildMetadataJson,
+  copyText,
+  downloadText,
+} from "@/lib/exports";
+import { countEvents } from "@/lib/summary";
 import type {
   SharedReportPayload,
   StoredEvent,
@@ -48,11 +51,6 @@ import { TimelineCard } from "./components/TimelineCard";
 import type { ReplayPlayerHandle } from "./ReplayPlayer";
 
 type ShareResult = { link: string; copied: boolean; reused: boolean };
-
-// Concurrent share attempts for the same session (e.g. rapid double-clicks)
-// share one upload instead of hitting blob storage twice. Module scope so it
-// survives across clicks; separate tabs are out of reach without messaging.
-const shareInFlight = new Map<string, Promise<ShareResult>>();
 
 function App() {
   const reportId =
@@ -90,20 +88,7 @@ function App() {
       // into local history, then hand off to the plain ?report= reopen path —
       // the reviewer gets the exact same review UI, persisted automatically.
       if (shareUrl) {
-        let parsed: URL;
-        try {
-          parsed = new URL(shareUrl);
-        } catch {
-          setShareError("That doesn't look like a TRAIL share link.");
-          setLoading(false);
-          return;
-        }
-        if (!["http:", "https:"].includes(parsed.protocol)) {
-          setShareError("Only http(s) TRAIL share links can be opened.");
-          setLoading(false);
-          return;
-        }
-        if (!/^\/api\/replays\/[A-Za-z0-9.-]{1,64}$/.test(parsed.pathname)) {
+        if (!isShareLink(shareUrl)) {
           setShareError("That doesn't look like a TRAIL share link.");
           setLoading(false);
           return;
@@ -123,9 +108,7 @@ function App() {
           // Sync the share cache: the recipient now holds the same session, so
           // re-sharing it should reuse the incoming link instead of uploading
           // the payload to blob storage a second time.
-          void hashSession(stableShareJson(payload))
-            .then((hash) => rememberShare(hash, shareUrl))
-            .catch(() => {});
+          void rememberIncomingShare(payload, shareUrl).catch(() => {});
           location.replace(
             `${location.origin}${location.pathname}?report=${seq}`,
           );
@@ -147,13 +130,6 @@ function App() {
       } else {
         const evs = await getAllEvents();
         const timestamps = evs.map((event) => event.t).filter(Number.isFinite);
-        const counts: TrailCounts = { click: 0, input: 0, console: 0, net: 0 };
-        for (const event of evs) {
-          if (event.k === "click") counts.click++;
-          else if (event.k === "input") counts.input++;
-          else if (event.k === "console") counts.console++;
-          else if (event.k === "net") counts.net++;
-        }
         setReport({
           seq: 0,
           title: suggestTitle(evs),
@@ -161,7 +137,7 @@ function App() {
           startedAt: timestamps.length ? Math.min(...timestamps) : Date.now(),
           endedAt: timestamps.length ? Math.max(...timestamps) : Date.now(),
           eventCount: evs.length,
-          counts,
+          counts: countEvents(evs),
           url: evs[0]?.url ?? "",
         });
         setEvents(evs);
@@ -204,19 +180,10 @@ function App() {
   );
   const replayT0 = rrwebEvents[0]?.timestamp ?? t0;
 
-  const counts: TrailCounts = useMemo(() => {
-    const c: TrailCounts = { click: 0, input: 0, console: 0, net: 0 };
-    for (const e of events) {
-      if (e.k === "click") c.click++;
-      else if (e.k === "input") c.input++;
-      else if (e.k === "console") c.console++;
-      else if (e.k === "net") c.net++;
-    }
-    return c;
-  }, [events]);
+  const counts: TrailCounts = useMemo(() => countEvents(events), [events]);
   const facts = useMemo(
-    () => buildReportFacts(events, report),
-    [events, report],
+    () => buildReportFacts(events, report, undefined, timeline),
+    [events, report, timeline],
   );
 
   // Phase 4: when a repo is typed, detect its issue template (debounced). Any
@@ -251,18 +218,23 @@ function App() {
     }
   }, [template, labels]);
 
-  const base = report ?? { title: "Bug report" };
+  const base = report ?? {
+    title: "Bug report",
+    startedAt: events[0]?.t ?? 0,
+    endedAt: events.at(-1)?.t ?? 0,
+    url: events[0]?.url ?? "",
+  };
   const displayTitle = title || base.title;
   const labelsList = labels
     .split(",")
     .map((l) => l.trim())
     .filter(Boolean);
   const sections = useMemo(() => {
-    const baseSections = buildSections(base, events, { repo, redact });
+    const baseSections = buildSections(base, events, { redact }, timeline);
     return template
       ? shapeSections(template, baseSections).sections
       : baseSections;
-  }, [base, events, repo, template]);
+  }, [base, events, redact, template, timeline]);
   const markdown = useMemo(
     () => buildMarkdownFromSections(displayTitle, sections),
     [displayTitle, sections],
@@ -314,133 +286,41 @@ function App() {
     sileo.success({ title: "Markdown copied to clipboard" });
   };
 
-  const copyText = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      ta.remove();
-      return true;
-    }
-  };
-
-  const download = async (filename: string, blob: Blob) => {
-    const url = URL.createObjectURL(blob);
-    try {
-      await browser.downloads.download({ url, filename });
-      sileo.success({ title: `Downloaded ${filename}` });
-    } finally {
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    }
-  };
-
-  const downloadReport = () =>
-    download(
-      "trail-report.md",
-      new Blob([markdown], { type: "text/markdown" }),
-    );
-
   const networkEvents = events.filter((event) => event.k === "net");
   const consoleEvents = events.filter((event) => event.k === "console");
 
-  const downloadNetworkHar = () => {
-    const har = {
-      log: {
-        version: "1.2",
-        creator: { name: "TRAIL", version: facts.extensionVersion },
-        entries: networkEvents.map((event) => ({
-          startedDateTime: new Date(event.t).toISOString(),
-          time: 0,
-          request: {
-            method: event.method,
-            url: event.target,
-            httpVersion: "",
-            headers: Object.entries(event.requestHeaders ?? {}).map(
-              ([name, value]) => ({ name, value }),
-            ),
-            ...(event.requestBody
-              ? {
-                  postData: {
-                    mimeType: "application/octet-stream",
-                    text: event.requestBody,
-                  },
-                }
-              : {}),
-            queryString: [],
-            cookies: [],
-            headersSize: -1,
-            bodySize: -1,
-          },
-          response: {
-            status: event.status,
-            statusText: event.err ?? "",
-            httpVersion: "",
-            headers: Object.entries(event.responseHeaders ?? {}).map(
-              ([name, value]) => ({ name, value }),
-            ),
-            cookies: [],
-            content: {
-              size: event.body?.length ?? 0,
-              mimeType: "text/plain",
-              text: event.body ?? "",
-            },
-            redirectURL: "",
-            headersSize: -1,
-            bodySize: event.body?.length ?? -1,
-          },
-          cache: {},
-          timings: { send: 0, wait: 0, receive: 0 },
-        })),
-      },
-    };
-    return download(
-      "network.har",
-      new Blob([JSON.stringify(har, null, 2)], { type: "application/json" }),
+  const download = (filename: string, text: string, mime: string) =>
+    void downloadText(filename, text, mime).then(() =>
+      sileo.success({ title: `Downloaded ${filename}` }),
     );
-  };
 
-  const downloadConsoleLog = () => {
-    const log = consoleEvents
-      .map((event) => {
-        const timestamp = new Date(event.t).toISOString();
-        return `[${timestamp}] ${event.lv.toUpperCase()} ${event.msg}${event.stack ? `\n${event.stack}` : ""}`;
-      })
-      .join("\n\n");
-    return download(
-      "console.log",
-      new Blob([log || "No console errors captured."], { type: "text/plain" }),
+  const downloadReport = () =>
+    download("trail-report.md", markdown, "text/markdown");
+
+  const downloadNetworkHar = () =>
+    download(
+      "network.har",
+      buildHar(networkEvents, facts.extensionVersion),
+      "application/json",
     );
-  };
+
+  const downloadConsoleLog = () =>
+    download("console.log", buildConsoleLog(consoleEvents), "text/plain");
 
   const downloadMetadata = () =>
     download(
       "metadata.json",
-      new Blob(
-        [
-          JSON.stringify(
-            {
-              title: displayTitle,
-              capturedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
-              durationMs: facts.durationMs,
-              url: facts.url,
-              browser: facts.browser,
-              os: facts.os,
-              extensionVersion: facts.extensionVersion,
-              counts,
-            },
-            null,
-            2,
-          ),
-        ],
-        { type: "application/json" },
-      ),
+      buildMetadataJson({
+        title: displayTitle,
+        capturedAt: report?.startedAt ?? events[0]?.t ?? Date.now(),
+        durationMs: facts.durationMs,
+        url: facts.url,
+        browser: facts.browser,
+        os: facts.os,
+        extensionVersion: facts.extensionVersion,
+        counts,
+      }),
+      "application/json",
     );
 
   const openIssue = () => {
@@ -502,95 +382,21 @@ function App() {
     [shareReportBase, events],
   );
 
-  // Upload the session to the replay server and hand back the share link.
-  // Uploads go through a presigned PUT URL: Vercel caps function bodies at
-  // ~4.5MB and full sessions blow past that, so the payload goes straight to
-  // storage. The payload carries the full report so a reviewer's extension can
-  // rebuild the exact same review UI (timeline, evidence, replay) from the
-  // link. Clipboard failures never block the link from being generated.
-  //
-  // A content hash of the session is remembered alongside each generated link
-  // (chrome.storage.local, see lib/share-cache.ts). Re-sharing an unchanged
-  // session reuses the existing link and never uploads to blob storage again;
-  // only new events (or any other payload change) hash differently and upload
-  // fresh. Title edits don't count — the title is excluded from the hash.
-  //
-  // Reused links are probed (status-only fetch, body cancelled) before being
-  // trusted: a cache entry can outlive its blob, and a confirmed 4xx/5xx
-  // clears the entry and uploads fresh. If the probe itself fails the network
-  // the entry is kept — better a possibly-stale link than destroying a valid
-  // one during an outage.
+  // Upload the session to the replay server and hand back the share link. The
+  // pipeline (presign → PUT → probe → cache → in-flight dedupe) lives in
+  // lib/share.ts; this component only wires it to state and toasts.
   const copyReplayLink = () => {
     if (sharing === "uploading") return;
     setSharing("uploading");
     const upload = async (): Promise<ShareResult> => {
-      const hash = await hashSession(stableShareInput);
-      const running = shareInFlight.get(hash);
-      if (running) return running;
-      const run = (async (): Promise<ShareResult> => {
-        const cached = await getCachedShare(hash);
-        if (cached?.startsWith(REPLAY_SERVER_URL)) {
-          try {
-            const probe = await fetch(cached);
-            await probe.body?.cancel().catch(() => {});
-            if (probe.ok) {
-              setReplayLink(cached);
-              return { link: cached, copied: await copyText(cached), reused: true };
-            }
-            await forgetShare(hash);
-          } catch {
-            setReplayLink(cached);
-            return { link: cached, copied: await copyText(cached), reused: true };
-          }
-        }
-        let res: Response;
-        try {
-          res = await fetch(`${REPLAY_SERVER_URL}/api/replays/presign`, {
-            method: "POST",
-          });
-        } catch (err) {
-          throw new Error(err instanceof Error ? err.message : "network error");
-        }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const { id, uploadUrl } = (await res.json()) as {
-          id?: string;
-          uploadUrl?: string;
-        };
-        if (!id || !uploadUrl) throw new Error("no presign");
-        let putRes: Response;
-        try {
-          putRes = await fetch(uploadUrl, {
-            method: "PUT",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              v: 2,
-              title: displayTitle,
-              exportedAt: Date.now(),
-              report: { title: displayTitle, ...shareReportBase },
-              events,
-            }),
-          });
-        } catch (err) {
-          throw new Error(err instanceof Error ? err.message : "network error");
-        }
-        if (!putRes.ok) throw new Error(`HTTP ${putRes.status}`);
-        const link = `${REPLAY_SERVER_URL}/api/replays/${id}`;
-        setReplayLink(link);
-        // Awaited so the entry exists before the success toast — closing the
-        // tab right after sharing must not lose the link. A storage failure
-        // is not worth failing the share over.
-        try {
-          await rememberShare(hash, link);
-        } catch {}
-        return { link, copied: await copyText(link), reused: false };
-      })();
-      shareInFlight.set(hash, run);
-      void run
-        .catch(() => {})
-        .finally(() => {
-          if (shareInFlight.get(hash) === run) shareInFlight.delete(hash);
-        });
-      return run;
+      const result = await shareSession({
+        stableJson: stableShareInput,
+        title: displayTitle,
+        base: shareReportBase,
+        events,
+      });
+      setReplayLink(result.link);
+      return result;
     };
     sileo
       .promise(upload(), {

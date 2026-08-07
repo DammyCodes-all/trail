@@ -1,5 +1,6 @@
 import type { StoredEvent, TrailReport } from "./types";
 import { buildTimeline } from "./timeline";
+import { isFailedRequest, severityOfStatus } from "./summary";
 
 export type ReportSeverity = "high" | "medium" | "low";
 
@@ -87,27 +88,29 @@ export function buildReportFacts(
   events: StoredEvent[],
   report?: Pick<TrailReport, "startedAt" | "endedAt" | "url"> | null,
   options: FactOptions = {},
+  // The review page already built the timeline for its step list; pass it in
+  // so eventCount never triggers a second full sort of the session.
+  timeline: ReturnType<typeof buildTimeline> = buildTimeline(events),
 ): ReportFacts {
   let consoleErrors = 0;
   let consoleWarnings = 0;
   let failedRequests = 0;
-  let highSeverityNetworkFailure = false;
+  let criticalNetworkFailure = false;
 
   for (const event of events) {
     if (event.k === "console") {
       if (event.lv === "error") consoleErrors++;
       else consoleWarnings++;
-    }
-    if (event.k === "net") {
+    } else if (event.k === "net" && isFailedRequest(event.status)) {
       failedRequests++;
-      if (event.status === 0 || event.status >= 500) {
-        highSeverityNetworkFailure = true;
+      if (severityOfStatus(event.status) === "critical") {
+        criticalNetworkFailure = true;
       }
     }
   }
 
   const severity: ReportSeverity =
-    consoleErrors > 0 || highSeverityNetworkFailure
+    consoleErrors > 0 || criticalNetworkFailure
       ? "high"
       : consoleWarnings > 0 || failedRequests > 0
         ? "medium"
@@ -137,7 +140,7 @@ export function buildReportFacts(
   return {
     severity,
     durationMs: savedDuration || durationFromEvents(events),
-    eventCount: buildTimeline(events).length,
+    eventCount: timeline.length,
     consoleErrors,
     consoleWarnings,
     failedRequests,
