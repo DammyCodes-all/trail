@@ -11,7 +11,18 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import type { IssueTemplate } from "@/lib/templates";
+import type { AIStatus } from "@/lib/ai";
+
+const AI_STATUS_LINE: Record<Exclude<AIStatus, "generating" | "ready">, string> = {
+  idle: "",
+  disabled: "AI is off — Trail uses its deterministic report format.",
+  "server-off":
+    "AI is disabled on the Trail server. Using the deterministic report.",
+  unavailable:
+    "AI is unavailable right now (offline or rate limited). Using the deterministic report.",
+};
 
 export function GitHubIssueDialog({
   open,
@@ -23,6 +34,9 @@ export function GitHubIssueDialog({
   issueReady,
   template,
   templateState,
+  aiEnabled,
+  onAiEnabledChange,
+  aiState,
   reportTooLong,
   onOpenIssue,
 }: {
@@ -35,6 +49,9 @@ export function GitHubIssueDialog({
   issueReady: boolean;
   template: IssueTemplate | null;
   templateState: "idle" | "checking" | "found" | "none";
+  aiEnabled: boolean;
+  onAiEnabledChange: (value: boolean) => void;
+  aiState: AIStatus;
   reportTooLong: boolean;
   onOpenIssue: () => void;
 }) {
@@ -75,6 +92,45 @@ export function GitHubIssueDialog({
               spellCheck={false}
             />
           </div>
+          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+            <div className="grid gap-0.5">
+              <Label htmlFor="trail-ai" className="text-sm font-medium">
+                AI-written report
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Trail sends a redacted session digest to its server for a
+                natural-language report. Off always falls back to the
+                deterministic format.
+              </p>
+            </div>
+            <Switch
+              id="trail-ai"
+              aria-label="AI-written report"
+              checked={aiEnabled}
+              onCheckedChange={onAiEnabledChange}
+            />
+          </div>
+          {aiState === "generating" && (
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+              Writing the report with AI...
+            </p>
+          )}
+          {aiState === "ready" && (
+            <p className="flex items-center gap-2 rounded-md border border-success/20 bg-success-soft px-3 py-2 text-xs text-success">
+              <Check className="size-3.5 shrink-0" aria-hidden="true" />
+              AI wrote the report. Turn it off anytime to fall back to the
+              deterministic format.
+            </p>
+          )}
+          {(aiState === "disabled" ||
+            aiState === "server-off" ||
+            aiState === "unavailable") && (
+              <p className="flex items-center gap-2 rounded-md border border-warn/20 bg-warn-soft px-3 py-2 text-xs text-warn">
+                <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                {AI_STATUS_LINE[aiState]}
+              </p>
+            )}
           {templateState === "checking" && (
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
