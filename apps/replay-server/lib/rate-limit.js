@@ -7,9 +7,10 @@
 
 import { RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
 
-// The review page fires up to three enhancement calls on open (events load,
-// repo suggestion, template fetch), so the window must fit a full open plus
-// headroom for a repo change without tripping mid-session.
+// The review page fires the enhancement call once per submission intent
+// (issue dialog open + repo entered + template settled), plus once per repo
+// change while the dialog stays open, so the window must fit a normal
+// submission flow with headroom without tripping mid-session.
 const POINTS = 12; // requests allowed
 const DURATION_SECONDS = 60; // per window
 

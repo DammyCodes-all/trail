@@ -83,6 +83,9 @@ function App() {
   // Guards the AI generation run (stale-run token) and title seeding (never
   // clobber a title the user typed themselves).
   const aiGenToken = useRef(0);
+  // The in-flight AI fetch, so a superseded run can abort its network call
+  // instead of stacking requests against the upstream's concurrency limit.
+  const aiAbortRef = useRef<AbortController | null>(null);
   const titleEditedRef = useRef(false);
   const [sharing, setSharing] = useState<"idle" | "uploading">("idle");
   const [replayLink, setReplayLink] = useState("");
@@ -430,13 +433,23 @@ function App() {
 
   // AI enhancements: build a redaction-safe digest of the session and ask the
   // replay server's Featherless proxy for title/summary/steps/template mapping
-  // and labels. Runs when the report loads (title/summary/steps need no repo)
-  // and re-runs when the repo changes (template mapping + labels). Any failure
-  // degrades to the deterministic pipeline; the token guard drops stale runs.
-  // Declared after stableShareInput: the cache key hashes the same stable
-  // session serialization the share flow uses.
+  // and labels. Runs only when the user is about to submit — the issue dialog
+  // is open, a repo is entered, and the template fetch has settled — so no AI
+  // call happens on review load. Any failure degrades to the deterministic
+  // pipeline; the token guard drops stale runs. Declared after
+  // stableShareInput: the cache key hashes the same stable session
+  // serialization the share flow uses.
   useEffect(() => {
     if (loading || !events.length) return;
+    if (!issueDialogOpen) return;
+    const repoNorm = normalizeRepo(repo);
+    if (!repoNorm) return;
+    if (templateState === "idle" || templateState === "checking") return;
+    // A new run supersedes the previous one: cancel its in-flight fetch so
+    // requests never stack against the upstream's concurrency limit. The
+    // dialog-close early return above deliberately leaves a run in flight to
+    // complete and cache.
+    aiAbortRef.current?.abort();
     if (!aiEnabled) {
       ++aiGenToken.current;
       setAiResult(null);
@@ -444,9 +457,10 @@ function App() {
       return;
     }
     const token = ++aiGenToken.current;
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
     const run = async () => {
       setAiState("generating");
-      const repoNorm = normalizeRepo(repo);
       const key = aiCacheKey(await hashSession(stableShareInput), repoNorm);
       const cached = await getCachedAIResult(key);
       if (token !== aiGenToken.current) return;
@@ -468,7 +482,12 @@ function App() {
         allTemplates,
         repoNorm,
       );
-      const outcome = await generateEnhancements(digest, allTemplates, repoNorm);
+      const outcome = await generateEnhancements(
+        digest,
+        allTemplates,
+        repoNorm,
+        controller.signal,
+      );
       if (token !== aiGenToken.current) return;
       if (outcome.ok && outcome.result) {
         setAiResult(outcome.result);
@@ -487,6 +506,8 @@ function App() {
     report,
     repo,
     allTemplates,
+    templateState,
+    issueDialogOpen,
     stableShareInput,
     timeline,
     facts,
@@ -634,7 +655,17 @@ function App() {
         labels={labels}
         onLabelsChange={setLabels}
         issueReady={!!issue}
-        reportTooLong={issue ? issue.dropped.length > 0 : false}
+        // The URL's sections are deterministic until the AI result lands, so
+        // judging the fit while AI is still writing (or about to start) reports
+        // on a body that is about to be replaced. Wait until the AI pass has
+        // settled — ready, or failed down to the deterministic report.
+        reportTooLong={
+          issue
+            ? issue.dropped.length > 0 &&
+              (!aiEnabled ||
+                (aiState !== "idle" && aiState !== "generating"))
+            : false
+        }
         template={template}
         templateState={templateState}
         aiEnabled={aiEnabled}

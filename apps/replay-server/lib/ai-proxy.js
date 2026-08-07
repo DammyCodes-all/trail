@@ -9,12 +9,14 @@
 const FEATHERLESS_BASE =
   process.env.AI_BASE_URL ?? "https://api.featherless.ai/v1";
 const MODEL = process.env.AI_MODEL ?? "deepseek-ai/DeepSeek-V4-Flash-0731";
-const MAX_ATTEMPTS = 2; // one retry covers transient 5xx / empty completions
-const MAX_TOKENS = 1600;
+const MAX_ATTEMPTS = 2; // one retry covers transient 5xx / 429 / empty completions
+const MAX_TOKENS = 30000;
 const TEMPERATURE = 0.3;
 
 // Rough tokens ≈ chars / 4 (English). Used only for the size log line.
 const charsToTokens = (chars) => Math.round(chars / 4);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // AI enhancements are enabled only when the server holds a Featherless key.
 // The extension degrades to the deterministic report when this is false.
@@ -34,7 +36,12 @@ const SYSTEM_PROMPT = [
   "- Write concise, specific prose a maintainer can act on.",
   "- If the chosen template has a field for describing the issue (e.g. 'Summary',",
   "  'Describe the bug', 'What happened'), put the natural-language summary there.",
-  "- Respond with valid JSON only.",
+  "- Return exactly one JSON object. No Markdown, no code fences, no commentary.",
+  "  Example shape:",
+  '  {"title": "short issue title", "summary": "prose",',
+  '   "steps": ["1. ", "2. "], "template": {"filename": "bug_report.md",',
+  '   "fields": {"field-id": "value"}}, "labels": ["bug"]}',
+  "- Only include keys you can fill from the digest; omit empty ones.",
 ].join("\n");
 
 // POST a report digest to Featherless and return the model's raw completion
@@ -50,6 +57,11 @@ export async function proxyEnhance({ digest, templates, repo }) {
     model: MODEL,
     temperature: TEMPERATURE,
     max_tokens: MAX_TOKENS,
+    // V4 thinking mode on: reasoning is allowed and can spend the output
+    // budget, so MAX_TOKENS stays large enough for both reasoning and the
+    // final JSON. If Featherless ignores this field, it degrades to whatever
+    // the model defaults to.
+    thinking: { type: "enabled" },
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
@@ -83,13 +95,31 @@ export async function proxyEnhance({ digest, templates, repo }) {
         console.error(
           `[ai-proxy] attempt ${attempt} upstream ${res.status}, ${logSize()}: ${body.slice(0, 500)}`,
         );
-        if (res.status >= 500 && attempt < MAX_ATTEMPTS) continue; // transient
+        // 429 is a concurrency/rate limit — transient like 5xx, so retry once
+        // after a short backoff (honor Retry-After when the upstream sends it).
+        if (
+          (res.status >= 500 || res.status === 429) &&
+          attempt < MAX_ATTEMPTS
+        ) {
+          const retryAfter = Number(res.headers.get("retry-after"));
+          await sleep(retryAfter > 0 ? retryAfter * 1000 : 2500);
+          continue;
+        }
         return { ok: false, status: 502, error: `upstream_${res.status}` };
       }
       const data = await res.json();
       const content = data?.choices?.[0]?.message?.content;
       if (typeof content !== "string" || !content.trim()) {
-        console.error(`[ai-proxy] attempt ${attempt} empty completion, ${logSize()}`);
+        // Log why the completion is empty so the failure mode is diagnosable:
+        // JSON-mode empty (stop), thinking spent the budget (length + reasoning),
+        // or a routing quirk. Reasoning length only — never the reasoning text.
+        const choice = data?.choices?.[0];
+        console.error(
+          `[ai-proxy] attempt ${attempt} empty completion, ${logSize()}: ` +
+            `finish=${choice?.finish_reason ?? "unknown"} ` +
+            `reasoningChars=${choice?.message?.reasoning_content?.length ?? 0} ` +
+            `completionTokens=${data?.usage?.completion_tokens ?? "unknown"}`,
+        );
         if (attempt < MAX_ATTEMPTS) continue;
         return { ok: false, status: 502, error: "empty_completion" };
       }

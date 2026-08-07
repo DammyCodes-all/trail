@@ -341,21 +341,10 @@ function main() {
         reviewHooks.timeline.every((s) => s.kind !== 'input' || s.text !== 'Type into '),
         'review timeline never shows an unnamed typed field',
       );
-      // AI enhancements: the spike's replay server runs without a
-      // FEATHERLESS_API_KEY, so the enhancement call must resolve to
-      // server-off and the report stays fully deterministic — the AI path can
-      // never produce worse output than the deterministic one.
-      await review.waitForFunction(
-        () => window.__trailAIState === 'server-off',
-        { timeout: 15000, polling: 100 },
-      );
-      const fallbackMarkdown = await review.evaluate(() => window.__trailMarkdown);
-      assert(
-        fallbackMarkdown.includes('## Steps to Reproduce') &&
-          fallbackMarkdown.includes('## Environment'),
-        'deterministic report sections survive an unavailable AI path',
-      );
-      console.log('AI fallback PASS');
+      // AI enhancements must not fire on review load: no dialog, no repo, no
+      // template — the enhancement call runs only at submission time.
+      const aiStateOnLoad = await review.evaluate(() => window.__trailAIState);
+      assert(aiStateOnLoad === 'idle', 'AI stays idle until the issue dialog opens');
       assert(reviewHooks.replayCount > 0, 'review has rrweb replay frames');
       const playerReady = await review.evaluate(() => window.__trailPlayerReady === true);
       assert(playerReady, 'rrweb-player Svelte component mounted');
@@ -751,6 +740,21 @@ function main() {
       const body = decodeURIComponent(issueUrl.split('body=')[1] ?? '');
       assert(body.includes('## Steps to Reproduce'), 'fallback body keeps generic ## headings');
       console.log('template fallback PASS');
+      // AI enhancements: the dialog is open, a repo is entered, and the
+      // template has settled — this is the one moment the enhancement call may
+      // fire. The spike's replay server runs without a FEATHERLESS_API_KEY, so
+      // it must resolve to server-off and the report stays fully deterministic.
+      await review.waitForFunction(
+        () => window.__trailAIState === 'server-off',
+        { timeout: 15000, polling: 100 },
+      );
+      const fallbackMarkdown = await review.evaluate(() => window.__trailMarkdown);
+      assert(
+        fallbackMarkdown.includes('## Steps to Reproduce') &&
+          fallbackMarkdown.includes('## Environment'),
+        'deterministic report sections survive an unavailable AI path',
+      );
+      console.log('AI fallback PASS');
       console.log('review check PASS');
 
       // Phase 2: history shows the saved report. Auto-open closed the popup, so reopen.

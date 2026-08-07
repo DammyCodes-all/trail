@@ -159,12 +159,14 @@ export async function generateEnhancements(
   digest: SessionDigest,
   templates: IssueTemplate[],
   repo: string,
+  signal?: AbortSignal,
 ): Promise<EnhanceOutcome> {
   try {
     const res = await fetch(`${REPLAY_SERVER_URL}/api/ai/enhance`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ digest, templates, repo }),
+      signal,
     });
     if (res.status === 501) return { ok: false, status: 'server-off' };
     if (!res.ok) return { ok: false, status: 'unavailable' };
