@@ -2,7 +2,7 @@
 //   POST /api/replays/presign       → { id, uploadUrl } (uploads via PUT)
 //   PUT  /api/replays/upload/<id>   → store the session body
 //   GET  /api/replays/<id>          → session JSON
-//   POST /api/ai/enhance            → proxy a report-enhancement to Featherless
+//   POST /api/ai/enhance            → proxy a report-enhancement to Groq
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { put, get, isBlobMode } from "../lib/storage.js";

@@ -1,16 +1,18 @@
-// The Featherless proxy, shared by the Vercel function (api/ai/enhance.ts) and
-// the local twin (server/index.mjs) so the two can't drift. The API key lives
-// here in the server env — never in the extension.
+// The Groq proxy, shared by the Vercel function (api/ai/enhance.ts) and the
+// local twin (server/index.mjs) so the two can't drift. The API key lives here
+// in the server env — never in the extension.
 //
 // Error paths log the upstream status and error body (truncated) plus the
 // payload size, so context-length and rate-limit failures are diagnosable.
 // Prompts and completions are never logged.
 
-const FEATHERLESS_BASE =
-  process.env.AI_BASE_URL ?? "https://api.featherless.ai/v1";
-const MODEL = process.env.AI_MODEL ?? "deepseek-ai/DeepSeek-V4-Flash-0731";
+const GROQ_BASE =
+  process.env.AI_BASE_URL ?? "https://api.groq.com/openai/v1";
+const MODEL = process.env.AI_MODEL ?? "openai/gpt-oss-120b";
 const MAX_ATTEMPTS = 2; // one retry covers transient 5xx / 429 / empty completions
-const MAX_TOKENS = 30000;
+// Generous cap for a report JSON (~1-2k tokens of output); keeps latency and
+// cost bounded no matter how the model behaves.
+const MAX_TOKENS = 6000;
 const TEMPERATURE = 0.3;
 
 // Rough tokens ≈ chars / 4 (English). Used only for the size log line.
@@ -18,10 +20,10 @@ const charsToTokens = (chars) => Math.round(chars / 4);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// AI enhancements are enabled only when the server holds a Featherless key.
+// AI enhancements are enabled only when the server holds a Groq key.
 // The extension degrades to the deterministic report when this is false.
 export function isAiMode() {
-  return Boolean(process.env.FEATHERLESS_API_KEY);
+  return Boolean(process.env.GROQ_API_KEY);
 }
 
 const SYSTEM_PROMPT = [
@@ -44,24 +46,19 @@ const SYSTEM_PROMPT = [
   "- Only include keys you can fill from the digest; omit empty ones.",
 ].join("\n");
 
-// POST a report digest to Featherless and return the model's raw completion
-// text. The extension owns parsing and validation — this is a dumb pipe.
+// POST a report digest to Groq and return the model's raw completion text.
+// The extension owns parsing and validation — this is a dumb pipe.
 // Resolves { ok: true, content } on success, { ok: false, status, error }
 // otherwise; never throws.
 //
-// No timeout: Featherless queues first requests behind a loading model and can
-// take a while before the first token. We wait. One retry covers transient 5xx
-// and empty completions; the per-IP rate limiter caps abuse.
+// No timeout: slow first-token latency is tolerated; the per-IP rate limiter
+// caps abuse. One retry covers transient 5xx, 429 rate limits, and empty
+// completions.
 export async function proxyEnhance({ digest, templates, repo }) {
   const payload = JSON.stringify({
     model: MODEL,
     temperature: TEMPERATURE,
     max_tokens: MAX_TOKENS,
-    // V4 thinking mode on: reasoning is allowed and can spend the output
-    // budget, so MAX_TOKENS stays large enough for both reasoning and the
-    // final JSON. If Featherless ignores this field, it degrades to whatever
-    // the model defaults to.
-    thinking: { type: "enabled" },
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
@@ -80,13 +77,11 @@ export async function proxyEnhance({ digest, templates, repo }) {
     `payload ${payload.length} chars (~${charsToTokens(payload.length)} tokens)`;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
-      const res = await fetch(`${FEATHERLESS_BASE}/chat/completions`, {
+      const res = await fetch(`${GROQ_BASE}/chat/completions`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${process.env.FEATHERLESS_API_KEY}`,
-          "http-referer": "https://github.com/DammyCodes-all/trail",
-          "x-title": "TRAIL",
+          authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         },
         body: payload,
       });
@@ -95,7 +90,7 @@ export async function proxyEnhance({ digest, templates, repo }) {
         console.error(
           `[ai-proxy] attempt ${attempt} upstream ${res.status}, ${logSize()}: ${body.slice(0, 500)}`,
         );
-        // 429 is a concurrency/rate limit — transient like 5xx, so retry once
+        // 429 is a rate/concurrency limit — transient like 5xx, so retry once
         // after a short backoff (honor Retry-After when the upstream sends it).
         if (
           (res.status >= 500 || res.status === 429) &&
@@ -111,7 +106,7 @@ export async function proxyEnhance({ digest, templates, repo }) {
       const content = data?.choices?.[0]?.message?.content;
       if (typeof content !== "string" || !content.trim()) {
         // Log why the completion is empty so the failure mode is diagnosable:
-        // JSON-mode empty (stop), thinking spent the budget (length + reasoning),
+        // JSON-mode empty (stop), reasoning spent the budget (length + reasoning),
         // or a routing quirk. Reasoning length only — never the reasoning text.
         const choice = data?.choices?.[0];
         console.error(

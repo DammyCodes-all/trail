@@ -19,7 +19,7 @@ export const MSG_START_RECORDER = 'trail:start-recorder';
 // chrome.storage.local keys for persisted preferences
 export const REDACT_KEY = 'trail:autoRedact';
 export const REPO_KEY = 'trail:repo';
-// AI report enhancements: opt-out toggle (default on). The Featherless API key
+// AI report enhancements: opt-out toggle (default on). The Groq API key
 // lives on the replay server — the extension never sees or stores it.
 export const AI_ENABLED_KEY = 'trail:aiEnabled';
 // chrome.storage.local key for the AI-result cache (session hash + repo →

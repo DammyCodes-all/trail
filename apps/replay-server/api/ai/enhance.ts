@@ -1,4 +1,4 @@
-// POST /api/ai/enhance → proxy a report-enhancement call to Featherless.
+// POST /api/ai/enhance → proxy a report-enhancement call to Groq.
 // Thin route: validate the body, rate-limit per IP, delegate to the shared
 // proxy (lib/ai-proxy.js), map errors. The extension owns parsing and the
 // deterministic fallback — the server never inspects report content.

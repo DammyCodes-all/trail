@@ -1,6 +1,6 @@
 # TRAIL — browser extension
 
-The main product in this monorepo (see the [root README](../README.md) for the full picture). A WXT + React extension that records a bug reproduction — clicks, typed input, console errors, failed network requests, and an rrweb session replay — then turns it into a maintainer-ready GitHub issue. While you review, a local AI pass drafts a title, summary, reproduction steps, and labels from a redaction-safe session digest; it runs against the replay server's Featherless proxy when a key is configured, and degrades to the deterministic pipeline when it isn't.
+The main product in this monorepo (see the [root README](../README.md) for the full picture). A WXT + React extension that records a bug reproduction — clicks, typed input, console errors, failed network requests, and an rrweb session replay — then turns it into a maintainer-ready GitHub issue. While you review, a local AI pass drafts a title, summary, reproduction steps, and labels from a redaction-safe session digest; it runs against the replay server's Groq proxy when a key is configured, and degrades to the deterministic pipeline when it isn't.
 
 ## Scripts
 
@@ -38,5 +38,5 @@ spike/                           Puppeteer verification scripts and experiments
 - `lib/constants.ts` — message keys, `REPLAY_SERVER_URL` (points at the local replay server, `http://localhost:8898`, by default; swap in the Vercel deployment for production), `chrome.storage` preference keys.
 - `wxt.config.ts` — manifest, permissions, and the `escapeNonAscii` build plugin that keeps rrweb loadable by Chrome's content-script loader.
 - `lib/github.ts` — the URL byte-budget fitter that keeps the prefilled issue under GitHub's ~8 KB `issues/new` limit.
-- `lib/ai.ts` — builds a redaction-safe session digest and drafts a title, summary, steps, and labels via the replay server's `/api/ai/enhance` proxy. Falls back to the deterministic pipeline when the server has no `FEATHERLESS_API_KEY` (the spike asserts this path stays correct). Results are cached in `browser.storage.local` keyed by session hash.
+- `lib/ai.ts` — builds a redaction-safe session digest and drafts a title, summary, steps, and labels via the replay server's `/api/ai/enhance` proxy. Falls back to the deterministic pipeline when the server has no `GROQ_API_KEY` (the spike asserts this path stays correct). Results are cached in `browser.storage.local` keyed by session hash.
 - `spike/verify.mjs` — drives a real page through capture and review; also asserts the AI fallback leaves the report deterministic.

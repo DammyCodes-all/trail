@@ -1,5 +1,5 @@
-// Featherless-backed report enhancements. The extension never holds an API
-// key: the replay server proxies POST /api/ai/enhance to Featherless, and this
+// Groq-backed report enhancements. The extension never holds an API
+// key: the replay server proxies POST /api/ai/enhance to Groq, and this
 // module builds the (redaction-safe) session digest and calls it.
 //
 // The digest is the model's whole world: as much context as fits a budget,
@@ -22,7 +22,7 @@ export type AIStatus =
   | 'generating'
   | 'ready'
   | 'disabled' // user opted out
-  | 'server-off' // replay server has no FEATHERLESS_API_KEY
+  | 'server-off' // replay server has no GROQ_API_KEY
   | 'unavailable'; // network / rate limited / upstream / unparseable
 
 export interface EnhanceOutcome {

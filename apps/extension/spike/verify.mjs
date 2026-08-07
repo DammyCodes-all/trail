@@ -742,7 +742,7 @@ function main() {
       console.log('template fallback PASS');
       // AI enhancements: the dialog is open, a repo is entered, and the
       // template has settled — this is the one moment the enhancement call may
-      // fire. The spike's replay server runs without a FEATHERLESS_API_KEY, so
+      // fire. The spike's replay server runs without a GROQ_API_KEY, so
       // it must resolve to server-off and the report stays fully deterministic.
       await review.waitForFunction(
         () => window.__trailAIState === 'server-off',

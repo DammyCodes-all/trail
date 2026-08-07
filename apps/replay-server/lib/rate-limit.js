@@ -1,23 +1,12 @@
-// Rate limiting for the AI enhance proxy, backed by rate-limiter-flexible.
-//
-// In-memory: exact on the local twin, per-function-instance (best-effort) on
-// Vercel serverless — enough to damp a burst from one client, not a global
-// quota. For a hard quota, swap RateLimiterMemory for RateLimiterRedis with a
-// REDIS_URL client; the tryConsume contract below stays identical.
+import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
 
-import { RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
-
-// The review page fires the enhancement call once per submission intent
-// (issue dialog open + repo entered + template settled), plus once per repo
-// change while the dialog stays open, so the window must fit a normal
-// submission flow with headroom without tripping mid-session.
 const POINTS = 12; // requests allowed
 const DURATION_SECONDS = 60; // per window
 
 export const aiEnhanceLimiter = new RateLimiterMemory({
   points: POINTS,
   duration: DURATION_SECONDS,
-  keyPrefix: 'trail:ai-enhance',
+  keyPrefix: "trail:ai-enhance",
 });
 
 // consume() rejects with a RateLimiterRes when the limit is hit. Normalize to

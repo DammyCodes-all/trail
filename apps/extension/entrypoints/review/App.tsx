@@ -432,7 +432,7 @@ function App() {
   );
 
   // AI enhancements: build a redaction-safe digest of the session and ask the
-  // replay server's Featherless proxy for title/summary/steps/template mapping
+  // replay server's Groq proxy for title/summary/steps/template mapping
   // and labels. Runs only when the user is about to submit — the issue dialog
   // is open, a repo is entered, and the template fetch has settled — so no AI
   // call happens on review load. Any failure degrades to the deterministic

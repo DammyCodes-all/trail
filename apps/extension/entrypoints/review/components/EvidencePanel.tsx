@@ -305,9 +305,14 @@ function NetworkRow({
             {formatElapsedTime(event.t - t0)}
           </span>
           <span className="min-w-0">
-            <span className="block font-mono text-[11px] text-foreground">
+            <span
+              title={event.target}
+              className="block font-mono text-[11px] text-foreground"
+            >
               <span className="mr-2 font-semibold text-foreground">{event.method}</span>
-              <span className="wrap-break-word text-muted-foreground">{event.target}</span>
+              <span className="wrap-break-word text-muted-foreground line-clamp-1">
+                {event.target}
+              </span>
             </span>
             {(event.err || event.body) && (
               <span className="wrap-break-word mt-1 block font-mono text-[11px] leading-relaxed text-subtle-foreground line-clamp-2">
