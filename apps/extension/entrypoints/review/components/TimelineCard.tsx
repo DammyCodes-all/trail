@@ -1,18 +1,9 @@
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import {
-  ChevronDown,
-  Globe2,
-  Keyboard,
-  MousePointer2,
-  Terminal,
-  WifiOff,
-} from "lucide-react";
 
 import {
   Tabs,
@@ -21,239 +12,21 @@ import {
 } from "@/components/animate-ui/components/base/tabs";
 import type { TimelineStep } from "@/lib/timeline";
 import { formatElapsedTime } from "@/lib/time";
-import { severityOfStatus } from "@/lib/summary";
-import { cn } from "@/lib/utils";
-
-const iconByKind = {
-  nav: Globe2,
-  click: MousePointer2,
-  input: Keyboard,
-  console: Terminal,
-  net: WifiOff,
-} as const;
-
-// The timeline's tone comes from the same severity model the report summary
-// and the evidence panel use: console errors are failures, console warnings
-// and 4xx requests are moderate, 5xx/network-level failures are critical.
-function toneFor(step: TimelineStep) {
-  if (step.kind === "console" && step.level === "error") return "error";
-  if (step.kind === "net") {
-    return severityOfStatus(step.status ?? 0) === "critical"
-      ? "error"
-      : "warn";
-  }
-  if (step.kind === "console") return "warn";
-  return "neutral";
-}
-
-// Level dot: navigation / user action / network / warning / failure.
-function dotFor(step: TimelineStep) {
-  if (step.kind === "nav") return "nav";
-  const tone = toneFor(step);
-  if (tone === "error") return "error";
-  if (tone === "warn") return "warn";
-  return "neutral";
-}
-
-const dotClass = {
-  nav: "bg-success",
-  neutral: "bg-border-strong",
-  warn: "bg-warn",
-  error: "bg-destructive ring-2 ring-destructive/15",
-} as const;
-
-function TimelineRow({
-  step,
-  last,
-  t0,
-  active,
-  onSeek,
-  liRef,
-}: {
-  step: TimelineStep;
-  last: boolean;
-  t0: number;
-  active: boolean;
-  onSeek: (timestamp: number) => void;
-  liRef?: (el: HTMLLIElement | null) => void;
-}) {
-  const Icon = iconByKind[step.kind];
-  const tone = toneFor(step);
-  const isNavigation = step.kind === "nav";
-  const isFailure = tone !== "neutral";
-  const status = step.kind === "net" ? step.status || "ERR" : undefined;
-
-  return (
-    <li
-      ref={liRef}
-      className="relative grid grid-cols-[3.25rem_2.5rem_minmax(0,1fr)] sm:grid-cols-[4rem_2.75rem_minmax(0,1fr)]"
-    >
-      <span className="pt-3.5 font-mono text-[11px] tabular-nums text-muted-foreground">
-        {formatElapsedTime(step.t - t0)}
-      </span>
-      <span className="relative flex justify-center pt-3">
-        {!last ? (
-          <span className="absolute bottom-[-0.75rem] top-7 w-px bg-border" aria-hidden="true" />
-        ) : null}
-        <span
-          data-level={dotFor(step)}
-          className={cn(
-            "relative z-10 mt-1 size-2 rounded-full border-2 border-background",
-            active && "size-2.5 bg-primary ring-2 ring-primary/20",
-            !active && dotClass[dotFor(step)],
-          )}
-          aria-hidden="true"
-        />
-      </span>
-      <button
-        type="button"
-        className={cn(
-          "group/step my-1.5 grid min-h-11 w-full cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)_auto] items-start gap-3 rounded-sm px-3 py-2.5 text-left outline-none transition-[background-color,border-color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring/50 sm:px-4",
-          isFailure && "border border-destructive/30 bg-destructive/5 py-3.5 hover:bg-destructive/8",
-          !isFailure && active && "bg-accent",
-          !isFailure && !active && "hover:bg-muted/70",
-        )}
-        onClick={() => onSeek(step.t)}
-        aria-current={active ? "step" : undefined}
-      >
-        <span
-          className={cn(
-            "flex size-6 items-center justify-center rounded-sm",
-            tone === "error" && "bg-destructive/12 text-destructive",
-            tone === "warn" && "bg-warn/12 text-warn",
-            tone === "neutral" && isNavigation && "bg-info/10 text-info",
-            tone === "neutral" && !isNavigation && "bg-muted text-muted-foreground",
-          )}
-        >
-          <Icon className="size-3.5" aria-hidden="true" />
-        </span>
-        <span
-          className={cn(
-            "min-w-0 pt-0.5 text-[13px] leading-relaxed wrap-break-word",
-            tone === "error" && "font-medium text-destructive",
-            tone === "warn" && "text-warn",
-            tone === "neutral" && isNavigation && "font-medium text-foreground",
-            tone === "neutral" && !isNavigation && "text-foreground/85",
-          )}
-        >
-          {step.text}
-        </span>
-        {status ? (
-          <span className="pt-0.5 font-mono text-xs font-semibold text-destructive">
-            {status}
-          </span>
-        ) : (
-          <span className="w-2" aria-hidden="true" />
-        )}
-      </button>
-    </li>
-  );
-}
-
-function SubRow({
-  step,
-  t0,
-  active,
-  onSeek,
-  liRef,
-}: {
-  step: TimelineStep;
-  t0: number;
-  active: boolean;
-  onSeek: (timestamp: number) => void;
-  liRef?: (el: HTMLLIElement | null) => void;
-}) {
-  const Icon = iconByKind[step.kind];
-  return (
-    <li
-      ref={liRef}
-      className="grid grid-cols-[3.25rem_2.5rem_minmax(0,1fr)] sm:grid-cols-[4rem_2.75rem_minmax(0,1fr)]"
-    >
-      <span className="pt-2.5 pl-8 font-mono text-[11px] tabular-nums text-muted-foreground sm:pl-10">
-        {formatElapsedTime(step.t - t0)}
-      </span>
-      <span className="flex justify-center pt-2">
-        <span
-          data-level={dotFor(step)}
-          className={cn(
-            "relative z-10 mt-1 size-1.5 rounded-full border border-background",
-            active ? "bg-primary ring-2 ring-primary/20" : dotClass[dotFor(step)],
-          )}
-          aria-hidden="true"
-        />
-      </span>
-      <button
-        type="button"
-        className={cn(
-          "my-0.5 grid min-h-9 w-full cursor-pointer grid-cols-[1.5rem_minmax(0,1fr)_auto] items-start gap-2 rounded-sm px-3 py-2 text-left outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring/50",
-          active && "bg-accent",
-          !active && "hover:bg-muted/70",
-        )}
-        onClick={() => onSeek(step.t)}
-        aria-current={active ? "step" : undefined}
-      >
-        <span className="flex size-5 items-center justify-center rounded-sm bg-muted text-muted-foreground">
-          <Icon className="size-3" aria-hidden="true" />
-        </span>
-        <span className="min-w-0 pt-0.5 text-xs leading-relaxed text-foreground/85 wrap-break-word">
-          {step.text}
-        </span>
-        <span className="w-2" aria-hidden="true" />
-      </button>
-    </li>
-  );
-}
-
-type FilterMode = "all" | "errors" | "network" | "user" | "console";
-
-const filterLabels: Record<FilterMode, string> = {
-  all: "All",
-  errors: "Errors",
-  network: "Network",
-  user: "User",
-  console: "Console",
-};
-
-const filterModes = Object.keys(filterLabels) as FilterMode[];
-
-const GROUP_GAP = 2000;
-
-// Compress repetitive interaction runs (consecutive identical clicks/inputs
-// within GROUP_GAP) into one expandable row. Navigation, console and network
-// steps are landmarks and never group. Presentation-only: buildTimeline() and
-// the report markdown are untouched.
-type GroupRow = { kind: "group"; steps: TimelineStep[]; start: number; end: number };
-type Row = TimelineStep | GroupRow;
-
-function buildRows(steps: TimelineStep[]): Row[] {
-  const rows: Row[] = [];
-  for (const step of steps) {
-    const prev = rows.at(-1);
-    if (prev && prev.kind === "group") {
-      const lastStep = prev.steps.at(-1);
-      if (
-        lastStep &&
-        step.kind === lastStep.kind &&
-        step.text === lastStep.text &&
-        step.t - lastStep.t <= GROUP_GAP
-      ) {
-        prev.steps.push(step);
-        prev.end = step.t;
-        continue;
-      }
-    }
-    rows.push(
-      step.kind === "click" || step.kind === "input"
-        ? { kind: "group", steps: [step], start: step.t, end: step.t }
-        : step,
-    );
-  }
-  return rows;
-}
-
-const rowTime = (row: Row) => (row.kind === "group" ? row.end : row.t);
-
-type RenderItem = { key: string; row: Row; sub?: boolean; groupIndex?: number };
+import {
+  buildRows,
+  filterLabels,
+  filterModes,
+  rowTime,
+  toneFor,
+  type FilterMode,
+  type RenderItem,
+} from "@/lib/timeline-rows";
+import {
+  GroupRow,
+  SubRow,
+  TimelineRow,
+} from "./TimelineRows";
+import { useTimelineFollow } from "./useTimelineFollow";
 
 export function TimelineCard({
   steps,
@@ -272,7 +45,6 @@ export function TimelineCard({
 }) {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const rowEls = useRef<(HTMLLIElement | null)[]>([]);
 
   const filteredSteps = useMemo(
     () =>
@@ -353,193 +125,11 @@ export function TimelineCard({
   }
   const activeItem = activeIndex >= 0 ? renderable[activeIndex] : undefined;
 
-  // Follow-scroll: keep the active row at a fixed reading position (30% down
-  // the viewport) so the timeline scrolls up in rhythm with the replay. The
-  // user is always in control: any scroll input (wheel, touch, scroll keys,
-  // scrollbar drag) disengages follow for good until they click "Jump to
-  // latest". While playing on a desktop layout the follow glides with an
-  // eased rAF loop that retargets from wherever it is; paused/scrub row
-  // changes snap (the user initiated the jump), and reduced motion snaps
-  // instead of gliding. A play/pause toggle that doesn't move the row never
-  // scrolls.
-  const lastFollowedRef = useRef<number | null>(null);
-  const followRafRef = useRef(0);
-  const steeringRef = useRef(false);
-  const lastWrittenRef = useRef(-1);
-  // The first play of the session jumps to the timeline — the page opens at
-  // the top (see the follow effect) and the reporter should watch the replay
-  // unfold. Later plays respect the user's position instead of hijacking.
-  const playedOnceRef = useRef(false);
-  const cardRef = useRef<HTMLElement | null>(null);
-  // Never auto-scroll on initial load: the page must open at the top and only
-  // move once the replay is played or the user seeks. `seenTimeRef` marks the
-  // mount and distinguishes "time changed" (a seek) from re-renders (filter
-  // changes, group expansion) that must not scroll the page.
-  const seenTimeRef = useRef<number | null>(null);
-  const timeRef = useRef(currentTime);
-  timeRef.current = currentTime;
-  const [steering, setSteering] = useState(false);
-  const [followNonce, setFollowNonce] = useState(0);
-
-  const cancelFollow = useCallback(() => {
-    cancelAnimationFrame(followRafRef.current);
-    followRafRef.current = 0;
-  }, []);
-
-  // Mark our own scrolls so the window scroll listener doesn't read them as
-  // user steering.
-  const scrollToY = useCallback((y: number) => {
-    lastWrittenRef.current = y;
-    window.scrollTo(0, y);
-  }, []);
-
-  // The one glide implementation: an rAF lerp toward a target scroll
-  // position, snapping the final frame. `animate` is the caller's intent —
-  // live follow and the first-play jump glide, user seeks snap. Both
-  // follow-scroll and the jump land here so the motion language can't drift.
-  const glideTo = useCallback(
-    (target: number, animate: boolean) => {
-      cancelFollow();
-      const glide =
-        animate &&
-        window.matchMedia("(min-width: 1024px)").matches &&
-        !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (!glide) {
-        scrollToY(target);
-        return;
-      }
-      const step = () => {
-        const next = window.scrollY + (target - window.scrollY) * 0.22;
-        if (Math.abs(target - next) < 0.5) {
-          scrollToY(target);
-          followRafRef.current = 0;
-          return;
-        }
-        scrollToY(next);
-        followRafRef.current = requestAnimationFrame(step);
-      };
-      followRafRef.current = requestAnimationFrame(step);
-    },
-    [cancelFollow, scrollToY],
-  );
-
-  const disengage = useCallback(() => {
-    steeringRef.current = true;
-    setSteering(true);
-    cancelFollow();
-  }, [cancelFollow]);
-
-  useEffect(() => {
-    const scrollKeys = new Set([
-      "ArrowUp",
-      "ArrowDown",
-      "PageUp",
-      "PageDown",
-      "Home",
-      "End",
-      " ",
-    ]);
-    const onWheel = () => disengage();
-    const onTouchStart = () => disengage();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!scrollKeys.has(event.key)) return;
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        target.closest(
-          "button, input, textarea, select, [contenteditable='true']",
-        )
-      ) {
-        return;
-      }
-      disengage();
-    };
-    const onScroll = () => {
-      if (Math.abs(window.scrollY - lastWrittenRef.current) <= 1) return;
-      disengage();
-    };
-    window.addEventListener("wheel", onWheel, { passive: true });
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("wheel", onWheel);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, [disengage]);
-
-  useEffect(() => {
-    if (steeringRef.current) return;
-    const el = rowEls.current[activeIndex];
-    if (!el) return;
-
-    // The first run is the mount: land at the top of the page and never
-    // scroll. After that, only move when playing or when the replay time
-    // changed (a seek the user initiated) — filter changes and group
-    // expansions shift indices without changing time and must not scroll.
-    const time = timeRef.current;
-    const firstRun = seenTimeRef.current === null;
-    const timeChanged = seenTimeRef.current !== time;
-    seenTimeRef.current = time;
-    if (firstRun) return;
-    if (!isPlaying && !timeChanged) return;
-
-    if (lastFollowedRef.current === activeIndex) return;
-    lastFollowedRef.current = activeIndex;
-
-    const target = Math.max(
-      0,
-      Math.min(
-        el.getBoundingClientRect().top + window.scrollY - window.innerHeight * 0.3,
-        document.documentElement.scrollHeight - window.innerHeight,
-      ),
-    );
-
-    // Deadband: don't glide for a row already near the reading position —
-    // constant micro-pulls are what made the follow feel like a hijack.
-    // Seeks (paused row clicks) snap instead of gliding.
-    if (isPlaying && Math.abs(window.scrollY - target) < window.innerHeight * 0.2) {
-      lastFollowedRef.current = activeIndex;
-      return;
-    }
-
-    glideTo(target, isPlaying);
-  }, [activeIndex, isPlaying, followNonce, glideTo]);
-
-  // First play: glide to the timeline card. Same motion language as follow —
-  // rAF lerp on desktop, instant snap otherwise.
-  useEffect(() => {
-    if (!isPlaying || playedOnceRef.current) return;
-    playedOnceRef.current = true;
-    const card = cardRef.current;
-    if (!card) return;
-    const target = Math.max(
-      0,
-      Math.min(
-        card.getBoundingClientRect().top +
-          window.scrollY -
-          window.innerHeight * 0.12,
-        document.documentElement.scrollHeight - window.innerHeight,
-      ),
-    );
-    glideTo(target, true);
-  }, [isPlaying, glideTo]);
-
-  const jumpToLatest = () => {
-    lastFollowedRef.current = null;
-    steeringRef.current = false;
-    setSteering(false);
-    setFollowNonce((nonce) => nonce + 1);
-  };
-
-  useEffect(
-    () => () => {
-      cancelAnimationFrame(followRafRef.current);
-    },
-    [],
-  );
+  const { steering, jumpToLatest, cardRef, rowEls } = useTimelineFollow({
+    activeIndex,
+    isPlaying,
+    currentTime,
+  });
 
   const toggleGroup = (index: number) => {
     const key = `row-${index}`;
@@ -603,85 +193,24 @@ export function TimelineCard({
               );
             }
             if (row.kind === "group") {
-              const group = row;
-              const first = group.steps[0] as TimelineStep;
-              const active = index === activeIndex;
-              const Icon = iconByKind[first.kind];
-              const groupKey = `row-${groupIndex}`;
               return (
-                <li
+                <GroupRow
                   key={key}
-                  ref={attachRef(index)}
-                  className="relative grid grid-cols-[3.25rem_2.5rem_minmax(0,1fr)] sm:grid-cols-[4rem_2.75rem_minmax(0,1fr)]"
-                >
-                  <span className="pt-3.5 font-mono text-[11px] tabular-nums text-muted-foreground">
-                    {formatElapsedTime(group.start - t0)}
-                  </span>
-                  <span className="relative flex justify-center pt-3">
-                    {!last ? (
-                      <span className="absolute bottom-[-0.75rem] top-7 w-px bg-border" aria-hidden="true" />
-                    ) : null}
-                    <span
-                      data-level={dotFor(first)}
-                      className={cn(
-                        "relative z-10 mt-1 size-2 rounded-full border-2 border-background",
-                        active && "size-2.5 bg-primary ring-2 ring-primary/20",
-                        !active && dotClass[dotFor(first)],
-                      )}
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <div className="my-1.5 flex items-stretch">
-                    <button
-                      type="button"
-                      className={cn(
-                        "grid min-h-11 min-w-0 flex-1 cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)_auto] items-start gap-3 rounded-sm px-3 py-2.5 text-left outline-none transition-[background-color,border-color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring/50 sm:px-4",
-                        active && "bg-accent",
-                        !active && "hover:bg-muted/70",
-                      )}
-                      onClick={() => {
-                        onSeek(group.start);
-                        toggleGroup(groupIndex as number);
-                      }}
-                      aria-current={active ? "step" : undefined}
-                      aria-expanded={expanded.has(groupKey)}
-                    >
-                      <span className="flex size-6 items-center justify-center rounded-sm bg-muted text-muted-foreground">
-                        <Icon className="size-3.5" aria-hidden="true" />
-                      </span>
-                      <span className="min-w-0 pt-0.5 text-[13px] leading-relaxed text-foreground/85 wrap-break-word">
-                        {first.text}
-                      </span>
-                      <span className="rounded-sm bg-muted px-2 py-1 font-mono text-[10px] font-medium text-muted-foreground">
-                        {group.steps.length} interactions
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={
-                        expanded.has(groupKey)
-                          ? "Collapse interactions"
-                          : "Expand interactions"
-                      }
-                      className="flex w-9 shrink-0 cursor-pointer items-center justify-center self-stretch rounded-sm text-muted-foreground outline-none transition-colors duration-150 hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
-                      onClick={() => toggleGroup(groupIndex as number)}
-                    >
-                      <ChevronDown
-                        className={cn(
-                          "size-4 transition-transform duration-200 ease-out",
-                          expanded.has(groupKey) && "rotate-180",
-                        )}
-                        aria-hidden="true"
-                      />
-                    </button>
-                  </div>
-                </li>
+                  group={row}
+                  last={last}
+                  t0={t0}
+                  active={index === activeIndex}
+                  expanded={expanded.has(`row-${groupIndex}`)}
+                  onSeek={onSeek}
+                  onToggle={() => toggleGroup(groupIndex as number)}
+                  liRef={attachRef(index)}
+                />
               );
             }
             return (
               <TimelineRow
                 key={key}
-                step={row as TimelineStep}
+                step={row}
                 last={last}
                 t0={t0}
                 active={index === activeIndex}
