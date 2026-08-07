@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   countEvents,
   countSummary,
+  isBeaconTarget,
   isFailedRequest,
   severityOfStatus,
   totalCounts,
@@ -60,6 +61,23 @@ describe("isFailedRequest", () => {
     expect(isFailedRequest(200)).toBe(false);
     expect(isFailedRequest(301)).toBe(false);
     expect(isFailedRequest(399)).toBe(false);
+  });
+});
+
+describe("isBeaconTarget", () => {
+  it("flags analytics hosts and tracking subdomains", () => {
+    expect(isBeaconTarget("https://www.google-analytics.com/g/collect?v=2")).toBe(true);
+    expect(isBeaconTarget("https://www.googletagmanager.com/gtag/js?id=G-1")).toBe(true);
+    expect(isBeaconTarget("https://connect.facebook.net/tr?id=1")).toBe(true);
+    expect(isBeaconTarget("https://analytics.pub.dev/collect")).toBe(true);
+    expect(isBeaconTarget("https://tracker.example.com/tick")).toBe(true);
+  });
+
+  it("keeps real API failures and only facebook's /tr pixel", () => {
+    expect(isBeaconTarget("https://zedu.chat/api/v1/auth/login")).toBe(false);
+    expect(isBeaconTarget("https://api.acme.com/collect")).toBe(false);
+    expect(isBeaconTarget("https://www.facebook.com/signup")).toBe(false);
+    expect(isBeaconTarget("not a url")).toBe(false);
   });
 });
 

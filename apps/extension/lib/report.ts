@@ -1,5 +1,5 @@
 import { buildReportFacts, formatDuration } from './facts.ts';
-import { isFailedRequest } from './summary.ts';
+import { isBeaconTarget, isFailedRequest } from './summary.ts';
 import { buildTimeline } from './timeline.ts';
 import type { StoredEvent, TrailReport } from './types.ts';
 
@@ -25,6 +25,18 @@ const cleanErrorMessage = (message: string): string =>
     .replace(/^boom:\s*/i, '')
     .trim();
 
+// A fence that won't collide with its own content (bodies occasionally carry
+// triple backticks).
+const fenceFor = (s: string): string => (s.includes('```') ? '````' : '```');
+
+// Fenced code blocks must sit at column 0: indenting a fence inside a list
+// item closes it the moment the content dedents, and CommonMark swallows
+// everything after that into one giant code block (GitHub parses the same way).
+const fenced = (s: string): string => {
+  const fence = fenceFor(s);
+  return `${fence}\n${s.trimEnd()}\n${fence}`;
+};
+
 // Deterministic, evidence-backed title. When an error immediately follows a user
 // action on the same page, include that action; otherwise report the failure as-is.
 export function suggestTitle(events: StoredEvent[]): string {
@@ -46,7 +58,9 @@ export function suggestTitle(events: StoredEvent[]): string {
     }
     return message.slice(0, 70);
   }
-  const netErr = ordered.find((e) => e.k === 'net' && isFailedRequest(e.status));
+  const netErr = ordered.find(
+    (e) => e.k === 'net' && isFailedRequest(e.status) && !isBeaconTarget(e.target),
+  );
   if (netErr && netErr.k === 'net') {
     return `${netErr.method} ${netErr.target} failed (${netErr.status})`.slice(0, 70);
   }
@@ -91,13 +105,16 @@ const pathOf = (url: string): string => {
 // different one in the issue body.
 const envLines = (report: ReportSummary, events: StoredEvent[]) => {
   const facts = buildReportFacts(events, report);
+  // Recorded is the capture start (like the AI digest's), never the render
+  // time — re-exporting a cached session must not change the report.
+  const recorded = new Date(report?.startedAt ?? Date.now()).toISOString();
   return [
     `- Browser: ${facts.browser}`,
     `- OS: ${facts.os}`,
     `- Page: ${facts.url || 'Unknown'}`,
     `- Duration: ${formatDuration(facts.durationMs)}`,
     `- TRAIL: ${facts.extensionVersion}`,
-    `- Recorded: ${new Date().toLocaleString()}`,
+    `- Recorded: ${recorded}`,
   ].join('\n');
 };
 
@@ -107,6 +124,23 @@ const isFailedNet = (
   e: StoredEvent,
 ): e is Extract<StoredEvent, { k: 'net' }> =>
   e.k === 'net' && isFailedRequest(e.status);
+
+// Issue bodies are read by humans: analytics beacons and tracking calls carry
+// multi-KB query strings that would bury the actual failure. Scheme, host, and
+// path always survive; the query string is trimmed to fit a display cap. The
+// review UI keeps the full capture — this only affects the exported report.
+const shortTarget = (target: string, max = 220): string => {
+  if (target.length <= max) return target;
+  try {
+    const u = new URL(target);
+    const base = `${u.origin}${u.pathname}`;
+    if (base.length >= max) return `${base.slice(0, max - 1)}…`;
+    return `${base}${u.search.slice(0, max - base.length - 1)}…`;
+  } catch {
+    // Relative targets (no parseable host) can still be huge — cap them too.
+    return `${target.slice(0, max - 1)}…`;
+  }
+};
 
 // Build the report sections (also what buildIssueUrl fits to a byte budget).
 // Callers that already built the timeline (the review page memoizes it) pass
@@ -135,8 +169,13 @@ export function buildSections(
       text: consoles.length
         ? consoles
             .map((e) => {
-              const stack = (e.k === 'console' && (e.stack ?? '').split('\n').slice(0, 10).join('\n')) || '';
-              return `- \`${e.lv}\` at ${pathOf(e.url)}: ${stack || e.msg}`;
+              // Stacks are capped like before; the fence keeps them readable.
+              const stack = (
+                e.k === 'console' &&
+                (e.stack ?? '').split('\n').slice(0, 10).join('\n').trim()
+              ) || '';
+              const first = `- \`${e.lv}\` at ${pathOf(e.url)}: ${e.msg || 'Console error'}`;
+              return stack ? `${first}\n\n${fenced(stack)}` : first;
             })
             .join('\n')
         : 'None captured.',
@@ -148,22 +187,38 @@ export function buildSections(
     },
   ];
 
-  if (nets.length) {
+  // Beacons (analytics, tracking) are filtered out: they fail constantly for
+  // reasons unrelated to the bug. The review UI keeps them; the report does not.
+  const failed = nets.filter((e) => !isBeaconTarget(e.target));
+  if (failed.length) {
+    // Separated with --- so GitHub renders each failure as its own block —
+    // long entries no longer blur together in one wall of text. Bodies sit in
+    // top-level fenced blocks (never indented inside the list item — see
+    // fenced()).
+    const list = failed
+      .map((e) => {
+        const line = `- ${e.method} ${shortTarget(e.target)} — ${e.status}${e.err ? ` (${e.err})` : ''}`;
+        // Capture stores large bodies for the review UI; the report keeps a
+        // tight cap so issue bodies stay within the tracker's budget.
+        const body =
+          e.body && e.body.length > 4000
+            ? `${e.body.slice(0, 4000)}\n...(truncated)`
+            : e.body;
+        return body ? `${line}\n\n${fenced(body)}` : line;
+      })
+      .join('\n\n---\n\n');
+    // Beacon floods (analytics, tracking) can produce dozens of rows; tuck the
+    // list behind a <details> toggle on GitHub so a small report reads plainly
+    // while a big one hides behind one click. GitHub renders <details> in issue
+    // bodies; the blank line after </summary> is required for the markdown.
+    const text =
+      failed.length > 5 || list.length > 600
+        ? `<details>\n<summary>${failed.length} failed requests</summary>\n\n${list}\n\n</details>`
+        : list;
     sections.push({
       name: 'Failed Requests',
       priority: SECTION_PRIORITIES['Failed Requests']!,
-      text: nets
-        .map((e) => {
-          const line = `- ${e.method} ${e.target} — ${e.status}${e.err ? ` (${e.err})` : ''}`;
-          // Capture stores large bodies for the review UI; the report keeps a
-          // tight cap so issue bodies stay within the tracker's budget.
-          const body =
-            e.body && e.body.length > 4000
-              ? `${e.body.slice(0, 4000)}\n...(truncated)`
-              : e.body;
-          return body ? `${line}\n  \`\`\`\n${body}\n  \`\`\`` : line;
-        })
-        .join('\n'),
+      text,
     });
   }
 

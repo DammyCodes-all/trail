@@ -34,6 +34,50 @@ export function countEvents(events: Array<{ k: string }>): TrailCounts {
 export const isFailedRequest = (status: number): boolean =>
   status === 0 || status >= 400;
 
+// Analytics/tracking beacons: high-volume noise (ad blockers, CORS, ghostery)
+// that drowns the real evidence in a report. The review UI keeps every
+// capture; report consumers filter through this. Host-based, with a carve-out
+// for facebook's /tr pixel (facebook.com is also a real destination).
+const BEACON_HOSTS = [
+  "google-analytics.com",
+  "googletagmanager.com",
+  "doubleclick.net",
+  "connect.facebook.net",
+  "facebook.com",
+  "scorecardresearch.com",
+  "quantcount.com",
+  "mixpanel.com",
+  "segment.io",
+  "segment.com",
+  "amplitude.com",
+  "hotjar.com",
+  "clarity.ms",
+  "mc.yandex.ru",
+];
+
+export const isBeaconTarget = (target: string): boolean => {
+  let host: string;
+  let path: string;
+  try {
+    const u = new URL(target);
+    host = u.hostname.toLowerCase();
+    path = u.pathname;
+  } catch {
+    return false;
+  }
+  const isHost = (h: string) => host === h || host.endsWith(`.${h}`);
+  if (BEACON_HOSTS.some(isHost)) {
+    if (isHost("facebook.com")) return /^\/tr(\/|$)/.test(path);
+    return true;
+  }
+  // Tracking-shaped subdomains on any domain (analytics.example.com).
+  return host
+    .split(".")
+    .some((p) =>
+      ["analytics", "beacon", "telemetry", "tracking", "tracker", "collect"].includes(p),
+    );
+};
+
 // The derived summary a report shows in the popup history: console errors and
 // failed requests. Kept as one pass so the background, the import path, and
 // the popup's backfill can never disagree.

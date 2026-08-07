@@ -9,7 +9,7 @@
 
 import { REPLAY_SERVER_URL } from './constants.ts';
 import { formatDuration, type ReportFacts } from './facts.ts';
-import { isFailedRequest } from './summary.ts';
+import { isBeaconTarget, isFailedRequest } from './summary.ts';
 import type { TimelineStep } from './timeline.ts';
 import type { IssueTemplate } from './templates.ts';
 import type { StoredEvent, TrailReport } from './types.ts';
@@ -99,7 +99,9 @@ export function buildSessionDigest(
   const nets = events
     .filter(
       (e): e is Extract<StoredEvent, { k: 'net' }> =>
-        e.k === 'net' && isFailedRequest(e.status),
+        e.k === 'net' &&
+        isFailedRequest(e.status) &&
+        !isBeaconTarget(e.target),
     )
     .slice(-MAX_NET)
     .map((e) => ({
