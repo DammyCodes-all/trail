@@ -3,8 +3,7 @@
 // detector and shaper are pure (spike-tested); only fetchIssueTemplate hits the
 // network, and every failure path degrades to null → the generic body.
 
-import type { ReportSection } from './github.ts';
-import { defaultSectionRender } from './github.ts';
+import { defaultSectionRender, type ReportSection } from './report.ts';
 
 export interface IssueTemplateField {
   id: string;
