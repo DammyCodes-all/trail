@@ -179,7 +179,10 @@ export function detectTemplate(files: TemplateFile[]): TemplateFile | null {
   return scored[0]?.f ?? null;
 }
 
-function detectParsed(templates: IssueTemplate[]): IssueTemplate | null {
+// Pick the bug-report-ish template from a list the caller already parsed.
+// Exported so a caller that fetched all templates once (for the AI path) can
+// derive the deterministic pick without a second network pass.
+export function detectParsed(templates: IssueTemplate[]): IssueTemplate | null {
   if (!templates.length) return null;
   const scored = templates
     .map((t) => ({ t, bugish: isBugish(t, t.filename) }))
@@ -195,6 +198,8 @@ function matchScore(fieldLabel: string, section: ReportSection): number {
   const w = fieldLabel.toLowerCase();
   const t = (re: RegExp) => (re.test(w) ? 1 : 0);
   switch (section.name) {
+    case 'Summary':
+      return t(/summary|describe|what happened|problem|overview/i);
     case 'Steps to Reproduce':
       return t(/repro|step|follow|action|go to/i);
     case 'Console Errors':
@@ -294,35 +299,20 @@ const atobUtf8 = (base64: string): string => {
 
 // Resolve a repo to its best issue template (markdown or YAML form), or null
 // when there is none / the repo is private / the network is unavailable. Callers
-// fall back to the generic report body.
-export async function fetchIssueTemplate(repo: string): Promise<IssueTemplate | null> {
-  const clean = repo
-    .trim()
-    .replace(/^https?:\/\/(www\.)?github\.com\//i, '')
-    .replace(/\/+$/, '');
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(clean)) return null;
+// fall back to the generic report body. Pass `prefetched` (from
+// fetchAllIssueTemplates) to skip the directory fetch — the deterministic pick
+// then runs over already-parsed templates, and only the legacy single-file
+// fallback may still hit the network.
+export async function fetchIssueTemplate(
+  repo: string,
+  prefetched?: IssueTemplate[],
+): Promise<IssueTemplate | null> {
+  const clean = cleanRepo(repo);
+  if (!clean) return null;
 
-  const dirRes = await fetchWithTimeout(`${API}/${clean}/contents/.github/ISSUE_TEMPLATE`);
-  if (dirRes) {
-    const list = (await dirRes.json().catch(() => null)) as Array<{ name?: unknown; type?: unknown }> | null;
-    if (Array.isArray(list)) {
-      const parsed: IssueTemplate[] = [];
-      for (const entry of list) {
-        const name = typeof entry?.name === 'string' ? entry.name : '';
-        if (entry?.type !== 'file' || !name || /^config\.ya?ml$/i.test(name)) continue;
-        const raw = await fetchTemplateRaw(
-          `${API}/${clean}/contents/.github/ISSUE_TEMPLATE/${encodeURIComponent(name)}`,
-        );
-        if (raw === null) continue;
-        const t = /\.ya?ml$/i.test(name)
-          ? parseYamlTemplate(raw, name)
-          : parseMarkdownTemplate(raw, name);
-        if (t) parsed.push(t);
-      }
-      const detected = detectParsed(parsed);
-      if (detected) return detected;
-    }
-  }
+  const parsed = prefetched ?? (await fetchAllIssueTemplates(clean));
+  const detected = detectParsed(parsed);
+  if (detected) return detected;
 
   // Single-file fallback for older repos: .github/issue_template.md
   const singleRes = await fetchWithTimeout(`${API}/${clean}/contents/.github/issue_template.md`);
@@ -342,4 +332,44 @@ export async function fetchIssueTemplate(repo: string): Promise<IssueTemplate | 
   }
 
   return null;
+}
+
+// Fetch and parse every template in the repo's .github/ISSUE_TEMPLATE dir.
+// Returns [] on any failure (no dir, private repo, offline) — callers decide
+// what that means: the deterministic path picks the bugish one, the AI path
+// hands the whole parsed list to the model. Never rejects.
+export async function fetchAllIssueTemplates(repo: string): Promise<IssueTemplate[]> {
+  const clean = cleanRepo(repo);
+  if (!clean) return [];
+
+  const dirRes = await fetchWithTimeout(`${API}/${clean}/contents/.github/ISSUE_TEMPLATE`);
+  if (!dirRes) return [];
+  const list = (await dirRes.json().catch(() => null)) as Array<{ name?: unknown; type?: unknown }> | null;
+  if (!Array.isArray(list)) return [];
+
+  const parsed: IssueTemplate[] = [];
+  for (const entry of list) {
+    const name = typeof entry?.name === 'string' ? entry.name : '';
+    if (entry?.type !== 'file' || !name || /^config\.ya?ml$/i.test(name)) continue;
+    const raw = await fetchTemplateRaw(
+      `${API}/${clean}/contents/.github/ISSUE_TEMPLATE/${encodeURIComponent(name)}`,
+    );
+    if (raw === null) continue;
+    const t = /\.ya?ml$/i.test(name)
+      ? parseYamlTemplate(raw, name)
+      : parseMarkdownTemplate(raw, name);
+    if (t) parsed.push(t);
+  }
+  return parsed;
+}
+
+// Accept any of the ways users express a repo and reduce it to `owner/repo`,
+// or null when it can't be a GitHub repo reference.
+function cleanRepo(repo: string): string | null {
+  const clean = repo
+    .trim()
+    .replace(/^https?:\/\/(www\.)?github\.com\//i, '')
+    .replace(/\/+$/, '');
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(clean)) return null;
+  return clean;
 }
