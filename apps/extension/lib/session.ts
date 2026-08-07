@@ -1,17 +1,9 @@
+import { ZERO_COUNTS } from "./summary";
 import type { TrailCounts, TrailSession } from "@/lib/types";
 
 // Session + live-count state lives in chrome.storage.session so it survives the
 // SW going to sleep but dies with the browser session. All read-modify-write
 // callers go through this module; the background routes around it.
-export const DEFAULT_COUNTS: TrailCounts = {
-  click: 0,
-  input: 0,
-  console: 0,
-  net: 0,
-};
-
-export const totalCounts = (counts: TrailCounts) =>
-  counts.click + counts.input + counts.console + counts.net;
 
 export async function getSession(): Promise<TrailSession | null> {
   const { session } = await browser.storage.session.get("session");
@@ -25,7 +17,7 @@ export async function setSession(session: TrailSession | null): Promise<void> {
 
 export async function getCounts(): Promise<TrailCounts> {
   const { counts } = await browser.storage.session.get("counts");
-  return { ...DEFAULT_COUNTS, ...(counts as Partial<TrailCounts>) };
+  return { ...ZERO_COUNTS, ...(counts as Partial<TrailCounts>) };
 }
 
 export async function setCounts(counts: TrailCounts): Promise<void> {

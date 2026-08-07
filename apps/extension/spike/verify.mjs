@@ -832,6 +832,10 @@ function main() {
         { timeout: 10000 },
       );
       const shareReview = await shareReviewTarget.page();
+      // Page-side waitForFunction polling runs on the page's timers, which
+      // Chrome throttles hard when the tab is hidden — brings intermittent
+      // 15-30s timeouts. Front the tab so timers run normally.
+      await shareReview.bringToFront();
       await shareReview.waitForFunction(() => window.__trailMarkdown, {
         timeout: 10000,
         polling: 100,
@@ -854,11 +858,29 @@ function main() {
         );
         item?.click();
       });
-      await shareReview.waitForFunction(
-        () => String(window.__trailReplayLink || '').startsWith(`${REPLAY_BASE}/api/replays/`),
-        { timeout: 15000, polling: 100 },
-      );
-      const link = await shareReview.evaluate(() => window.__trailReplayLink);
+      const shareConsole = [];
+      shareReview.on('console', (m) => shareConsole.push(`[${m.type()}] ${m.text()}`));
+      // Node-side polling for the hook: CDP evaluates bypass the page's timer
+      // throttling, so the wait can't be starved by a hidden tab.
+      let link = null;
+      const shareDeadline = Date.now() + 30000;
+      while (Date.now() < shareDeadline) {
+        link = await shareReview
+          .evaluate(() => window.__trailReplayLink || null)
+          .catch(() => null);
+        if (
+          typeof link === 'string' &&
+          link.startsWith(`${REPLAY_BASE}/api/replays/`)
+        ) {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      if (typeof link !== 'string') {
+        console.log('DEBUG console:', JSON.stringify(shareConsole, null, 2));
+        throw new Error('Waiting failed: 30000ms exceeded (share link never appeared)');
+      }
+      console.log('SPIKE3: replay-link wait OK');
       console.log('share link:', link);
       assert(
         new RegExp(`^${REPLAY_BASE}/api/replays/[A-Za-z0-9.-]{1,64}$`).test(link),
@@ -894,12 +916,17 @@ function main() {
         'rrweb events carry player-ready timestamps',
       );
 
-      // The public player routes are gone.
-      const gone = await shareReview.evaluate(async () => {
-        const a = await fetch(`${REPLAY_BASE}/r/anything`);
-        const b = await fetch(`${REPLAY_BASE}/api/replays/anything.json`);
-        return { page: a.status, json: b.status };
-      });
+      // The public player routes are gone. The base URL must come in as an
+      // argument — puppeteer serializes the function source, so a template
+      // literal inside the body would resolve in the page (and fail).
+      const gone = await shareReview.evaluate(
+        async (base) => {
+          const a = await fetch(`${base}/r/anything`);
+          const b = await fetch(`${base}/api/replays/anything.json`);
+          return { page: a.status, json: b.status };
+        },
+        REPLAY_BASE,
+      );
       assert(
         gone.page === 404 && gone.json === 404,
         `public player routes removed (/r/ and .json — got ${gone.page}/${gone.json})`,
@@ -924,10 +951,12 @@ function main() {
       const importedSeq = await shared.evaluate(() =>
         new URLSearchParams(location.search).get('report'),
       );
+      console.log('SPIKE3: import landed, waiting for timeline hooks');
       await shared.waitForFunction(() => Array.isArray(window.__trailTimeline), {
         timeout: 15000,
         polling: 100,
       });
+      console.log('SPIKE3: imported timeline hooks OK');
       const importedHooks = await shared.evaluate(() => ({
         timeline: window.__trailTimeline,
         markdown: window.__trailMarkdown,
@@ -938,8 +967,12 @@ function main() {
         JSON.stringify(importedHooks.timeline) === JSON.stringify(reviewHooks3.timeline),
         'imported review shows the identical timeline',
       );
+      // The Environment section stamps the wall-clock export time, which
+      // differs between the sharer's render and the imported one — strip the
+      // line before comparing so the assertion is about report content.
+      const stripRecorded = (md) => md.replace(/^- Recorded: .*$/m, '');
       assert(
-        importedHooks.markdown === reviewHooks3.markdown,
+        stripRecorded(importedHooks.markdown) === stripRecorded(reviewHooks3.markdown),
         'imported review shows the identical report',
       );
       assert(

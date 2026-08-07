@@ -2,6 +2,7 @@ import type { NetEvent } from "@/lib/types";
 import type { RecordContext } from "./context";
 import { bodyText, requestBodyText } from "./format";
 import { redactHeaders } from "./redaction";
+import { isFailedRequest } from "@/lib/summary";
 
 // Best-effort normalization of anything fetch/XHR expose as "headers":
 // Headers instances, [name, value][] arrays, and plain records. Sensitive
@@ -63,7 +64,7 @@ export const instrumentNetwork = (ctx: RecordContext) => {
     const requestBody = requestBodyText(init?.body);
     try {
       const r = await origFetch.apply(this, a as Parameters<typeof fetch>);
-      if (!r.ok && isActive()) {
+      if (isFailedRequest(r.status) && isActive()) {
         // Clone keeps the page's own read of the response intact; the body is
         // captured async so a failed body read never blocks the app's fetch.
         void (async () => {
@@ -152,7 +153,7 @@ export const instrumentNetwork = (ctx: RecordContext) => {
       const m = (
         this as unknown as { __trail?: XhrMeta }
       ).__trail;
-      const bad = this.status === 0 || this.status >= 400;
+      const bad = isFailedRequest(this.status);
       if (bad && m && isActive()) {
         let body: string | undefined;
         try {
