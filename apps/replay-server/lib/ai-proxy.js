@@ -6,8 +6,9 @@
 // payload size, so context-length and rate-limit failures are diagnosable.
 // Prompts and completions are never logged.
 
-const FEATHERLESS_BASE = process.env.AI_BASE_URL ?? 'https://api.featherless.ai/v1';
-const MODEL = process.env.AI_MODEL ?? 'deepseek-ai/DeepSeek-V4-Flash';
+const FEATHERLESS_BASE =
+  process.env.AI_BASE_URL ?? "https://api.featherless.ai/v1";
+const MODEL = process.env.AI_MODEL ?? "deepseek-ai/DeepSeek-V4-Flash-0731";
 const TIMEOUT_MS = 25_000;
 const MAX_TOKENS = 1600;
 const TEMPERATURE = 0.3;
@@ -22,19 +23,19 @@ export function isAiMode() {
 }
 
 const SYSTEM_PROMPT = [
-  'You are the report writer for TRAIL, a browser extension that turns a captured bug',
-  'reproduction into a maintainer-ready GitHub issue.',
-  'You receive a digest of captured evidence and the repo\'s issue templates.',
-  'Rules:',
-  '- Never invent facts that are not in the digest. If something is unknown, say so.',
-  '- Never restate console errors, failed requests, or environment lines verbatim;',
-  '  the evidence sections are rendered deterministically by the extension.',
-  '- Use only field ids that exist in the provided templates.',
-  '- Write concise, specific prose a maintainer can act on.',
+  "You are the report writer for TRAIL, a browser extension that turns a captured bug",
+  "reproduction into a maintainer-ready GitHub issue.",
+  "You receive a digest of captured evidence and the repo's issue templates.",
+  "Rules:",
+  "- Never invent facts that are not in the digest. If something is unknown, say so.",
+  "- Never restate console errors, failed requests, or environment lines verbatim;",
+  "  the evidence sections are rendered deterministically by the extension.",
+  "- Use only field ids that exist in the provided templates.",
+  "- Write concise, specific prose a maintainer can act on.",
   "- If the chosen template has a field for describing the issue (e.g. 'Summary',",
   "  'Describe the bug', 'What happened'), put the natural-language summary there.",
-  '- Respond with valid JSON only.',
-].join('\n');
+  "- Respond with valid JSON only.",
+].join("\n");
 
 // POST a report digest to Featherless and return the model's raw completion
 // text. The extension owns parsing and validation — this is a dumb pipe.
@@ -47,13 +48,13 @@ export async function proxyEnhance({ digest, templates, repo }) {
     model: MODEL,
     temperature: TEMPERATURE,
     max_tokens: MAX_TOKENS,
-    response_format: { type: 'json_object' },
+    response_format: { type: "json_object" },
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: "system", content: SYSTEM_PROMPT },
       {
-        role: 'user',
+        role: "user",
         content: JSON.stringify({
-          task: 'Write the report enhancements for this captured bug.',
+          task: "Write the report enhancements for this captured bug.",
           repo,
           digest,
           templates,
@@ -65,18 +66,18 @@ export async function proxyEnhance({ digest, templates, repo }) {
     `payload ${payload.length} chars (~${charsToTokens(payload.length)} tokens)`;
   try {
     const res = await fetch(`${FEATHERLESS_BASE}/chat/completions`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'content-type': 'application/json',
+        "content-type": "application/json",
         authorization: `Bearer ${process.env.FEATHERLESS_API_KEY}`,
-        'http-referer': 'https://github.com/DammyCodes-all/trail',
-        'x-title': 'TRAIL',
+        "http-referer": "https://github.com/DammyCodes-all/trail",
+        "x-title": "TRAIL",
       },
       signal: controller.signal,
       body: payload,
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
+      const body = await res.text().catch(() => "");
       console.error(
         `[ai-proxy] upstream ${res.status}, ${logSize()}: ${body.slice(0, 500)}`,
       );
@@ -84,18 +85,18 @@ export async function proxyEnhance({ digest, templates, repo }) {
     }
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content;
-    if (typeof content !== 'string' || !content.trim()) {
+    if (typeof content !== "string" || !content.trim()) {
       console.error(`[ai-proxy] empty completion, ${logSize()}`);
-      return { ok: false, status: 502, error: 'empty_completion' };
+      return { ok: false, status: 502, error: "empty_completion" };
     }
     return { ok: true, content };
   } catch (err) {
     console.error(
-      `[ai-proxy] upstream ${controller.signal.aborted ? 'timeout' : 'error'}, ${logSize()}: ${
+      `[ai-proxy] upstream ${controller.signal.aborted ? "timeout" : "error"}, ${logSize()}: ${
         err?.message ?? String(err)
       }`,
     );
-    return { ok: false, status: 504, error: 'upstream_timeout' };
+    return { ok: false, status: 504, error: "upstream_timeout" };
   } finally {
     clearTimeout(timer);
   }
