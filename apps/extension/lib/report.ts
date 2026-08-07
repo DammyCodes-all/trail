@@ -1,8 +1,23 @@
-import type { ReportSection } from './github.ts';
-import { defaultSectionRender } from './github.ts';
 import { buildReportFacts, formatDuration } from './facts.ts';
+import { isFailedRequest } from './summary.ts';
 import { buildTimeline } from './timeline.ts';
 import type { StoredEvent, TrailReport } from './types.ts';
+
+// The unit the document pipeline works in: a named, prioritized block of the
+// report. Consumers (issue URL, templates) fit them to a byte budget and
+// re-render them to match a tracker's template.
+export interface ReportSection {
+  name: string;
+  text: string;
+  // lower = kept first when a consumer fits sections to a budget
+  priority: number;
+  // Optional custom emitter so a section can carry template-shaped headings
+  // (markdown templates use `**Label**`, YAML issue forms use `### Label`).
+  // Defaults to a generic `## name` heading.
+  render?: (name: string, text: string) => string;
+}
+
+export const defaultSectionRender = (name: string, text: string) => `## ${name}\n\n${text}`;
 
 const cleanErrorMessage = (message: string): string =>
   message
@@ -31,7 +46,7 @@ export function suggestTitle(events: StoredEvent[]): string {
     }
     return message.slice(0, 70);
   }
-  const netErr = ordered.find((e) => e.k === 'net' && (e.status === 0 || e.status >= 400));
+  const netErr = ordered.find((e) => e.k === 'net' && isFailedRequest(e.status));
   if (netErr && netErr.k === 'net') {
     return `${netErr.method} ${netErr.target} failed (${netErr.status})`.slice(0, 70);
   }
@@ -54,10 +69,14 @@ const SECTION_PRIORITIES: Record<string, number> = {
 };
 
 export interface ReportOptions {
-  repo: string;
   // Backstop: when true, any typed value that was captured unmasked is hidden anyway.
   redact: boolean;
 }
+
+export type ReportSummary = Pick<
+  TrailReport,
+  'title' | 'startedAt' | 'endedAt' | 'url'
+> | null;
 
 const pathOf = (url: string): string => {
   try {
@@ -67,8 +86,11 @@ const pathOf = (url: string): string => {
   }
 };
 
-const envLines = (events: StoredEvent[]) => {
-  const facts = buildReportFacts(events);
+// The Environment section must derive from the same report the header facts
+// use — otherwise a saved session shows one duration/URL in the header and a
+// different one in the issue body.
+const envLines = (report: ReportSummary, events: StoredEvent[]) => {
+  const facts = buildReportFacts(events, report);
   return [
     `- Browser: ${facts.browser}`,
     `- OS: ${facts.os}`,
@@ -79,18 +101,27 @@ const envLines = (events: StoredEvent[]) => {
   ].join('\n');
 };
 
+// A net event that counts as a failed request. Kept as an explicit type guard
+// because the shared isFailedRequest predicate isn't one by itself.
+const isFailedNet = (
+  e: StoredEvent,
+): e is Extract<StoredEvent, { k: 'net' }> =>
+  e.k === 'net' && isFailedRequest(e.status);
+
 // Build the report sections (also what buildIssueUrl fits to a byte budget).
+// Callers that already built the timeline (the review page memoizes it) pass
+// it in so a render never sorts the events more than once.
 export function buildSections(
-  report: Pick<TrailReport, 'title'>,
+  report: ReportSummary,
   events: StoredEvent[],
   opts: ReportOptions,
+  timeline: ReturnType<typeof buildTimeline> = buildTimeline(events, opts.redact),
 ): ReportSection[] {
-  const timeline = buildTimeline(events, opts.redact);
   const actions = timeline.filter((s) => s.kind === 'nav' || s.kind === 'click' || s.kind === 'input');
   const steps = actions.map((s, i) => `${i + 1}. ${s.text}`).join('\n');
 
   const consoles = events.filter((e) => e.k === 'console');
-  const nets = events.filter((e) => e.k === 'net');
+  const nets = events.filter(isFailedNet);
 
   const sections: ReportSection[] = [
     {
@@ -113,7 +144,7 @@ export function buildSections(
     {
       name: 'Environment',
       priority: SECTION_PRIORITIES.Environment!,
-      text: envLines(events),
+      text: envLines(report, events),
     },
   ];
 
@@ -152,9 +183,9 @@ export function buildMarkdownFromSections(
 }
 
 export function buildMarkdown(
-  report: Pick<TrailReport, 'title'>,
+  report: ReportSummary,
   events: StoredEvent[],
   opts: ReportOptions,
 ): string {
-  return buildMarkdownFromSections(report.title, buildSections(report, events, opts));
+  return buildMarkdownFromSections(report?.title ?? 'Bug report', buildSections(report, events, opts));
 }
