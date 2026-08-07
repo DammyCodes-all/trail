@@ -3,18 +3,10 @@
 // the URL opens prefilled and the full report is still on the clipboard.
 const URL_LIMIT = 7600;
 
-export interface ReportSection {
-  name: string;
-  text: string;
-  // lower = kept first when the budget runs out
-  priority: number;
-  // Optional custom emitter so a section can carry template-shaped headings
-  // (markdown templates use `**Label**`, YAML issue forms use `### Label`).
-  // Defaults to a generic `## name` heading.
-  render?: (name: string, text: string) => string;
-}
-
-export const defaultSectionRender = (name: string, text: string) => `## ${name}\n\n${text}`;
+import {
+  defaultSectionRender,
+  type ReportSection,
+} from "./report";
 
 export interface IssueUrlResult {
   url: string;

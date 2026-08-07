@@ -1,5 +1,6 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import { DB_NAME, EVENTS_STORE, REPORTS_STORE, SESSIONS_STORE } from './constants.ts';
+import { countSummary, ZERO_COUNTS } from './summary.ts';
 import type { SessionEvents, SharedReportPayload, StoredEvent, TrailReport } from './types.ts';
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
@@ -112,23 +113,18 @@ export async function importSharedReport(
   if (dup) return dup.seq;
 
   const fallback = payload.report ?? {};
+  const summary = countSummary(payload.events);
   const report: Omit<TrailReport, 'seq'> = {
     title: fallback.title || payload.title || 'Shared report',
     repo: fallback.repo ?? '',
     startedAt: fallback.startedAt ?? payload.exportedAt ?? Date.now(),
     endedAt: fallback.endedAt ?? Date.now(),
     eventCount: fallback.eventCount ?? payload.events.length,
-    counts: fallback.counts ?? { click: 0, input: 0, console: 0, net: 0 },
+    counts: fallback.counts ?? { ...ZERO_COUNTS },
     url: fallback.url ?? payload.events[0]?.url ?? '',
-    errorCount:
-      fallback.errorCount ??
-      payload.events.filter((e) => e.k === 'console' && e.lv === 'error')
-        .length,
+    errorCount: fallback.errorCount ?? summary.errorCount,
     failedRequestCount:
-      fallback.failedRequestCount ??
-      payload.events.filter(
-        (e) => e.k === 'net' && (e.status === 0 || e.status >= 400),
-      ).length,
+      fallback.failedRequestCount ?? summary.failedRequestCount,
     source,
   };
   const seq = await saveReport(report);
