@@ -56,6 +56,7 @@ const MARKDOWN_TEMPLATE: IssueTemplate = {
     { id: "describe-the-bug", label: "Describe the bug" },
     { id: "to-reproduce", label: "To Reproduce" },
     { id: "expected-behavior", label: "Expected behavior" },
+    { id: "actual-behavior", label: "Actual behavior" },
   ],
 };
 
@@ -183,6 +184,43 @@ describe("shapeSections with Summary (fallback parity)", () => {
     const describe = out.find((s) => s.name === "Describe the bug");
     expect(describe?.text).toBe("It broke");
   });
+
+  it("routes flagged Expected/Actual notes into the template's own fields", () => {
+    const flaggedEvents = [
+      ...events,
+      event({
+        k: "flag",
+        t: 900,
+        expected: "Cart keeps items",
+        actual: "Cart empties",
+      }),
+    ];
+    const sections = buildSections(report, flaggedEvents, { redact: true });
+    const out = shapeSections(MARKDOWN_TEMPLATE, sections).sections;
+    const expected = out.find((s) => s.name === "Expected behavior");
+    const actual = out.find((s) => s.name === "Actual behavior");
+    expect(expected?.text).toContain("Cart keeps items");
+    expect(actual?.text).toContain("Cart empties");
+  });
+
+  it("does not misroute a field that merely mentions 'happened' mid-sentence", () => {
+    const deploymentTemplate: IssueTemplate = {
+      ...MARKDOWN_TEMPLATE,
+      fields: [
+        { id: "describe-the-bug", label: "Describe the bug" },
+        { id: "deployment", label: "What actually happened during deployment" },
+        { id: "to-reproduce", label: "To Reproduce" },
+      ],
+    };
+    const flaggedEvents = [
+      ...events,
+      event({ k: "flag", t: 900, expected: "Cart keeps items" }),
+    ];
+    const sections = buildSections(report, flaggedEvents, { redact: true });
+    const out = shapeSections(deploymentTemplate, sections).sections;
+    const deployment = out.find((s) => s.name === "What actually happened during deployment");
+    expect(deployment?.text).toBe("_No response_");
+  });
 });
 
 describe("buildSessionDigest", () => {
@@ -229,6 +267,29 @@ describe("buildSessionDigest", () => {
     expect(digest.repo).toBe("acme/widget");
     expect(digest.templates[0]?.filename).toBe("bug_report.md");
     expect(digest.templates[0]?.fields[0]).toEqual({ id: "describe-the-bug", label: "Describe the bug" });
+  });
+
+  it("carries reporter flags with time offsets and notes", () => {
+    const flagged = [
+      ...events,
+      event({ k: "flag", t: 900, expected: "Cart keeps items", actual: "Cart empties" }),
+    ];
+    const digest = buildSessionDigest(report, flagged, timeline, facts, []);
+    expect(digest.flags).toEqual([
+      { at: "00:00", expected: "Cart keeps items", actual: "Cart empties" },
+    ]);
+  });
+
+  it("includes flags without notes and caps the flag list", () => {
+    const manyFlags = [
+      ...Array.from({ length: 7 }, (_, i) =>
+        event({ k: "flag", t: 900 + i, expected: `note ${i}` }),
+      ),
+    ];
+    const digest = buildSessionDigest(report, manyFlags, timeline, facts, []);
+    expect(digest.flags).toHaveLength(5);
+    expect(digest.flags.at(-1)?.expected).toBe("note 6");
+    expect(digest.flags.some((f) => f.at)).toBe(true);
   });
 });
 

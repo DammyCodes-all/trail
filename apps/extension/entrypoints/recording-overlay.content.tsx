@@ -8,9 +8,11 @@ import {
 } from "motion/react";
 import { SlidingNumber } from "@/components/animate-ui/primitives/texts/sliding-number";
 import {
+  FLAG_KEY,
   MSG_OVERLAY_STATUS,
   MSG_OVERLAY_UPDATE,
   MSG_STOP,
+  POST_MESSAGE_KEY,
 } from "@/lib/constants";
 import { totalCounts } from "@/lib/summary";
 import { formatElapsedTime } from "@/lib/time";
@@ -34,6 +36,7 @@ type OverlayStatus = {
   recording: boolean;
   counts: TrailCounts;
   startedAt?: number;
+  flags: number;
 };
 
 type OverlayMessage = Partial<OverlayStatus> & {
@@ -53,6 +56,7 @@ function RecordingOverlay() {
   const [status, setStatus] = React.useState<OverlayStatus>({
     recording: false,
     counts: ZERO_COUNTS,
+    flags: 0,
   });
   const [now, setNow] = React.useState(Date.now());
   const [placement, setPlacement] = React.useState<Placement>({
@@ -60,8 +64,15 @@ function RecordingOverlay() {
     offset: 96,
   });
   const [positioned, setPositioned] = React.useState(false);
+  const [flagOpen, setFlagOpen] = React.useState(false);
+  const [flagExpected, setFlagExpected] = React.useState("");
+  const [flagActual, setFlagActual] = React.useState("");
+  const [flagToast, setFlagToast] = React.useState<string | null>(null);
   const panelRef = React.useRef<HTMLDivElement>(null);
+  const flagButtonRef = React.useRef<HTMLButtonElement>(null);
+  const flagExpectedRef = React.useRef<HTMLTextAreaElement>(null);
   const sizeRef = React.useRef<Size>({ width: 232, height: 108 });
+  const flagToastTimerRef = React.useRef(0);
   const statusVersionRef = React.useRef(0);
   const dragRef = React.useRef<{
     pointerId: number;
@@ -137,10 +148,12 @@ function RecordingOverlay() {
       }
       const nextStatus: OverlayStatus = {
         recording: response.recording === true,
-        counts: normalizeCounts(response.counts),        startedAt:
+        counts: normalizeCounts(response.counts),
+        startedAt:
           typeof response.startedAt === "number"
             ? response.startedAt
             : undefined,
+        flags: typeof response.flags === "number" ? response.flags : 0,
       };
       setStatus((current) => {
         if (
@@ -190,12 +203,88 @@ function RecordingOverlay() {
     return () => window.clearInterval(interval);
   }, [status.recording]);
 
+  // When recording ends, tear down the flag UI so the next session starts clean.
+  React.useEffect(() => {
+    if (status.recording) return;
+    setFlagOpen(false);
+    setFlagToast(null);
+    setFlagExpected("");
+    setFlagActual("");
+  }, [status.recording]);
+
+  // The reporter must land in the first field the instant the form opens —
+  // this happens mid-frustration, so no extra click.
+  React.useEffect(() => {
+    if (flagOpen) flagExpectedRef.current?.focus();
+  }, [flagOpen]);
+
+  const showFlagToast = (text: string) => {
+    setFlagToast(text);
+    window.clearTimeout(flagToastTimerRef.current);
+    flagToastTimerRef.current = window.setTimeout(() => setFlagToast(null), 1600);
+  };
+
+  const submitFlag = (expected: string, actual: string) => {
+    // Post to the page window like the relay's start/stop commands; the
+    // MAIN-world recorder turns it into a captured 'flag' event.
+    window.postMessage(
+      { [POST_MESSAGE_KEY]: FLAG_KEY, d: { expected, actual } },
+      "*",
+    );
+    setFlagOpen(false);
+    setFlagExpected("");
+    setFlagActual("");
+    const at = formatElapsedTime(
+      Date.now() - (status.startedAt ?? Date.now()),
+    );
+    showFlagToast(`Flagged at ${at}`);
+    flagButtonRef.current?.focus();
+  };
+
+  const cancelFlag = () => {
+    setFlagOpen(false);
+    setFlagExpected("");
+    setFlagActual("");
+    flagButtonRef.current?.focus();
+  };
+
+  const onFlagKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancelFlag();
+      return;
+    }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (e.currentTarget === flagExpectedRef.current) {
+        // Enter in the first field moves on to the second; the last field
+        // (handled in its own handler) submits.
+        const form = e.currentTarget.form;
+        (form?.querySelector<HTMLTextAreaElement>("textarea:last-of-type"))?.focus();
+        return;
+      }
+      submitFlag(flagExpected, flagActual);
+    }
+  };
+
+  const onFlagActualKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancelFlag();
+      return;
+    }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submitFlag(flagExpected, flagActual);
+    }
+  };
+
   React.useLayoutEffect(() => {
     if (!status.recording || !panelRef.current) return;
     const rect = panelRef.current.getBoundingClientRect();
     sizeRef.current = { width: rect.width, height: rect.height };
     applyPlacement(placement, { x: 0, y: 0 }, !positioned);
-  }, [applyPlacement, placement, positioned, status.recording]);
+  }, [applyPlacement, flagOpen, placement, positioned, status.recording]);
 
   React.useEffect(() => {
     const handleResize = () =>
@@ -280,7 +369,7 @@ function RecordingOverlay() {
   return (
     <motion.div
       ref={panelRef}
-      className="trail-overlay rr-block"
+      className={`trail-overlay rr-block${flagOpen ? " trail-overlay--flagging" : ""}`}
       role="status"
       aria-live="polite"
       style={{ x, y, opacity: positioned ? 1 : 0 }}
@@ -297,19 +386,54 @@ function RecordingOverlay() {
         <span className="trail-overlay__time">
           {status.startedAt ? formatElapsedTime(now - status.startedAt) : "00:00"}
         </span>
-        <button
-          type="button"
-          className="trail-overlay__stop"
-          aria-label="Stop recording"
-          onPointerDownCapture={(event) => event.stopPropagation()}
-          onMouseDownCapture={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            stopRecording();
-          }}
-        >
-          Stop
-        </button>
+        <span className="trail-overlay__actions">
+          <button
+            ref={flagButtonRef}
+            type="button"
+            className={`trail-overlay__flag${flagOpen ? " trail-overlay__flag--open" : ""}`}
+            aria-label="Flag a problem"
+            aria-expanded={flagOpen}
+            onPointerDownCapture={(event) => event.stopPropagation()}
+            onMouseDownCapture={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              setFlagOpen((open) => !open);
+            }}
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+              <line x1="4" x2="4" y1="22" y2="15" />
+            </svg>
+            {status.flags > 0 && (
+              <span className="trail-overlay__flag-badge" aria-hidden="true">
+                {status.flags}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            className="trail-overlay__stop"
+            aria-label="Stop recording"
+            onPointerDownCapture={(event) => event.stopPropagation()}
+            onMouseDownCapture={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              stopRecording();
+            }}
+          >
+            Stop
+          </button>
+        </span>
       </div>
       <div className="trail-overlay__total">
         <SlidingNumber
@@ -341,6 +465,59 @@ function RecordingOverlay() {
           transition={numberTransition}
         />
       </div>
+      {flagOpen && (
+        <form
+          className="trail-overlay__form"
+          onPointerDownCapture={(event) => event.stopPropagation()}
+          onMouseDownCapture={(event) => event.stopPropagation()}
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitFlag(flagExpected, flagActual);
+          }}
+        >
+          <div className="trail-overlay__field">
+            <label htmlFor="trail-flag-expected">
+              Expected behavior
+            </label>
+            <textarea
+              ref={flagExpectedRef}
+              id="trail-flag-expected"
+              rows={2}
+              value={flagExpected}
+              onChange={(e) => setFlagExpected(e.target.value)}
+              onKeyDown={onFlagKeyDown}
+              placeholder="Optional, e.g. Checkout should accept the total"
+            />
+          </div>
+          <div className="trail-overlay__field">
+            <label htmlFor="trail-flag-actual">
+              Current behavior
+            </label>
+            <textarea
+              id="trail-flag-actual"
+              rows={2}
+              value={flagActual}
+              onChange={(e) => setFlagActual(e.target.value)}
+              onKeyDown={onFlagActualKeyDown}
+              placeholder="Optional, e.g. The total shows double the price"
+            />
+          </div>
+          <div className="trail-overlay__form-row">
+            <span className="trail-overlay__hint">↵ flag it · esc cancels</span>
+            <button
+              type="button"
+              className="trail-overlay__cancel"
+              onClick={cancelFlag}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="trail-overlay__submit">
+              Flag it
+            </button>
+          </div>
+        </form>
+      )}
+      {flagToast && <div className="trail-overlay__toast">{flagToast}</div>}
     </motion.div>
   );
 }
