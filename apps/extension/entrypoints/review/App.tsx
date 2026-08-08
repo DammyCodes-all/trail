@@ -199,6 +199,10 @@ function App() {
   const replayT0 = rrwebEvents[0]?.timestamp ?? t0;
 
   const counts: TrailCounts = useMemo(() => countEvents(events), [events]);
+  const flags = useMemo(
+    () => events.filter((e) => e.k === "flag").length,
+    [events],
+  );
   const facts = useMemo(
     () => buildReportFacts(events, report, undefined, timeline),
     [events, report, timeline],
@@ -577,6 +581,7 @@ function App() {
         onTitleBlur={persistTitle}
         facts={facts}
         counts={counts}
+        flags={flags}
         sharing={sharing}
         onCreateIssue={handleCreateIssue}
         onCopyMarkdown={() => void copyMarkdown()}

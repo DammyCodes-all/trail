@@ -1,6 +1,11 @@
 export const POST_MESSAGE_KEY = '__trail__';
 export const RECORDER_ID = 'trail-recorder';
 
+// The command the overlay posts to the MAIN-world recorder to emit a flag
+// event (payload `d: { expected?, actual? }`). Uses the same postMessage
+// channel as the relay's start/stop commands.
+export const FLAG_KEY = 'flag';
+
 export const DB_NAME = 'trail';
 export const EVENTS_STORE = 'events';
 export const REPORTS_STORE = 'reports';

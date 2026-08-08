@@ -202,6 +202,13 @@ function matchScore(fieldLabel: string, section: ReportSection): number {
       return t(/summary|describe|what happened|problem|overview/i);
     case 'Steps to Reproduce':
       return t(/repro|step|follow|action|go to/i);
+    // Anchored to GitHub's canonical wording ("Expected behavior",
+    // "What did you expect to happen?", "What happened instead?"): mid-sentence
+    // mentions of "happened" ("…during deployment") must not match.
+    case 'Expected Behavior':
+      return t(/^expected\b|expect(ed|ing)? to (happen|occur|be)|should have/i);
+    case 'Actual Behavior':
+      return t(/^actual\b|what happened( instead)?|actually happen(ed)?/i);
     case 'Console Errors':
       return t(/console|error|log|stack|exception/i);
     case 'Environment':
