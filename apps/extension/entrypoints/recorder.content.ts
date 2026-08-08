@@ -1,10 +1,11 @@
-import { POST_MESSAGE_KEY } from "@/lib/constants";
+import { POST_MESSAGE_KEY, FLAG_KEY } from "@/lib/constants";
 import type { RecordContext } from "@/lib/record/context";
 import { instrumentConsole } from "@/lib/record/console";
 import { instrumentClicks, instrumentInputs } from "@/lib/record/interactions";
 import { instrumentNetwork } from "@/lib/record/network";
 import { createRrweb } from "@/lib/record/rrweb";
-import type { NavEvent } from "@/lib/types";
+import { cap } from "@/lib/record/format";
+import type { FlagEvent, NavEvent } from "@/lib/types";
 
 declare global {
   interface Window {
@@ -70,6 +71,19 @@ export default defineContentScript({
           // visual replay honors the new preference.
           if (rrweb.running) rrweb.restart();
         }
+      } else if (e.data?.[POST_MESSAGE_KEY] === FLAG_KEY) {
+        // The overlay's ⚑ button: a reporter-marked moment, captured like any
+        // other event so it flows through the same relay/batch/db pipeline.
+        if (!active) return;
+        const d = e.data.d as { expected?: string; actual?: string } | undefined;
+        const flag: FlagEvent = {
+          k: "flag",
+          t: Date.now(),
+          url: location.href,
+          expected: cap(d?.expected ?? "", 240) || undefined,
+          actual: cap(d?.actual ?? "", 240) || undefined,
+        };
+        ctx.emit(flag);
       }
     });
 

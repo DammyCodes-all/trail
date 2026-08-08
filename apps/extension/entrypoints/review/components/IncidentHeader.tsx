@@ -3,6 +3,7 @@ import {
   Clock3,
   Copy,
   ExternalLink,
+  Flag,
   Link2,
   ListChecks,
   Loader2,
@@ -71,6 +72,7 @@ export function IncidentHeader({
   onTitleBlur,
   facts,
   counts,
+  flags,
   sharing,
   onCreateIssue,
   onCopyMarkdown,
@@ -81,6 +83,7 @@ export function IncidentHeader({
   onTitleBlur: () => void;
   facts: ReportFacts;
   counts: TrailCounts;
+  flags: number;
   sharing: "idle" | "uploading";
   onCreateIssue: () => void;
   onCopyMarkdown: () => void;
@@ -161,9 +164,17 @@ export function IncidentHeader({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 border-y border-border sm:grid-cols-3 lg:grid-cols-6 lg:divide-x lg:divide-border">
+      <div className="grid grid-cols-2 border-y border-border sm:grid-cols-3 lg:grid-cols-7 lg:divide-x lg:divide-border">
         <div className="lg:pr-5">
           <Fact icon={Clock3} label="Duration" value={formatDuration(facts.durationMs)} />
+        </div>
+        <div className="lg:px-5">
+          <Fact
+            icon={Flag}
+            label="Reporter flags"
+            value={flags}
+            tone={flags ? "warn" : "neutral"}
+          />
         </div>
         <div className="lg:px-5">
           <Fact

@@ -25,9 +25,12 @@ import {
 import { suggestTitle } from "@/lib/report";
 import {
   clearCounts,
+  clearFlagCount,
   getCounts,
+  getFlagCount,
   getSession,
   setCounts,
+  setFlagCount,
   setSession,
 } from "@/lib/session";
 import { countEvents, countSummary, totalCounts, ZERO_COUNTS } from "@/lib/summary";
@@ -45,6 +48,7 @@ function pushOverlayStatus(
   session: TrailSession,
   counts: TrailCounts,
   recording = true,
+  flags = 0,
 ): void {
   void browser.tabs
     .sendMessage(session.tabId, {
@@ -53,6 +57,7 @@ function pushOverlayStatus(
       counts: recording ? counts : ZERO_COUNTS,
       startedAt: session.startedAt,
       version: nextOverlayVersion(),
+      flags: recording ? flags : 0,
     })
     .catch(() => {});
 }
@@ -82,6 +87,7 @@ async function startRecording(
   }
   await clearEvents();
   await setCounts(ZERO_COUNTS);
+  await setFlagCount(0);
   const session: TrailSession = { tabId: id, startedAt: Date.now() };
 
   try {
@@ -138,6 +144,7 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
   const counts = await getCounts();
   await setSession(null);
   await clearCounts();
+  await clearFlagCount();
   if (session) pushOverlayStatus(session, ZERO_COUNTS, false);
   browser.action.setBadgeText({ text: "" });
 
@@ -188,7 +195,7 @@ export default defineBackground(() => {
       const counts = await getCounts();
       browser.action.setBadgeBackgroundColor({ color: "#ff6a00" });
       browser.action.setBadgeText({ text: String(totalCounts(counts)) });
-      pushOverlayStatus(session, counts);
+      pushOverlayStatus(session, counts, true, await getFlagCount());
     } catch {
       // Nothing to restore if session storage is unavailable.
     }
@@ -219,7 +226,15 @@ export default defineBackground(() => {
           counts.net += added.net;
           const countsChanged = totalCounts(added) > 0;
           await setCounts(counts);
-          if (countsChanged) pushOverlayStatus(session, counts);
+          const addedFlags = (msg.batch as Array<{ k: string }>).filter(
+            (e) => e.k === "flag",
+          ).length;
+          if (addedFlags > 0) {
+            await setFlagCount((await getFlagCount()) + addedFlags);
+          }
+          if (countsChanged || addedFlags > 0) {
+            pushOverlayStatus(session, counts, true, await getFlagCount());
+          }
           browser.action.setBadgeText({ text: String(totalCounts(counts)) });
           if (msg.final === true) sendResponse({ ok: true });
         })
@@ -283,6 +298,7 @@ export default defineBackground(() => {
           sendResponse({
             recording,
             counts: recording ? await getCounts() : ZERO_COUNTS,
+            flags: recording ? await getFlagCount() : 0,
             startedAt: recording ? session.startedAt : undefined,
             version,
           });
@@ -290,6 +306,7 @@ export default defineBackground(() => {
           sendResponse({
             recording: false,
             counts: ZERO_COUNTS,
+            flags: 0,
             version,
             error: (err as Error).message,
           });
