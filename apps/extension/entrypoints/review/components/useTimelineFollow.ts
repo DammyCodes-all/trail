@@ -23,10 +23,10 @@ export function useTimelineFollow({
   const followRafRef = useRef(0);
   const steeringRef = useRef(false);
   const lastWrittenRef = useRef(-1);
-  // The first play of the session fixes the view on the timeline — the page
-  // opens at the top (see the follow effect) and the reporter should watch
-  // the replay unfold. Later plays respect the user's position instead of
-  // hijacking.
+  // The first play of the session brings the active row to the reading
+  // position, wherever the user had scrolled to — so pressing play always
+  // drops them into the follow animation. Later plays respect the user's
+  // position instead of hijacking.
   const playedOnceRef = useRef(false);
   const cardRef = useRef<HTMLElement | null>(null);
   // Never auto-scroll on initial load: the page must open at the top and only
@@ -87,6 +87,23 @@ export function useTimelineFollow({
     cancelFollow();
   }, [cancelFollow]);
 
+  // Clamp a desired scroll position to the document. Both follow targets go
+  // through here so "how far down the viewport should this sit" is stated
+  // once.
+  const clampY = useCallback(
+    (el: HTMLElement, viewportFraction: number) =>
+      Math.max(
+        0,
+        Math.min(
+          el.getBoundingClientRect().top +
+            window.scrollY -
+            window.innerHeight * viewportFraction,
+          document.documentElement.scrollHeight - window.innerHeight,
+        ),
+      ),
+    [],
+  );
+
   useEffect(() => {
     const scrollKeys = new Set([
       "ArrowUp",
@@ -128,6 +145,35 @@ export function useTimelineFollow({
     };
   }, [disengage]);
 
+  // First play is the one moment we override the user's scroll position: press
+  // play and the active row comes to you, wherever you had wandered. It also
+  // clears steering, so a user who scrolled away before ever playing still
+  // lands in the follow rhythm rather than starting out disengaged. Every
+  // later play respects where they are.
+  //
+  // Declared before the follow effect so it wins the commit they share: React
+  // runs effects in order, and this one is the override.
+  //
+  // The row can be missing — a replay scrubbed deep into a capped timeline has
+  // its active row behind "show more". Fall back to the card, and let the
+  // follow effect take over once the row mounts.
+  useEffect(() => {
+    if (!isPlaying || playedOnceRef.current) return;
+    const el = rowEls.current[activeIndex];
+    // No active row yet (replay at 0, or the row is still behind "show more"):
+    // fall back to the card so the first play still frames the timeline.
+    const anchor = el ?? cardRef.current;
+    if (!anchor) return;
+
+    playedOnceRef.current = true;
+    steeringRef.current = false;
+    setSteering(false);
+    // Claim the row so the follow effect, which runs later in this same
+    // commit, doesn't fire a second competing glide at the same target.
+    if (el) lastFollowedRef.current = activeIndex;
+    glideTo(clampY(anchor, el ? 0.3 : 0.12), true);
+  }, [isPlaying, activeIndex, glideTo, clampY]);
+
   useEffect(() => {
     if (steeringRef.current) return;
     const el = rowEls.current[activeIndex];
@@ -147,13 +193,7 @@ export function useTimelineFollow({
     if (lastFollowedRef.current === activeIndex) return;
     lastFollowedRef.current = activeIndex;
 
-    const target = Math.max(
-      0,
-      Math.min(
-        el.getBoundingClientRect().top + window.scrollY - window.innerHeight * 0.3,
-        document.documentElement.scrollHeight - window.innerHeight,
-      ),
-    );
+    const target = clampY(el, 0.3);
 
     // Deadband: don't glide for a row already near the reading position —
     // constant micro-pulls are what made the follow feel like a hijack.
@@ -164,27 +204,7 @@ export function useTimelineFollow({
     }
 
     glideTo(target, isPlaying);
-  }, [activeIndex, isPlaying, followNonce, glideTo]);
-
-  // First play: fix the view on the timeline so the follow animation is in
-  // sight. Same motion language as follow — rAF lerp on desktop, instant
-  // snap otherwise.
-  useEffect(() => {
-    if (!isPlaying || playedOnceRef.current) return;
-    playedOnceRef.current = true;
-    const card = cardRef.current;
-    if (!card) return;
-    const target = Math.max(
-      0,
-      Math.min(
-        card.getBoundingClientRect().top +
-          window.scrollY -
-          window.innerHeight * 0.12,
-        document.documentElement.scrollHeight - window.innerHeight,
-      ),
-    );
-    glideTo(target, true);
-  }, [isPlaying, glideTo]);
+  }, [activeIndex, isPlaying, followNonce, glideTo, clampY]);
 
   const jumpToLatest = useCallback(() => {
     lastFollowedRef.current = null;
