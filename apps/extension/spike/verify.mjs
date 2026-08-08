@@ -249,6 +249,44 @@ function main() {
       await testPage.bringToFront();
       await testPage.click('#pay');
 
+      // Reporter flag: drive the overlay's ⚑ button and inline form through the
+      // shadow DOM mid-recording. Capture must keep running the whole time.
+      const flagFlow = await testPage.evaluate(async () => {
+        const root = document.querySelector('#trail-recording-overlay')?.shadowRoot;
+        const flagBtn = root?.querySelector('button[aria-label="Flag a problem"]');
+        if (!flagBtn) return { ok: false, reason: 'flag button missing' };
+        flagBtn.click();
+        await new Promise((r) => setTimeout(r, 200));
+        const expected = root?.querySelector('#trail-flag-expected');
+        const actual = root?.querySelector('#trail-flag-actual');
+        if (!expected || !actual) return { ok: false, reason: 'flag form fields missing' };
+        const setVal = (el, v) => {
+          const setter = Object.getOwnPropertyDescriptor(
+            HTMLTextAreaElement.prototype,
+            'value',
+          ).set;
+          setter.call(el, v);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        setVal(expected, 'Checkout total should be $4.99');
+        setVal(actual, 'Total shows $9.98');
+        root?.querySelector('button[type="submit"]')?.click();
+        await new Promise((r) => setTimeout(r, 250));
+        return { ok: true, formClosed: !root?.querySelector('#trail-flag-expected') };
+      });
+      console.log('flag flow:', flagFlow);
+      assert(flagFlow.ok === true, `overlay flag button + form reachable (${flagFlow.reason ?? ''})`);
+      assert(flagFlow.formClosed === true, 'flag form collapses on submit');
+      // The flag count badge is pushed by the background once the event lands.
+      await testPage.waitForFunction(
+        () =>
+          document
+            .querySelector('#trail-recording-overlay')
+            ?.shadowRoot?.querySelector('.trail-overlay__flag-badge')?.textContent === '1',
+        { timeout: 8000, polling: 100 },
+      );
+      console.log('flag badge live');
+
       await sleep(1500); // let batches flush
       const s1 = await clickStop(popup);
 
@@ -303,6 +341,22 @@ function main() {
         s1.some((e) => e.k === 'click' && e.label?.includes('Pay now')),
         'final click before stop survives the teardown (no tail loss)',
       );
+      // The reporter flag rides the same capture pipeline as every other event.
+      assert(summary(s1).flag === 1, 'expected exactly one reporter flag event');
+      const flagEvent = s1.find((e) => e.k === 'flag');
+      assert(
+        flagEvent?.expected === 'Checkout total should be $4.99' &&
+          flagEvent?.actual === 'Total shows $9.98',
+        'flag carries the reporter expected/actual notes verbatim',
+      );
+      assert(
+        !s1.some(
+          (e) =>
+            e.k === 'input' &&
+            (e.value.includes('Checkout total') || e.value.includes('Total shows')),
+        ),
+        'typing in the overlay flag form is never captured as an input event',
+      );
       console.log('SPIKE 1 PASS');
 
       // Phase 3: stopping auto-opens the review tab with replay + timeline + export.
@@ -340,6 +394,12 @@ function main() {
       assert(
         reviewHooks.timeline.every((s) => s.kind !== 'input' || s.text !== 'Type into '),
         'review timeline never shows an unnamed typed field',
+      );
+      assert(
+        reviewHooks.timeline.some(
+          (s) => s.kind === 'flag' && s.text.includes('Total shows $9.98'),
+        ),
+        'review timeline shows the reporter flag as its own in-lane marker',
       );
       // AI enhancements must not fire on review load: no dialog, no repo, no
       // template — the enhancement call runs only at submission time.
@@ -386,6 +446,26 @@ function main() {
       assert(reviewHooks.markdown.includes('## Steps to Reproduce'), 'markdown has steps section');
       assert(reviewHooks.markdown.includes('Click Submit'), 'markdown has the click step');
       assert(!reviewHooks.markdown.includes('hunter2'), 'markdown never leaks the password');
+      assert(
+        reviewHooks.markdown.includes('## Expected Behavior'),
+        'markdown has the expected-behavior section',
+      );
+      assert(
+        reviewHooks.markdown.includes('Checkout total should be $4.99'),
+        'markdown carries the flagged expected note',
+      );
+      assert(
+        reviewHooks.markdown.includes('## Actual Behavior'),
+        'markdown has the actual-behavior section',
+      );
+      assert(
+        reviewHooks.markdown.includes('Total shows $9.98'),
+        'markdown carries the flagged actual note',
+      );
+      assert(
+        !reviewHooks.markdown.includes('## Flagged moments'),
+        'report has no banner flagged-moments section',
+      );
       const incidentUi = await review.evaluate(() => ({
         text: document.body.innerText,
         repoVisible: !!document.querySelector('.repo'),
@@ -398,8 +478,8 @@ function main() {
       assert(incidentUi.text.includes('Create GitHub Issue'), 'review has one focused GitHub action');
       assert(!incidentUi.repoVisible, 'repo configuration stays out of the report until requested');
       assert(
-        incidentUi.title.startsWith('Submit failed:'),
-        'report title connects the triggering action to the captured failure',
+        incidentUi.title === 'Total shows $9.98',
+        'report title leads with the reporter flag note over the console error',
       );
 
       // Layout: desktop uses a two-column evidence grid — timeline left, replay
@@ -812,7 +892,62 @@ function main() {
         reopenTimeline.some((s) => s.kind === 'click' && s.text.includes('Pay now')),
         'reopened report has the final Pay now step — the stop tail is in the snapshot',
       );
+      assert(
+        reopenTimeline.some((s) => s.kind === 'flag' && s.text.includes('Total shows $9.98')),
+        'reopened report keeps the reporter flag from its snapshot',
+      );
       console.log('reopen check PASS');
+
+      // Deleting an issue must wipe its data: the popup removes the report
+      // record AND the session event snapshot, and nothing report-shaped may
+      // linger in chrome.storage.local. (The live 'events' store is the current
+      // recording buffer, not history — it is cleared at the next start.)
+      await popup.evaluate(() =>
+        document.querySelector('[aria-label="Delete report 1"]')?.click(),
+      );
+      await popup.waitForSelector('[role="alertdialog"]', { timeout: 5000, polling: 100 });
+      await popup.evaluate(() => {
+        const del = [...document.querySelectorAll('[role="alertdialog"] button')].find(
+          (b) => b.textContent?.trim() === 'Delete',
+        );
+        del?.click();
+      });
+      await popup.waitForFunction(
+        () => !document.querySelector('.report'),
+        { timeout: 5000, polling: 100 },
+      );
+      const storesAfterDelete = await popup.evaluate(async () => {
+        const db = await new Promise((resolve, reject) => {
+          const req = indexedDB.open('trail');
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        const out = {};
+        for (const name of ['events', 'reports', 'sessions']) {
+          out[name] = await new Promise((resolve) => {
+            const tx = db.transaction(name, 'readonly');
+            const req = tx.objectStore(name).count();
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(-1);
+          });
+        }
+        db.close();
+        return out;
+      });
+      const localResidue = await popup.evaluate(async () => {
+        const all = await chrome.storage.local.get(null);
+        const flat = JSON.stringify(all);
+        return {
+          hasTitle: flat.includes('Submit failed'),
+          hasFlagNote: flat.includes('Total shows $9.98'),
+        };
+      });
+      console.log('stores after delete:', storesAfterDelete);
+      assert(storesAfterDelete.reports === 0, 'deleting an issue removes its report record');
+      assert(storesAfterDelete.sessions === 0, 'deleting an issue removes its session event snapshot');
+      assert(!localResidue.hasTitle && !localResidue.hasFlagNote, 'no report data lingers in chrome.storage.local');
+      assert(storesAfterDelete.events > 0, 'live events store keeps the recording buffer until the next start (by design)');
+      console.log('delete wipes data PASS');
       // Close the phase-3 review tabs so SPIKE 2's stop leaves exactly one
       // review target for the share flow to pick up.
       for (const t of browser.targets()) {

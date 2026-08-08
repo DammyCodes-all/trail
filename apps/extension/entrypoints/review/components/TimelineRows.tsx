@@ -6,6 +6,7 @@ import {
 } from "react";
 import {
   ChevronDown,
+  Flag,
   Globe2,
   Keyboard,
   MousePointer2,
@@ -29,6 +30,7 @@ export const iconByKind = {
   input: Keyboard,
   console: Terminal,
   net: WifiOff,
+  flag: Flag,
 } as const;
 
 // Long entries (network failures, console errors) clamp to two lines so the
@@ -87,7 +89,10 @@ export function TimelineRow({
   const Icon = iconByKind[step.kind];
   const tone = toneFor(step);
   const isNavigation = step.kind === "nav";
-  const isFailure = tone !== "neutral";
+  // Flags are landmarks with their own tone: reporter intent, not a failure —
+  // they get info-toned styling instead of the destructive failure look.
+  const isFailure = tone === "error" || tone === "warn";
+  const isFlag = tone === "flag";
   const status = step.kind === "net" ? step.status || "ERR" : undefined;
   const [long, setLong] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -123,8 +128,9 @@ export function TimelineRow({
         className={cn(
           "my-1.5 flex items-stretch rounded-sm transition-[background-color,border-color] duration-150 ease-out focus-within:ring-2 focus-within:ring-ring/50",
           isFailure && "border border-destructive/30 bg-destructive/5 hover:bg-destructive/8",
-          !isFailure && active && "bg-accent",
-          !isFailure && !active && "hover:bg-muted/70",
+          isFlag && "border border-info/30 bg-info/5 hover:bg-info/8",
+          !isFailure && !isFlag && active && "bg-accent",
+          !isFailure && !isFlag && !active && "hover:bg-muted/70",
         )}
       >
         <button
@@ -141,6 +147,7 @@ export function TimelineRow({
               "flex size-6 items-center justify-center rounded-sm",
               tone === "error" && "bg-destructive/12 text-destructive",
               tone === "warn" && "bg-warn/12 text-warn",
+              tone === "flag" && "bg-info/12 text-info",
               tone === "neutral" && isNavigation && "bg-info/10 text-info",
               tone === "neutral" && !isNavigation && "bg-muted text-muted-foreground",
             )}
@@ -155,6 +162,7 @@ export function TimelineRow({
               "min-w-0 pt-0.5 text-[13px] leading-relaxed",
               tone === "error" && "font-medium text-destructive",
               tone === "warn" && "text-warn",
+              tone === "flag" && "text-info",
               tone === "neutral" && isNavigation && "font-medium text-foreground",
               tone === "neutral" && !isNavigation && "text-foreground/85",
             )}

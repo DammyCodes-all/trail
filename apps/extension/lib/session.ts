@@ -27,3 +27,19 @@ export async function setCounts(counts: TrailCounts): Promise<void> {
 export async function clearCounts(): Promise<void> {
   await browser.storage.session.remove("counts");
 }
+
+// Reporter-flag count for the overlay badge. Kept out of TrailCounts on
+// purpose: flags are user intent markers, not counted evidence, so the
+// odometer/counts/reports never grow a slot for them.
+export async function getFlagCount(): Promise<number> {
+  const { flagCount } = await browser.storage.session.get("flagCount");
+  return typeof flagCount === "number" ? flagCount : 0;
+}
+
+export async function setFlagCount(flagCount: number): Promise<void> {
+  await browser.storage.session.set({ flagCount });
+}
+
+export async function clearFlagCount(): Promise<void> {
+  await browser.storage.session.remove("flagCount");
+}
