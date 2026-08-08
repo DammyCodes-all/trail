@@ -1,6 +1,7 @@
 import { buildReportFacts, formatDuration } from './facts.ts';
 import { isBeaconTarget, isFailedRequest } from './summary.ts';
 import { buildTimeline } from './timeline.ts';
+import { formatElapsedTime } from './time.ts';
 import type { StoredEvent, TrailReport } from './types.ts';
 
 // The unit the document pipeline works in: a named, prioritized block of the
@@ -39,8 +40,16 @@ const fenced = (s: string): string => {
 
 // Deterministic, evidence-backed title. When an error immediately follows a user
 // action on the same page, include that action; otherwise report the failure as-is.
+// A reporter flag with a note outranks everything: it is explicit human intent,
+// so it names the bug even in a session with no technical evidence at all.
 export function suggestTitle(events: StoredEvent[]): string {
   const ordered = [...events].sort((a, b) => a.t - b.t);
+  const flag = ordered.find(
+    (e) => e.k === 'flag' && Boolean((e.actual || e.expected)?.trim()),
+  );
+  if (flag && flag.k === 'flag') {
+    return (flag.actual || flag.expected || '').trim().slice(0, 70);
+  }
   const consoleErr = ordered.find((e) => e.k === 'console' && e.lv === 'error');
   if (consoleErr && consoleErr.k === 'console') {
     const action = ordered
@@ -77,6 +86,11 @@ export function suggestTitle(events: StoredEvent[]): string {
 
 const SECTION_PRIORITIES: Record<string, number> = {
   'Steps to Reproduce': 1,
+  // The reporter's expected/actual notes sit right after the repro steps —
+  // the canonical position for them in a professional bug report — and before
+  // the technical evidence sections.
+  'Expected Behavior': 1.25,
+  'Actual Behavior': 1.35,
   'Console Errors': 2,
   Environment: 3,
   'Failed Requests': 4,
@@ -157,12 +171,45 @@ export function buildSections(
   const consoles = events.filter((e) => e.k === 'console');
   const nets = events.filter(isFailedNet);
 
+  // Reporter flags: each flag is its own moment. Bullets carry the time offset
+  // so N flags read as N distinct moments, never one merged pair. Sections are
+  // only emitted when the reporter left that note — a flag without notes stays
+  // a timeline marker and a hint for the AI, not report text.
+  const flags = events
+    .filter((e) => e.k === 'flag')
+    .sort((a, b) => a.t - b.t);
+  const t0 = events[0]?.t ?? 0;
+  const flagNote = (
+    f: Extract<StoredEvent, { k: 'flag' }>,
+    pick: (f: Extract<StoredEvent, { k: 'flag' }>) => string | undefined,
+  ) => `- \`@${formatElapsedTime(f.t - t0)}\` — ${pick(f) ?? ''}`.trim();
+  const expectedNotes = flags.filter((f) => f.expected?.trim());
+  const actualNotes = flags.filter((f) => f.actual?.trim());
+
   const sections: ReportSection[] = [
     {
       name: 'Steps to Reproduce',
       priority: SECTION_PRIORITIES['Steps to Reproduce']!,
       text: steps || 'No actions recorded.',
     },
+  ];
+
+  if (expectedNotes.length) {
+    sections.push({
+      name: 'Expected Behavior',
+      priority: SECTION_PRIORITIES['Expected Behavior']!,
+      text: expectedNotes.map((f) => flagNote(f, (x) => x.expected)).join('\n'),
+    });
+  }
+  if (actualNotes.length) {
+    sections.push({
+      name: 'Actual Behavior',
+      priority: SECTION_PRIORITIES['Actual Behavior']!,
+      text: actualNotes.map((f) => flagNote(f, (x) => x.actual)).join('\n'),
+    });
+  }
+
+  sections.push(
     {
       name: 'Console Errors',
       priority: SECTION_PRIORITIES['Console Errors']!,
@@ -185,7 +232,7 @@ export function buildSections(
       priority: SECTION_PRIORITIES.Environment!,
       text: envLines(report, events),
     },
-  ];
+  );
 
   // Beacons (analytics, tracking) are filtered out: they fail constantly for
   // reasons unrelated to the bug. The review UI keeps them; the report does not.

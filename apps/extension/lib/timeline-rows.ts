@@ -4,7 +4,9 @@ import type { TimelineStep } from "@/lib/timeline";
 // The timeline's tone comes from the same severity model the report summary
 // and the evidence panel use: console errors are failures, console warnings
 // and 4xx requests are moderate, 5xx/network-level failures are critical.
-export type StepTone = "error" | "warn" | "neutral";
+// Reporter flags get their own tone: they are explicit human intent, visually
+// distinct from warnings so they read as "the reporter said so" markers.
+export type StepTone = "error" | "warn" | "neutral" | "flag";
 
 export function toneFor(step: TimelineStep): StepTone {
   if (step.kind === "console" && step.level === "error") return "error";
@@ -14,10 +16,11 @@ export function toneFor(step: TimelineStep): StepTone {
       : "warn";
   }
   if (step.kind === "console") return "warn";
+  if (step.kind === "flag") return "flag";
   return "neutral";
 }
 
-// Level dot: navigation / user action / network / warning / failure.
+// Level dot: navigation / user action / network / warning / failure / flag.
 export type DotTone = "nav" | StepTone;
 
 export function dotFor(step: TimelineStep): DotTone {
@@ -25,6 +28,7 @@ export function dotFor(step: TimelineStep): DotTone {
   const tone = toneFor(step);
   if (tone === "error") return "error";
   if (tone === "warn") return "warn";
+  if (tone === "flag") return "flag";
   return "neutral";
 }
 
@@ -33,6 +37,7 @@ export const dotClass = {
   neutral: "bg-border-strong",
   warn: "bg-warn",
   error: "bg-destructive ring-2 ring-destructive/15",
+  flag: "bg-info ring-2 ring-info/25",
 } as const;
 
 export type FilterMode = "all" | "errors" | "network" | "user" | "console";

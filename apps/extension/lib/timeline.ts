@@ -1,6 +1,6 @@
 import type { StoredEvent } from './types.ts';
 
-export type StepKind = 'nav' | 'click' | 'input' | 'console' | 'net';
+export type StepKind = 'nav' | 'click' | 'input' | 'console' | 'net' | 'flag';
 
 export interface TimelineStep {
   t: number;
@@ -70,6 +70,20 @@ export function buildTimeline(events: StoredEvent[], redact = true): TimelineSte
           text: `${e.method} ${e.target} — ${e.status}${e.err ? ` (${e.err})` : ''}`,
         });
         break;
+      case 'flag': {
+        const expected = e.expected;
+        const actual = e.actual;
+        const text =
+          expected && actual
+            ? `Flag: "${expected}" — "${actual}"`
+            : expected
+              ? `Flag: "${expected}"`
+              : actual
+                ? `Flag: "${actual}"`
+                : 'Flagged this moment';
+        steps.push({ t: e.t, kind: 'flag', text });
+        break;
+      }
     }
   }
 
