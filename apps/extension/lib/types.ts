@@ -1,5 +1,5 @@
 export interface BaseTrailEvent {
-  k: 'click' | 'input' | 'console' | 'net' | 'nav' | 'rrweb';
+  k: 'click' | 'input' | 'console' | 'net' | 'nav' | 'rrweb' | 'flag';
   t: number;
   url: string;
 }
@@ -56,7 +56,24 @@ export interface RrwebEvent extends BaseTrailEvent {
   ev: unknown;
 }
 
-export type TrailEvent = ClickEvent | InputEvent | ConsoleEvent | NetEvent | NavEvent | RrwebEvent;
+// A moment the reporter marked during recording (⚑ in the overlay). The notes
+// are the reporter's own words about what should have happened vs what did.
+// Both fields are optional: a flag without notes is still a timeline marker.
+// Captured at capture time (user-authored text — never redacted).
+export interface FlagEvent extends BaseTrailEvent {
+  k: 'flag';
+  expected?: string;
+  actual?: string;
+}
+
+export type TrailEvent =
+  | ClickEvent
+  | InputEvent
+  | ConsoleEvent
+  | NetEvent
+  | NavEvent
+  | RrwebEvent
+  | FlagEvent;
 
 export type StoredEvent = TrailEvent & { seq: number };
 

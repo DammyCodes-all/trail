@@ -37,6 +37,24 @@ describe("suggestTitle", () => {
   it("falls back to the page host", () => {
     expect(suggestTitle([event({ k: "click" })])).toBe("Bug on example.com");
   });
+
+  it("prefers a flagged note over an incidental console error", () => {
+    const flagged = [
+      ...events,
+      event({ k: "flag", t: 900, expected: "Total shows the final price" }),
+    ];
+    expect(suggestTitle(flagged)).toBe("Total shows the final price");
+  });
+
+  it("uses the actual note when the flag has no expected note", () => {
+    expect(
+      suggestTitle([event({ k: "flag", t: 900, actual: "Total doubles" })]),
+    ).toBe("Total doubles");
+  });
+
+  it("ignores flags without notes for the title", () => {
+    expect(suggestTitle([event({ k: "flag", t: 900 })])).toBe("Bug on example.com");
+  });
 });
 
 describe("buildSections", () => {
@@ -154,6 +172,95 @@ describe("buildSections", () => {
       "Environment",
       "Failed Requests",
     ]);
+  });
+
+  it("emits Expected/Actual sections between steps and console errors", () => {
+    const sections = buildSections(
+      report,
+      [
+        ...events,
+        event({
+          k: "flag",
+          t: 650,
+          expected: "The total should be $4.99",
+          actual: "The total shows $9.98",
+        }),
+      ],
+      { redact: true },
+    );
+    expect(sections.map((s) => s.name)).toEqual([
+      "Steps to Reproduce",
+      "Expected Behavior",
+      "Actual Behavior",
+      "Console Errors",
+      "Environment",
+      "Failed Requests",
+    ]);
+    const expected = sections.find((s) => s.name === "Expected Behavior");
+    const actual = sections.find((s) => s.name === "Actual Behavior");
+    expect(expected?.text).toContain("`@00:00` — The total should be $4.99");
+    expect(actual?.text).toContain("`@00:00` — The total shows $9.98");
+    // Priorities keep the notes ahead of console evidence in URL-budget fits.
+    expect(expected!.priority).toBeLessThan(
+      sections.find((s) => s.name === "Console Errors")!.priority,
+    );
+  });
+
+  it("renders two flags as two distinct moments, never one merged pair", () => {
+    const sections = buildSections(
+      report,
+      [
+        event({ k: "flag", t: 1000, expected: "Cart keeps items", actual: "Cart empties" }),
+        event({ k: "flag", t: 5000, expected: "Checkout accepts the card", actual: "Card rejected" }),
+      ],
+      { redact: true },
+    );
+    const expected = sections.find((s) => s.name === "Expected Behavior");
+    const actual = sections.find((s) => s.name === "Actual Behavior");
+    expect(expected?.text).toBe(
+      "- `@00:00` — Cart keeps items\n- `@00:04` — Checkout accepts the card",
+    );
+    expect(actual?.text).toBe(
+      "- `@00:00` — Cart empties\n- `@00:04` — Card rejected",
+    );
+  });
+
+  it("emits no Expected/Actual sections when the flag has no notes", () => {
+    const sections = buildSections(
+      report,
+      [...events, event({ k: "flag", t: 650 })],
+      { redact: true },
+    );
+    expect(sections.some((s) => s.name === "Expected Behavior")).toBe(false);
+    expect(sections.some((s) => s.name === "Actual Behavior")).toBe(false);
+  });
+
+  it("emits only the note that exists", () => {
+    const sections = buildSections(
+      report,
+      [event({ k: "flag", t: 1000, expected: "Only expected" })],
+      { redact: true },
+    );
+    expect(sections.map((s) => s.name)).toEqual([
+      "Steps to Reproduce",
+      "Expected Behavior",
+      "Console Errors",
+      "Environment",
+    ]);
+  });
+
+  it("keeps flagged notes out of the Steps to Reproduce", () => {
+    const sections = buildSections(
+      report,
+      [
+        event({ k: "click", t: 500, label: "Submit", tag: "button" }),
+        event({ k: "flag", t: 600, expected: "It should work" }),
+      ],
+      { redact: true },
+    );
+    const steps = sections.find((s) => s.name === "Steps to Reproduce");
+    expect(steps?.text).toContain("Click Submit");
+    expect(steps?.text).not.toContain("It should work");
   });
 });
 

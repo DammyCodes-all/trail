@@ -12,6 +12,7 @@ import { formatDuration, type ReportFacts } from './facts.ts';
 import { isBeaconTarget, isFailedRequest } from './summary.ts';
 import type { TimelineStep } from './timeline.ts';
 import type { IssueTemplate } from './templates.ts';
+import { formatElapsedTime } from './time.ts';
 import type { StoredEvent, TrailReport } from './types.ts';
 import { sanitizeAIResult, type AIResult } from './ai-merge.ts';
 
@@ -33,6 +34,7 @@ export interface EnhanceOutcome {
 
 const MAX_CONSOLE = 15;
 const MAX_NET = 10;
+const MAX_FLAGS = 5;
 const MAX_STACK_LINES = 10;
 const MAX_MSG_CHARS = 1000;
 const MAX_BODY_CHARS = 1500;
@@ -54,6 +56,10 @@ export interface SessionDigest {
   steps: string[];
   consoleErrors: Array<{ level: string; page: string; message: string; stack: string }>;
   failedRequests: Array<{ method: string; target: string; status: number; error: string; body: string }>;
+  // Reporter-flagged moments: the user's own account of expected vs actual
+  // outcome. High-signal intent — see the proxy's SYSTEM_PROMPT for how the
+  // model is told to treat them.
+  flags: Array<{ at: string; expected?: string; actual?: string }>;
   templates: Array<{
     filename: string;
     name: string;
@@ -112,13 +118,31 @@ export function buildSessionDigest(
       body: e.body ? truncate(e.body, MAX_BODY_CHARS) : '',
     }));
 
+  // Reporter flags: the user's own expected/actual notes, offset like the
+  // timeline so the model can anchor them to the surrounding steps. Last five
+  // kept — flags are rare, but a flag-spam session must not eat the budget.
+  const t0 = events[0]?.t ?? 0;
+  const flags = events
+    .filter((e): e is Extract<StoredEvent, { k: 'flag' }> => e.k === 'flag')
+    .slice(-MAX_FLAGS)
+    .map((e) => ({
+      at: formatElapsedTime(e.t - t0),
+      ...(e.expected ? { expected: truncate(e.expected, MAX_STEP_CHARS) } : {}),
+      ...(e.actual ? { actual: truncate(e.actual, MAX_STEP_CHARS) } : {}),
+    }));
+
   // Hard total budget for evidence beyond the timeline: trim oldest-first so
-  // the newest (most relevant) evidence always survives.
+  // the newest (most relevant) evidence always survives. Flags are the
+  // reporter's own words, so they're trimmed last.
   let note: string | undefined;
   let total = 0;
   for (const c of consoles) total += c.message.length + c.stack.length;
   for (const n of nets) total += n.target.length + n.body.length;
-  while (total > TOTAL_EVIDENCE_BUDGET && (consoles.length || nets.length)) {
+  for (const f of flags) total += (f.expected ?? '').length + (f.actual ?? '').length;
+  while (
+    total > TOTAL_EVIDENCE_BUDGET &&
+    (consoles.length || nets.length || flags.length)
+  ) {
     if (consoles.length) {
       total -= consoles[0]!.message.length + consoles[0]!.stack.length;
       consoles.shift();
@@ -126,6 +150,10 @@ export function buildSessionDigest(
     } else if (nets.length) {
       const n = nets.shift()!;
       total -= n.target.length + n.body.length;
+      note = 'Some older evidence was truncated for size.';
+    } else if (flags.length) {
+      const f = flags.shift()!;
+      total -= (f.expected ?? '').length + (f.actual ?? '').length;
       note = 'Some older evidence was truncated for size.';
     }
   }
@@ -142,6 +170,7 @@ export function buildSessionDigest(
     steps,
     consoleErrors: consoles,
     failedRequests: nets,
+    flags,
     templates: templates.map((t) => ({
       filename: t.filename,
       name: t.name,
