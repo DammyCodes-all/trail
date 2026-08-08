@@ -10,7 +10,7 @@ export interface PrettyResult {
 
 // Capture appends this marker to capped bodies; it would break JSON.parse, so
 // it is stripped before shaping and re-appended to the shaped output.
-const TRUNCATED_MARKER = "\n...(truncated)";
+export const TRUNCATED_MARKER = "\n...(truncated)";
 
 export function prettyBody(raw: string): PrettyResult {
   const truncated = raw.endsWith(TRUNCATED_MARKER);

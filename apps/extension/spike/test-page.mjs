@@ -54,7 +54,7 @@ const server = http.createServer((req, res) => {
       'content-type': 'text/plain',
       'x-trail-test': 'yes',
     });
-    res.end('server blew up');
+    res.end('server blew up for ops@example.com');
   } else {
     res.writeHead(200, { 'content-type': 'text/plain' });
     res.end('ok');

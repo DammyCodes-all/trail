@@ -1,7 +1,7 @@
 import type { NetEvent } from "@/lib/types";
 import type { RecordContext } from "./context";
 import { bodyText, requestBodyText } from "./format";
-import { redactHeaders } from "./redaction";
+import { redactBody, redactHeaders, redactText, redactUrl } from "./redaction";
 import { isFailedRequest } from "@/lib/summary";
 
 // Best-effort normalization of anything fetch/XHR expose as "headers":
@@ -61,7 +61,7 @@ export const instrumentNetwork = (ctx: RecordContext) => {
       init?.headers ??
         (typeof arg === "object" ? (arg as { headers?: unknown }).headers : undefined),
     );
-    const requestBody = requestBodyText(init?.body);
+    const requestBody = redactBody(requestBodyText(init?.body));
     try {
       const r = await origFetch.apply(this, a as Parameters<typeof fetch>);
       if (isFailedRequest(r.status) && isActive()) {
@@ -70,14 +70,14 @@ export const instrumentNetwork = (ctx: RecordContext) => {
         void (async () => {
           let body: string | undefined;
           try {
-            body = bodyText(await r.clone().text());
+            body = redactBody(bodyText(await r.clone().text()));
           } catch {
             // body unreadable — still record the failure without it
           }
           if (!isActive()) return;
           const ev: NetEvent = {
             k: "net",
-            target: url,
+            target: redactUrl(url),
             method,
             status: r.status,
             t,
@@ -96,10 +96,10 @@ export const instrumentNetwork = (ctx: RecordContext) => {
       if (isActive()) {
         const ev: NetEvent = {
           k: "net",
-          target: url,
+          target: redactUrl(url),
           method,
           status: 0,
-          err: (err as Error).message,
+          err: redactText((err as Error).message),
           t,
           via: "fetch",
           url: pageUrl(),
@@ -148,7 +148,7 @@ export const instrumentNetwork = (ctx: RecordContext) => {
   XMLHttpRequest.prototype.send = function (...a: unknown[]) {
     const t = Date.now();
     const meta = (this as unknown as { __trail?: XhrMeta }).__trail;
-    if (meta) meta.body = requestBodyText(a[0]);
+    if (meta) meta.body = redactBody(requestBodyText(a[0]));
     this.addEventListener("loadend", () => {
       const m = (
         this as unknown as { __trail?: XhrMeta }
@@ -158,13 +158,13 @@ export const instrumentNetwork = (ctx: RecordContext) => {
         let body: string | undefined;
         try {
           const rt = this.responseType;
-          if (rt === "" || rt === "text") body = bodyText(this.responseText);
+          if (rt === "" || rt === "text") body = redactBody(bodyText(this.responseText));
         } catch {
           // binary/opaque responses have no text body
         }
         const ev: NetEvent = {
           k: "net",
-          target: m.url,
+          target: redactUrl(m.url),
           method: m.method,
           status: this.status,
           t,

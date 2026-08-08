@@ -223,10 +223,10 @@ function main() {
       console.log('clicked boom');
       await testPage.click('#xhr');
       await testPage.evaluate(() =>
-        fetch('/missing', {
+        fetch('/missing?token=sekret&q=2', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ qty: 2 }),
+          body: JSON.stringify({ qty: 2, password: 'hunter2' }),
         }).catch(() => {}),
       );
       await testPage.focus('#email');
@@ -611,6 +611,16 @@ function main() {
         !failDetails.includes('hunter2'),
         'redacted header value never leaks the secret',
       );
+      // The failed response body carried an email address — capture must scrub
+      // it at the source, keeping the domain for context.
+      assert(
+        failDetails.includes('server blew up for [redacted]@example.com'),
+        'response body email is redacted, domain kept for context',
+      );
+      assert(
+        !failDetails.includes('ops@example.com'),
+        'response body never leaks the raw email',
+      );
       await review.evaluate(() => {
         const missing = [...document.querySelectorAll('[data-net-row]')].find((r) =>
           r.textContent?.includes('/missing') && r.textContent?.includes('POST'),
@@ -659,6 +669,28 @@ function main() {
       assert(
         missingDetails.includes('qty') && missingDetails.includes('2'),
         'request body of the failed request is captured',
+      );
+      // The request body and URL carried a password and a token query param.
+      // Keys, paths, and unrelated params survive; values are scrubbed.
+      assert(
+        missingDetails.includes('password'),
+        'request body keeps the sensitive key name',
+      );
+      assert(
+        !missingDetails.includes('hunter2'),
+        'request body password value is redacted',
+      );
+      assert(
+        missingDetails.includes('token=[redacted]') && missingDetails.includes('q=2'),
+        'query params: sensitive values masked, unrelated ones kept',
+      );
+      assert(
+        !missingDetails.includes('sekret'),
+        'query token value is redacted',
+      );
+      assert(
+        missingDetails.includes('/missing'),
+        'request path survives redaction',
       );
 
       // Console details: expanding a row reveals the full message and stack.
