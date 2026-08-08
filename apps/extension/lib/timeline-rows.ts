@@ -99,4 +99,36 @@ export type RenderItem = {
   row: Row;
   sub?: boolean;
   groupIndex?: number;
+  // Index of the owning row in buildRows() output. Sub rows repeat their
+  // group's index, so the collapse cap counts rows rather than rendered
+  // items — an expanded group can never be sliced down the middle.
+  rowIndex: number;
 };
+
+// A long session runs to hundreds of rows and the page scrolls the window,
+// so an uncapped timeline makes the review tab enormous. Collapsed, we render
+// the first COLLAPSED_ROW_LIMIT rows behind a "show more" control. The cap is
+// deliberately below a screenful of rows (~56px each) so the collapsed
+// timeline stays in the same order of magnitude as the sticky replay column.
+export const COLLAPSED_ROW_LIMIT = 25;
+// Don't bother collapsing to save a handful of rows — a "Show 2 more" button
+// costs more attention than the rows it hides.
+export const COLLAPSE_SLACK = 5;
+
+// How much of `items` to render, given the collapse state. Cuts on a row
+// boundary: the returned count always ends a whole row (group header plus any
+// expanded sub rows), never inside one.
+export function visibleCount(
+  items: RenderItem[],
+  showAll: boolean,
+): { count: number; hiddenRows: number } {
+  const totalRows = (items.at(-1)?.rowIndex ?? -1) + 1;
+  if (showAll || totalRows <= COLLAPSED_ROW_LIMIT + COLLAPSE_SLACK) {
+    return { count: items.length, hiddenRows: 0 };
+  }
+  let count = 0;
+  while (count < items.length && items[count]!.rowIndex < COLLAPSED_ROW_LIMIT) {
+    count += 1;
+  }
+  return { count, hiddenRows: totalRows - COLLAPSED_ROW_LIMIT };
+}

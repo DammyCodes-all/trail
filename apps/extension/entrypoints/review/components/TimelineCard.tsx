@@ -5,6 +5,8 @@ import {
   useState,
 } from "react";
 
+import { ChevronDown } from "lucide-react";
+
 import {
   Tabs,
   TabsList,
@@ -12,12 +14,15 @@ import {
 } from "@/components/animate-ui/components/base/tabs";
 import type { TimelineStep } from "@/lib/timeline";
 import { formatElapsedTime } from "@/lib/time";
+import { cn } from "@/lib/utils";
 import {
   buildRows,
+  COLLAPSED_ROW_LIMIT,
   filterLabels,
   filterModes,
   rowTime,
   toneFor,
+  visibleCount,
   type FilterMode,
   type RenderItem,
 } from "@/lib/timeline-rows";
@@ -45,6 +50,11 @@ export function TimelineCard({
 }) {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showAll, setShowAll] = useState(false);
+  const disclosureRef = useRef<HTMLButtonElement>(null);
+  // An explicit collapse beats the replay's auto-lift until the replay comes
+  // back inside the collapsed window (mirrors `userCollapsed` for groups).
+  const userCollapsedAll = useRef(false);
 
   const filteredSteps = useMemo(
     () =>
@@ -61,6 +71,12 @@ export function TimelineCard({
   );
 
   const rows = useMemo(() => buildRows(filteredSteps), [filteredSteps]);
+
+  // A new filter is a new list: start it collapsed again.
+  useEffect(() => {
+    setShowAll(false);
+    userCollapsedAll.current = false;
+  }, [filter]);
 
   const absoluteTime = replayT0 + currentTime;
 
@@ -97,17 +113,26 @@ export function TimelineCard({
     const out: RenderItem[] = [];
     rows.forEach((row, index) => {
       if (row.kind === "group" && row.steps.length > 1) {
-        out.push({ key: `row-${index}`, row, groupIndex: index });
+        out.push({ key: `row-${index}`, row, groupIndex: index, rowIndex: index });
         if (expanded.has(`row-${index}`)) {
           for (const step of row.steps) {
-            out.push({ key: `${index}-${step.t}`, row: step, sub: true });
+            out.push({
+              key: `${index}-${step.t}`,
+              row: step,
+              sub: true,
+              rowIndex: index,
+            });
           }
         }
       } else if (row.kind === "group") {
         // Singleton interaction groups render as a plain step.
-        out.push({ key: `row-${index}`, row: row.steps[0] as TimelineStep });
+        out.push({
+          key: `row-${index}`,
+          row: row.steps[0] as TimelineStep,
+          rowIndex: index,
+        });
       } else {
-        out.push({ key: `row-${index}`, row });
+        out.push({ key: `row-${index}`, row, rowIndex: index });
       }
     });
     return out;
@@ -125,6 +150,26 @@ export function TimelineCard({
   }
   const activeItem = activeIndex >= 0 ? renderable[activeIndex] : undefined;
 
+  // Collapse is presentation-only and sits on top of the full list: rows,
+  // activeIndex and the rowEls refs all still span the whole timeline, so
+  // follow-scroll keeps working unchanged.
+  const { count: shownCount, hiddenRows } = visibleCount(renderable, showAll);
+  const shown = hiddenRows ? renderable.slice(0, shownCount) : renderable;
+
+  // The replay outruns the collapsed window: lift the cap rather than let the
+  // active row point at an unmounted element, which would strand follow-scroll
+  // for the rest of the pass. Same precedent — and same override rule — as a
+  // group auto-expanding when the replay reaches it: an explicit collapse wins
+  // until the replay comes back inside the collapsed window.
+  useEffect(() => {
+    if (!hiddenRows) return;
+    if (activeIndex < shownCount) {
+      userCollapsedAll.current = false;
+      return;
+    }
+    if (!userCollapsedAll.current) setShowAll(true);
+  }, [hiddenRows, activeIndex, shownCount]);
+
   const { steering, jumpToLatest, cardRef, rowEls } = useTimelineFollow({
     activeIndex,
     isPlaying,
@@ -140,6 +185,25 @@ export function TimelineCard({
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
+    });
+  };
+
+  // Collapsing removes page height above the fold, so the button can end up
+  // off-screen and the page appears to jump. Pull it back into view when that
+  // happens; expanding only ever adds height below, so it needs nothing.
+  const toggleShowAll = () => {
+    if (!showAll) {
+      userCollapsedAll.current = false;
+      setShowAll(true);
+      return;
+    }
+    userCollapsedAll.current = true;
+    setShowAll(false);
+    requestAnimationFrame(() => {
+      const el = disclosureRef.current;
+      if (el && el.getBoundingClientRect().top < 0) {
+        el.scrollIntoView({ block: "center" });
+      }
     });
   };
 
@@ -178,8 +242,12 @@ export function TimelineCard({
       </header>
       {renderable.length ? (
         <ol>
-          {renderable.map(({ key, row, sub, groupIndex }, index) => {
-            const last = index === renderable.length - 1;
+          {shown.map(({ key, row, sub, groupIndex }, index) => {
+            const last = index === shown.length - 1;
+            // Rows revealed by "show more" fade in; the rows that were always
+            // on screen must not re-animate when the cap lifts.
+            const revealed = showAll && index >= COLLAPSED_ROW_LIMIT;
+            const revealIndex = revealed ? index - COLLAPSED_ROW_LIMIT : 0;
             if (sub) {
               return (
                 <SubRow
@@ -189,6 +257,7 @@ export function TimelineCard({
                   active={index === activeIndex}
                   onSeek={onSeek}
                   liRef={attachRef(index)}
+                  reveal={revealed ? revealIndex : undefined}
                 />
               );
             }
@@ -204,6 +273,7 @@ export function TimelineCard({
                   onSeek={onSeek}
                   onToggle={() => toggleGroup(groupIndex as number)}
                   liRef={attachRef(index)}
+                  reveal={revealed ? revealIndex : undefined}
                 />
               );
             }
@@ -216,6 +286,7 @@ export function TimelineCard({
                 active={index === activeIndex}
                 onSeek={onSeek}
                 liRef={attachRef(index)}
+                reveal={revealed ? revealIndex : undefined}
               />
             );
           })}
@@ -225,6 +296,26 @@ export function TimelineCard({
           No events match this filter.
         </p>
       )}
+      {hiddenRows || showAll ? (
+        <div className="mt-3 flex justify-center">
+          <button
+            ref={disclosureRef}
+            type="button"
+            onClick={toggleShowAll}
+            aria-expanded={showAll}
+            className="flex h-9 cursor-pointer items-center gap-2 rounded-sm border border-border-strong bg-background px-3 text-xs font-medium text-foreground transition-colors duration-150 ease-out hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            {showAll ? "Show less" : `Show ${hiddenRows} more`}
+            <ChevronDown
+              className={cn(
+                "size-4 text-muted-foreground transition-transform duration-200 ease-out",
+                showAll && "rotate-180",
+              )}
+              aria-hidden="true"
+            />
+          </button>
+        </div>
+      ) : null}
       {steering && isPlaying && renderable.length ? (
         <div className="pointer-events-none sticky bottom-3 z-10 mt-3 flex justify-center">
           <button

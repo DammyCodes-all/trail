@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRows,
+  COLLAPSE_SLACK,
+  COLLAPSED_ROW_LIMIT,
   dotFor,
   rowTime,
   toneFor,
+  visibleCount,
   type GroupRow,
+  type RenderItem,
 } from "./timeline-rows";
 import type { TimelineStep } from "./timeline";
 
@@ -105,5 +109,85 @@ describe("rowTime", () => {
   it("uses the end of a group and the time of a plain step", () => {
     expect(rowTime({ t: 10, kind: "nav", text: "x" })).toBe(10);
     expect(rowTime({ kind: "group", steps: [step({ t: 0 })], start: 0, end: 500 })).toBe(500);
+  });
+});
+
+// One render item per row, which is what a timeline of plain landmarks emits.
+const items = (rowCount: number): RenderItem[] =>
+  Array.from({ length: rowCount }, (_, index) => ({
+    key: `row-${index}`,
+    row: step({ t: index * 1000, kind: "nav" }),
+    rowIndex: index,
+  }));
+
+describe("visibleCount", () => {
+  it("shows everything when the timeline is within the limit", () => {
+    const all = items(COLLAPSED_ROW_LIMIT);
+    expect(visibleCount(all, false)).toEqual({
+      count: COLLAPSED_ROW_LIMIT,
+      hiddenRows: 0,
+    });
+  });
+
+  it("does not collapse to save only a few rows", () => {
+    const all = items(COLLAPSED_ROW_LIMIT + COLLAPSE_SLACK);
+    expect(visibleCount(all, false).hiddenRows).toBe(0);
+  });
+
+  it("collapses to the limit once the timeline exceeds limit plus slack", () => {
+    const all = items(COLLAPSED_ROW_LIMIT + COLLAPSE_SLACK + 1);
+    expect(visibleCount(all, false)).toEqual({
+      count: COLLAPSED_ROW_LIMIT,
+      hiddenRows: COLLAPSE_SLACK + 1,
+    });
+  });
+
+  it("shows everything when expanded", () => {
+    const all = items(COLLAPSED_ROW_LIMIT * 4);
+    expect(visibleCount(all, true)).toEqual({
+      count: all.length,
+      hiddenRows: 0,
+    });
+  });
+
+  it("never cuts inside an expanded group", () => {
+    // The row at the cap boundary is an expanded group carrying sub rows: the
+    // cut must land before the header, not between its children.
+    const all: RenderItem[] = [
+      ...items(COLLAPSED_ROW_LIMIT - 1),
+      {
+        key: "group",
+        rowIndex: COLLAPSED_ROW_LIMIT - 1,
+        groupIndex: COLLAPSED_ROW_LIMIT - 1,
+        row: {
+          kind: "group",
+          steps: [step({ t: 0 }), step({ t: 100 })],
+          start: 0,
+          end: 100,
+        },
+      },
+      ...[0, 100].map((t) => ({
+        key: `sub-${t}`,
+        rowIndex: COLLAPSED_ROW_LIMIT - 1,
+        sub: true,
+        row: step({ t }),
+      })),
+      ...items(COLLAPSED_ROW_LIMIT * 2).slice(COLLAPSED_ROW_LIMIT),
+    ];
+    const { count } = visibleCount(all, false);
+    // Group header plus both sub rows survive together.
+    expect(count).toBe(COLLAPSED_ROW_LIMIT + 2);
+    expect(all[count - 1]).toMatchObject({ sub: true });
+  });
+
+  it("counts rows rather than rendered items when reporting hidden rows", () => {
+    const all: RenderItem[] = items(COLLAPSED_ROW_LIMIT + COLLAPSE_SLACK + 1).flatMap(
+      (item) => [item, { ...item, key: `${item.key}-sub`, sub: true }],
+    );
+    expect(visibleCount(all, false).hiddenRows).toBe(COLLAPSE_SLACK + 1);
+  });
+
+  it("handles an empty timeline", () => {
+    expect(visibleCount([], false)).toEqual({ count: 0, hiddenRows: 0 });
   });
 });

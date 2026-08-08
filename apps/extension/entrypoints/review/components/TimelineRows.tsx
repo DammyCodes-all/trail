@@ -33,6 +33,23 @@ export const iconByKind = {
   flag: Flag,
 } as const;
 
+// Rows revealed by the timeline's "show more" control fade up on entry. Only
+// the first few stagger: past that the rows are below the fold, where a delay
+// buys nothing and costs frames. `undefined` means "already on screen" and
+// renders with no animation at all.
+const STAGGER_STEP_MS = 30;
+const STAGGER_LIMIT = 6;
+
+export function revealProps(reveal?: number) {
+  if (reveal === undefined) return {};
+  return {
+    "data-reveal": "",
+    style: {
+      animationDelay: `${Math.min(reveal, STAGGER_LIMIT) * STAGGER_STEP_MS}ms`,
+    },
+  };
+}
+
 // Long entries (network failures, console errors) clamp to two lines so the
 // timeline stays scannable; the row's chevron reveals the full text. Overflow
 // is measured while the clamp is applied — scrollHeight includes the lines it
@@ -78,6 +95,7 @@ export function TimelineRow({
   active,
   onSeek,
   liRef,
+  reveal,
 }: {
   step: TimelineStep;
   last: boolean;
@@ -85,6 +103,7 @@ export function TimelineRow({
   active: boolean;
   onSeek: (timestamp: number) => void;
   liRef?: (el: HTMLLIElement | null) => void;
+  reveal?: number;
 }) {
   const Icon = iconByKind[step.kind];
   const tone = toneFor(step);
@@ -105,6 +124,7 @@ export function TimelineRow({
   return (
     <li
       ref={liRef}
+      {...revealProps(reveal)}
       className="relative grid grid-cols-[3.25rem_2.5rem_minmax(0,1fr)] sm:grid-cols-[4rem_2.75rem_minmax(0,1fr)]"
     >
       <span className="pt-3.5 font-mono text-[11px] tabular-nums text-muted-foreground">
@@ -213,6 +233,7 @@ export function GroupRow({
   onSeek,
   onToggle,
   liRef,
+  reveal,
 }: {
   group: GroupRow;
   last: boolean;
@@ -222,6 +243,7 @@ export function GroupRow({
   onSeek: (timestamp: number) => void;
   onToggle: () => void;
   liRef?: (el: HTMLLIElement | null) => void;
+  reveal?: number;
 }) {
   const first = group.steps[0] as TimelineStep;
   const Icon = iconByKind[first.kind];
@@ -229,6 +251,7 @@ export function GroupRow({
   return (
     <li
       ref={liRef}
+      {...revealProps(reveal)}
       className="relative grid grid-cols-[3.25rem_2.5rem_minmax(0,1fr)] sm:grid-cols-[4rem_2.75rem_minmax(0,1fr)]"
     >
       <span className="pt-3.5 font-mono text-[11px] tabular-nums text-muted-foreground">
@@ -300,17 +323,20 @@ export function SubRow({
   active,
   onSeek,
   liRef,
+  reveal,
 }: {
   step: TimelineStep;
   t0: number;
   active: boolean;
   onSeek: (timestamp: number) => void;
   liRef?: (el: HTMLLIElement | null) => void;
+  reveal?: number;
 }) {
   const Icon = iconByKind[step.kind];
   return (
     <li
       ref={liRef}
+      {...revealProps(reveal)}
       className="grid grid-cols-[3.25rem_2.5rem_minmax(0,1fr)] sm:grid-cols-[4rem_2.75rem_minmax(0,1fr)]"
     >
       <span className="pt-2.5 pl-8 font-mono text-[11px] tabular-nums text-muted-foreground sm:pl-10">
