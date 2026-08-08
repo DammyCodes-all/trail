@@ -3,10 +3,11 @@
 //   PUT  /api/replays/upload/<id>   → store the session body
 //   GET  /api/replays/<id>          → session JSON
 //   POST /api/ai/enhance            → proxy a report-enhancement to Groq
+//   POST /api/ai/title              → proxy a title-only completion to Groq
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { put, get, isBlobMode } from "../lib/storage.js";
-import { isAiMode, proxyEnhance } from "../lib/ai-proxy.js";
+import { isAiMode, proxyEnhance, proxyTitle } from "../lib/ai-proxy.js";
 import { aiEnhanceLimiter, tryConsume } from "../lib/rate-limit.js";
 
 const PORT = Number(process.env.REPLAY_PORT ?? 8898);
@@ -75,6 +76,51 @@ async function handleAiEnhance(req, res) {
   json(res, 200, { ok: true, content: upstream.content });
 }
 
+async function handleAiTitle(req, res) {
+  if (!isAiMode()) {
+    json(res, 501, { error: "ai_not_configured" });
+    return;
+  }
+  const allowed = await tryConsume(aiEnhanceLimiter, clientIp(req));
+  if (!allowed.ok) {
+    json(res, 429, {
+      error: "rate_limited",
+      retryAfterSecs: allowed.retryAfterSecs,
+    });
+    return;
+  }
+
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > MAX_AI_BODY) {
+      json(res, 413, { error: "payload_too_large" });
+      return;
+    }
+    chunks.push(chunk);
+  }
+  let body;
+  try {
+    body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    json(res, 400, { error: "invalid_json" });
+    return;
+  }
+  const { digest } = body ?? {};
+  if (typeof digest !== "object" || digest === null) {
+    json(res, 400, { error: "bad_payload" });
+    return;
+  }
+
+  const upstream = await proxyTitle({ digest });
+  if (!upstream.ok) {
+    json(res, upstream.status, { error: upstream.error });
+    return;
+  }
+  json(res, 200, { ok: true, content: upstream.content });
+}
+
 const server = http.createServer(async (req, res) => {
   const path = new URL(req.url, `http://localhost:${PORT}`).pathname;
 
@@ -133,6 +179,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "POST" && path === "/api/ai/enhance") {
     await handleAiEnhance(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && path === "/api/ai/title") {
+    await handleAiTitle(req, res);
     return;
   }
 

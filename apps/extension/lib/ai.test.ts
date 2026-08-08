@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { REPLAY_SERVER_URL } from "./constants";
 import {
   buildSessionDigest,
+  buildTitleDigest,
   generateEnhancements,
+  generateTitle,
 } from "./ai";
 import {
   applyAI,
@@ -290,6 +292,165 @@ describe("buildSessionDigest", () => {
     expect(digest.flags).toHaveLength(5);
     expect(digest.flags.at(-1)?.expected).toBe("note 6");
     expect(digest.flags.some((f) => f.at)).toBe(true);
+  });
+});
+
+describe("buildTitleDigest", () => {
+  it("keeps every flag — the title's strongest signal is never capped", () => {
+    const manyFlags = Array.from({ length: 7 }, (_, i) =>
+      event({ k: "flag", t: 900 + i, expected: `note ${i}` }),
+    );
+    const digest = buildTitleDigest(report, [...events, ...manyFlags], timeline, facts);
+    expect(digest.flags).toHaveLength(7);
+    expect(digest.flags.at(-1)?.expected).toBe("note 6");
+  });
+
+  it("normalizes nav step URLs to host+path (no query strings)", () => {
+    const withNav = [
+      event({ k: "nav", t: 0, reload: false, url: "https://example.com/checkout?token=abc" }),
+      event({ k: "nav", t: 100, reload: true, url: "https://example.com/checkout?token=abc" }),
+      ...events.filter((e) => e.k !== "nav"),
+    ];
+    const digest = buildTitleDigest(report, withNav, buildTimeline(withNav), facts);
+    expect(digest.steps[0]).toBe("Navigate to example.com/checkout");
+    expect(digest.steps[1]).toBe("Reloaded example.com/checkout");
+    expect(JSON.stringify(digest)).not.toContain("token=abc");
+  });
+
+  it("keeps the stack top of console errors and host+path request targets", () => {
+    const withConsole = event({
+      k: "console",
+      t: 900,
+      lv: "error",
+      msg: "TypeError: x is undefined",
+      stack: "at a\nat b\nat c\nat d\nat e\nat f",
+      url: "https://example.com/app?x=1",
+    });
+    const withNet = event({
+      k: "net",
+      t: 950,
+      status: 500,
+      method: "POST",
+      target: "https://example.com/api/order?key=1",
+    });
+    const digest = buildTitleDigest(
+      report,
+      [...events, withConsole, withNet],
+      timeline,
+      facts,
+    );
+    const error = digest.consoleErrors.at(-1);
+    expect(error?.stack?.split("\n")).toHaveLength(5);
+    expect(error?.stack).toContain("at e");
+    expect(error?.stack).not.toContain("at f");
+    expect(error?.page).toBe("/app");
+    const target = digest.failedRequests.at(-1)?.target;
+    expect(target).toBe("example.com/api/order");
+    expect(JSON.stringify(digest)).not.toContain("?x=1");
+    expect(JSON.stringify(digest)).not.toContain("?key=1");
+  });
+
+  it("carries whole-session stats and the page host+path", () => {
+    const digest = buildTitleDigest(report, events, timeline, facts);
+    expect(digest.stats).toMatch(/flagged moments/);
+    expect(digest.stats).toMatch(/1 console errors/);
+    expect(digest.stats).toMatch(/1 failed requests/);
+    expect(digest.environment.page).toBe("example.com");
+    expect(digest.environment.duration).toBeTruthy();
+  });
+
+  it("trims evidence oldest-first to the budget with flags surviving longest", () => {
+    const spam = Array.from({ length: 14 }, (_, i) =>
+      event({ k: "console", t: 900 + i, lv: "error", msg: "m".repeat(900) }),
+    );
+    const flags = Array.from({ length: 3 }, (_, i) =>
+      event({ k: "flag", t: 1900 + i, expected: `note ${i}` }),
+    );
+    const digest = buildTitleDigest(report, [...events, ...spam, ...flags], timeline, facts);
+    const total = digest.consoleErrors.reduce(
+      (sum, c) => sum + c.message.length + c.stack.length,
+      0,
+    );
+    expect(total).toBeLessThanOrEqual(8_200);
+    expect(digest.consoleErrors.length).toBeLessThan(15);
+    expect(digest.flags).toHaveLength(3);
+  });
+
+  it("never includes typed values", () => {
+    const withInput = [
+      ...events,
+      event({ k: "input", t: 800, label: "Email", masked: true, value: "a@b.com" }),
+    ];
+    const digest = buildTitleDigest(report, withInput, buildTimeline(withInput), facts);
+    expect(JSON.stringify(digest)).not.toContain("a@b.com");
+  });
+});
+
+describe("generateTitle (fallback matrix)", () => {
+  const digest = buildTitleDigest(report, events, timeline, facts);
+  const okBody = JSON.stringify({
+    ok: true,
+    content: '```json\n{"title": "Broken checkout"}\n```',
+  });
+
+  const mockFetch = (status: number, body: unknown, error = false) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        if (error) throw new TypeError("network down");
+        return new Response(JSON.stringify(body), { status });
+      }),
+    );
+  };
+
+  it("returns the parsed title on 200", async () => {
+    mockFetch(200, JSON.parse(okBody));
+    const out = await generateTitle(digest);
+    expect(out.ok).toBe(true);
+    expect(out.status).toBe("ready");
+    expect(out.title).toBe("Broken checkout");
+  });
+
+  it("maps 501 to server-off", async () => {
+    mockFetch(501, { error: "ai_not_configured" });
+    const out = await generateTitle(digest);
+    expect(out.ok).toBe(false);
+    expect(out.status).toBe("server-off");
+    expect(out.title).toBeUndefined();
+  });
+
+  it.each([429, 502, 504, 500])("maps %i to unavailable", async (status) => {
+    mockFetch(status, { error: "x" });
+    const out = await generateTitle(digest);
+    expect(out).toEqual({ ok: false, status: "unavailable" });
+  });
+
+  it("maps network failure to unavailable", async () => {
+    mockFetch(0, null, true);
+    const out = await generateTitle(digest);
+    expect(out).toEqual({ ok: false, status: "unavailable" });
+  });
+
+  it("maps an unparseable completion to unavailable", async () => {
+    mockFetch(200, { ok: true, content: "not json" });
+    const out = await generateTitle(digest);
+    expect(out).toEqual({ ok: false, status: "unavailable" });
+  });
+
+  it("maps a completion without a title to unavailable", async () => {
+    mockFetch(200, { ok: true, content: JSON.stringify({ summary: "S" }) });
+    const out = await generateTitle(digest);
+    expect(out).toEqual({ ok: false, status: "unavailable" });
+  });
+
+  it("posts the digest to the replay server title route", async () => {
+    const fetchMock = vi.fn(async () => new Response(okBody, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateTitle(digest);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`${REPLAY_SERVER_URL}/api/ai/title`);
+    const payload = JSON.parse(String(init.body)) as { digest: { stats: string } };
+    expect(payload.digest.stats).toContain("flagged moments");
   });
 });
 

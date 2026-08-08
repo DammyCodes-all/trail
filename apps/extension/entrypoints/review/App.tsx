@@ -24,7 +24,13 @@ import {
 } from "@/lib/templates";
 import { buildTimeline } from "@/lib/timeline";
 import { hashSession, stableShareJson } from "@/lib/share-cache";
-import { buildSessionDigest, generateEnhancements, type AIStatus } from "@/lib/ai";
+import {
+  buildSessionDigest,
+  buildTitleDigest,
+  generateEnhancements,
+  generateTitle,
+  type AIStatus,
+} from "@/lib/ai";
 import { applyAI, type AIResult } from "@/lib/ai-merge";
 import { aiCacheKey, getCachedAIResult, rememberAIResult } from "@/lib/ai-cache";
 import { isShareLink, rememberIncomingShare, shareSession } from "@/lib/share";
@@ -90,6 +96,16 @@ function App() {
   // instead of stacking requests against the upstream's concurrency limit.
   const aiAbortRef = useRef<AbortController | null>(null);
   const titleEditedRef = useRef(false);
+  // Page-load AI title generation: its own state/refs so the enhance run and
+  // the title run never abort each other.
+  const [titleAIState, setTitleAIState] = useState<AIStatus>("idle");
+  const titleGenToken = useRef(0);
+  // Set once the issue-dialog enhance result lands with a title: that title
+  // is repo-aware and wins over the page-load title, whichever resolves last.
+  const enhanceTitleLandedRef = useRef(false);
+  // aiEnabled at seed time: toggling AI off mid-flight stops a late title
+  // from landing.
+  const aiEnabledRef = useRef(true);
   const [sharing, setSharing] = useState<"idle" | "uploading">("idle");
   const [replayLink, setReplayLink] = useState("");
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
@@ -241,9 +257,19 @@ function App() {
 
   // AI title seeds the editable field only while the user hasn't typed — the
   // same guard the repo suggestion uses, so AI never clobbers a mid-edit.
+  // A landed enhance title also wins over a still-pending page-load title.
   useEffect(() => {
-    if (aiResult?.title && !titleEditedRef.current) setTitle(aiResult.title);
+    if (aiResult?.title) {
+      enhanceTitleLandedRef.current = true;
+      if (!titleEditedRef.current) setTitle(aiResult.title);
+    }
   }, [aiResult]);
+
+  // Mirror aiEnabled into a ref: async title/enhance completions read it at
+  // seed time, so toggling AI off mid-flight drops a late result.
+  useEffect(() => {
+    aiEnabledRef.current = aiEnabled;
+  }, [aiEnabled]);
 
   const handleTitleChange = (value: string) => {
     titleEditedRef.current = true;
@@ -304,6 +330,7 @@ function App() {
     w.__trailTemplateState = templateState;
     w.__trailTitle = displayTitle;
     w.__trailAIState = aiState;
+    w.__trailTitleAIState = titleAIState;
     w.__trailReplayLink = replayLink;
     w.__trailReplayTime = currentReplayTime;
   }, [
@@ -315,6 +342,7 @@ function App() {
     templateState,
     displayTitle,
     aiState,
+    titleAIState,
     replayLink,
     currentReplayTime,
     repo,
@@ -515,6 +543,68 @@ function App() {
     facts,
   ]);
 
+  // Page-load AI title: fire once the session is loaded, ahead of any
+  // repo/template context (the title is repo-independent). Cached under the
+  // session hash with an empty repo key, so reopens reuse the generated title
+  // instead of calling the model again — "only generate if one doesn't exist".
+  // The deterministic suggestTitle stays in the field until the call lands;
+  // any failure (off, server without a key, network) keeps it.
+  useEffect(() => {
+    if (loading || !events.length) return;
+    if (!aiEnabled) {
+      setTitleAIState("disabled");
+      return;
+    }
+    const token = ++titleGenToken.current;
+    const controller = new AbortController();
+    const run = async () => {
+      // Cache check first: a cached title lands without ever showing the
+      // generating state, so the skeleton only appears when a call is really
+      // in flight.
+      const key = aiCacheKey(await hashSession(stableShareInput), "");
+      const cached = await getCachedAIResult(key);
+      if (token !== titleGenToken.current) return;
+      if (cached?.title) {
+        if (
+          !titleEditedRef.current &&
+          !enhanceTitleLandedRef.current &&
+          aiEnabledRef.current
+        ) {
+          setTitle(cached.title);
+        }
+        setTitleAIState("ready");
+        return;
+      }
+      setTitleAIState("generating");
+      const summary = report ?? {
+        startedAt: events[0]?.t ?? 0,
+        endedAt: events.at(-1)?.t ?? 0,
+        url: events[0]?.url ?? "",
+      };
+      const digest = buildTitleDigest(summary, events, timeline, facts);
+      const outcome = await generateTitle(digest, controller.signal);
+      if (token !== titleGenToken.current) return;
+      if (outcome.ok && outcome.title) {
+        if (
+          !titleEditedRef.current &&
+          !enhanceTitleLandedRef.current &&
+          aiEnabledRef.current
+        ) {
+          setTitle(outcome.title);
+        }
+        void rememberAIResult(key, { title: outcome.title });
+        setTitleAIState("ready");
+      } else {
+        setTitleAIState(outcome.status);
+      }
+    };
+    void run();
+    return () => {
+      ++titleGenToken.current;
+      controller.abort();
+    };
+  }, [loading, events, aiEnabled, report, stableShareInput, timeline, facts]);
+
   // Upload the session to the replay server and hand back the share link. The
   // pipeline (presign → PUT → probe → cache → in-flight dedupe) lives in
   // lib/share.ts; this component only wires it to state and toasts.
@@ -579,6 +669,7 @@ function App() {
         title={title}
         onTitleChange={handleTitleChange}
         onTitleBlur={persistTitle}
+        titleLoading={titleAIState === "generating"}
         facts={facts}
         counts={counts}
         flags={flags}

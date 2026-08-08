@@ -21,6 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TrailLogo } from "@/components/ui/trail-logo";
 import type { ReportFacts } from "@/lib/facts";
 import { formatDuration } from "@/lib/facts";
@@ -70,6 +71,7 @@ export function IncidentHeader({
   title,
   onTitleChange,
   onTitleBlur,
+  titleLoading = false,
   facts,
   counts,
   flags,
@@ -81,6 +83,10 @@ export function IncidentHeader({
   title: string;
   onTitleChange: (value: string) => void;
   onTitleBlur: () => void;
+  // AI title generation in flight: the editable title is briefly replaced by
+  // a skeleton placeholder (the deterministic title fills the slot on any
+  // failure, so the page never looks empty).
+  titleLoading?: boolean;
   facts: ReportFacts;
   counts: TrailCounts;
   flags: number;
@@ -143,22 +149,29 @@ export function IncidentHeader({
       </div>
 
       <div className="pb-6 pt-8 sm:pb-8 sm:pt-12">
-        <textarea
-          rows={1}
-          className="-ml-1 min-h-11 w-full max-w-5xl resize-none overflow-hidden rounded-sm border border-transparent bg-transparent px-1 py-0.5 font-heading text-[1.75rem] font-semibold leading-[1.1] tracking-normal text-foreground outline-none transition-[background-color,border-color] duration-150 [field-sizing:content] placeholder:text-muted-foreground/60 hover:border-border focus:border-border focus:bg-card sm:text-[2.35rem]"
-          value={title}
-          onChange={(event) => onTitleChange(event.target.value.replace(/\n/g, " "))}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              event.currentTarget.blur();
-            }
-          }}
-          onBlur={onTitleBlur}
-          placeholder="What happened?"
-          spellCheck={false}
-          aria-label="Report title"
-        />
+        {titleLoading ? (
+          <Skeleton
+            className="-ml-1 h-11 w-3/4 min-w-60 max-w-5xl rounded-sm sm:h-13"
+            aria-hidden="true"
+          />
+        ) : (
+          <textarea
+            rows={1}
+            className="-ml-1 min-h-11 w-full max-w-5xl resize-none overflow-hidden rounded-sm border border-transparent bg-transparent px-1 py-0.5 font-heading text-[1.75rem] font-semibold leading-[1.1] tracking-normal text-foreground outline-none transition-[background-color,border-color] duration-150 [field-sizing:content] placeholder:text-muted-foreground/60 hover:border-border focus:border-border focus:bg-card sm:text-[2.35rem]"
+            value={title}
+            onChange={(event) => onTitleChange(event.target.value.replace(/\n/g, " "))}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+            }}
+            onBlur={onTitleBlur}
+            placeholder="What happened?"
+            spellCheck={false}
+            aria-label="Report title"
+          />
+        )}
         <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
           Trail captured the sequence, page context, and runtime failures needed to investigate this incident.
         </p>

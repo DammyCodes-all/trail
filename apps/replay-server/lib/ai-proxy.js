@@ -13,6 +13,10 @@ const MAX_ATTEMPTS = 2; // one retry covers transient 5xx / 429 / empty completi
 // Generous cap for a report JSON (structured summaries + template field
 // values); keeps latency and cost bounded no matter how the model behaves.
 const MAX_TOKENS = 15000;
+// Cap for the title-only call: a one-line JSON title plus reasoning headroom.
+// Reasoning models can spend a small budget before emitting output, so this
+// is deliberately larger than the ~30 output tokens the title actually needs.
+const TITLE_MAX_TOKENS = 1000;
 const TEMPERATURE = 0.3;
 
 // Rough tokens ≈ chars / 4 (English). Used only for the size log line.
@@ -63,33 +67,39 @@ const SYSTEM_PROMPT = [
   "- Only include keys you can fill from the digest; omit empty ones.",
 ].join("\n");
 
-// POST a report digest to Groq and return the model's raw completion text.
-// The extension owns parsing and validation — this is a dumb pipe.
+const TITLE_SYSTEM_PROMPT = [
+  "You are the title writer for TRAIL, a browser extension that turns a captured",
+  "bug reproduction into a maintainer-ready GitHub issue.",
+  "You receive a digest of captured evidence: the page, the step sequence,",
+  "console errors, failed requests, and reporter flags.",
+  "Rules:",
+  "- Produce exactly one JSON object with a single 'title' field.",
+  "- The title is one short line, at most 100 characters, specific enough for a",
+  "  maintainer to act on without opening the report. No Markdown, no quotes,",
+  "  no 'Fix:' or 'Bug:' style prefixes, no trailing punctuation.",
+  "- Digest 'flags' are moments the reporter explicitly marked during recording,",
+  "  with their own words for expected vs actual outcome. They are the most",
+  "  reliable statement of intent: anchor the title on them and prefer the",
+  "  reporter's phrasing.",
+  "- Otherwise anchor on the severest console error or failed request, naming",
+  "  the failing page or action from the steps when available,",
+  "  e.g. 'Checkout fails: POST /api/order returned 500'.",
+  "- With no failure evidence, name the page and the action the reporter was",
+  "  trying to perform, e.g. 'Cannot submit the sign-up form'.",
+  "- Never invent facts that are not in the digest.",
+  "- Return exactly one JSON object. No Markdown, no code fences, no commentary.",
+].join("\n");
+
+// POST a completion payload to Groq and return the model's raw completion
+// text. The extension owns parsing and validation — this is a dumb pipe.
 // Resolves { ok: true, content } on success, { ok: false, status, error }
-// otherwise; never throws.
+// otherwise; never throws. Shared by the full-report enhance call and the
+// title-only call so the retry/backoff/size-log machinery can't drift.
 //
 // No timeout: slow first-token latency is tolerated; the per-IP rate limiter
 // caps abuse. One retry covers transient 5xx, 429 rate limits, and empty
 // completions.
-export async function proxyEnhance({ digest, templates, repo }) {
-  const payload = JSON.stringify({
-    model: MODEL,
-    temperature: TEMPERATURE,
-    max_tokens: MAX_TOKENS,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: JSON.stringify({
-          task: "Write the report enhancements for this captured bug.",
-          repo,
-          digest,
-          templates,
-        }),
-      },
-    ],
-  });
+async function postCompletion(payload) {
   const logSize = () =>
     `payload ${payload.length} chars (~${charsToTokens(payload.length)} tokens)`;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -147,4 +157,48 @@ export async function proxyEnhance({ digest, templates, repo }) {
     }
   }
   return { ok: false, status: 502, error: "upstream_error" };
+}
+
+export async function proxyEnhance({ digest, templates, repo }) {
+  const payload = JSON.stringify({
+    model: MODEL,
+    temperature: TEMPERATURE,
+    max_tokens: MAX_TOKENS,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: JSON.stringify({
+          task: "Write the report enhancements for this captured bug.",
+          repo,
+          digest,
+          templates,
+        }),
+      },
+    ],
+  });
+  return postCompletion(payload);
+}
+
+// Title-only completion: a cheap, focused call for the report page's AI title
+// (no templates, no repo — the title is repo-independent).
+export async function proxyTitle({ digest }) {
+  const payload = JSON.stringify({
+    model: MODEL,
+    temperature: TEMPERATURE,
+    max_tokens: TITLE_MAX_TOKENS,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: TITLE_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: JSON.stringify({
+          task: "Write the title for this captured bug.",
+          digest,
+        }),
+      },
+    ],
+  });
+  return postCompletion(payload);
 }
