@@ -101,6 +101,218 @@ export const overlayStyles = `
     white-space: nowrap;
   }
 
+  .trail-overlay--flagging {
+    width: 300px;
+  }
+
+  .trail-overlay--flagging .trail-overlay__total,
+  .trail-overlay--flagging .trail-overlay__metrics {
+    opacity: 0;
+    max-height: 0;
+    margin-top: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .trail-overlay__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .trail-overlay__flag {
+    position: relative;
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border: 1px solid rgba(255, 138, 31, 0.55);
+    border-radius: 12px;
+    background: rgba(255, 138, 31, 0.12);
+    color: #ffb066;
+    cursor: pointer;
+    padding: 0;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      transform 140ms ease,
+      color 140ms ease;
+  }
+
+  .trail-overlay__flag:hover {
+    background: rgba(255, 138, 31, 0.22);
+    border-color: rgba(255, 138, 31, 0.95);
+    color: #ffd5ab;
+  }
+
+  .trail-overlay__flag:active {
+    transform: translateY(1px);
+  }
+
+  .trail-overlay__flag:focus-visible {
+    outline: 2px solid #ff8a1f;
+    outline-offset: 2px;
+  }
+
+  .trail-overlay__flag--open {
+    background: rgba(255, 138, 31, 0.26);
+    border-color: #ff8a1f;
+    color: #ffe0c2;
+  }
+
+  .trail-overlay__flag-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #ff8a1f;
+    color: #140a00;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 15px;
+    text-align: center;
+  }
+
+  .trail-overlay__form {
+    margin-top: 12px;
+    border-top: 1px solid rgba(255, 138, 31, 0.22);
+    padding-top: 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .trail-overlay__field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .trail-overlay__field label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: rgba(255, 138, 31, 0.85);
+  }
+
+  .trail-overlay__field textarea {
+    appearance: none;
+    resize: none;
+    width: 100%;
+    border: 1px solid rgba(255, 138, 31, 0.28);
+    border-radius: 12px;
+    background: rgba(5, 5, 5, 0.85);
+    color: #f2f4f6;
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.45;
+    padding: 7px 9px;
+    color-scheme: dark;
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .trail-overlay__field textarea::placeholder {
+    color: rgba(242, 244, 246, 0.35);
+  }
+
+  .trail-overlay__field textarea:focus {
+    outline: none;
+    border-color: rgba(255, 138, 31, 0.85);
+    box-shadow: 0 0 0 3px rgba(255, 138, 31, 0.14);
+  }
+
+  .trail-overlay__form-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .trail-overlay__hint {
+    margin-right: auto;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    color: rgba(242, 244, 246, 0.4);
+    white-space: nowrap;
+  }
+
+  .trail-overlay__cancel {
+    appearance: none;
+    border: 1px solid rgba(242, 244, 246, 0.2);
+    background: transparent;
+    color: rgba(242, 244, 246, 0.72);
+    border-radius: 12px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease;
+  }
+
+  .trail-overlay__cancel:hover {
+    background: rgba(242, 244, 246, 0.08);
+    border-color: rgba(242, 244, 246, 0.4);
+  }
+
+  .trail-overlay__cancel:focus-visible,
+  .trail-overlay__submit:focus-visible {
+    outline: 2px solid #ff8a1f;
+    outline-offset: 2px;
+  }
+
+  .trail-overlay__submit {
+    appearance: none;
+    border: 1px solid #ff8a1f;
+    background: linear-gradient(180deg, #ffa045, #ff7a0d);
+    color: #1c0d00;
+    border-radius: 12px;
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(255, 122, 13, 0.35);
+    transition:
+      filter 140ms ease,
+      transform 140ms ease;
+  }
+
+  .trail-overlay__submit:hover {
+    filter: brightness(1.08);
+  }
+
+  .trail-overlay__submit:active {
+    transform: translateY(1px);
+  }
+
+  .trail-overlay__toast {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid rgba(82, 196, 111, 0.35);
+    border-radius: 12px;
+    background: rgba(26, 62, 34, 0.6);
+    color: #7fe09a;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 7px 10px;
+    letter-spacing: 0.02em;
+  }
+
   .trail-overlay__stop {
     appearance: none;
     border: 1px solid rgba(255, 77, 79, 0.58);
@@ -142,6 +354,11 @@ export const overlayStyles = `
     align-items: baseline;
     gap: 7px;
     margin-top: 10px;
+    max-height: 60px;
+    transition:
+      opacity 160ms ease,
+      max-height 160ms ease,
+      margin-top 160ms ease;
   }
 
   .trail-overlay__total [data-slot="sliding-number"] {
@@ -154,10 +371,9 @@ export const overlayStyles = `
 
   .trail-overlay__total > span:last-child {
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: 0.02em;
     color: rgba(255, 138, 31, 0.88);
   }
 
@@ -166,6 +382,11 @@ export const overlayStyles = `
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
     margin-top: 11px;
+    max-height: 60px;
+    transition:
+      opacity 160ms ease,
+      max-height 160ms ease,
+      margin-top 160ms ease;
   }
 
   .trail-overlay__metric {

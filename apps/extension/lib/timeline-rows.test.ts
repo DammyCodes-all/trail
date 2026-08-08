@@ -36,6 +36,10 @@ describe("toneFor", () => {
     expect(toneFor(step({ t: 0, kind: "nav" }))).toBe("neutral");
     expect(toneFor(step({ t: 0, kind: "input" }))).toBe("neutral");
   });
+
+  it("gives reporter flags their own distinct tone", () => {
+    expect(toneFor(step({ t: 0, kind: "flag" }))).toBe("flag");
+  });
 });
 
 describe("dotFor", () => {
@@ -44,6 +48,7 @@ describe("dotFor", () => {
     expect(dotFor(step({ t: 0, kind: "net", status: 500 }))).toBe("error");
     expect(dotFor(step({ t: 0, kind: "net", status: 404 }))).toBe("warn");
     expect(dotFor(step({ t: 0, kind: "click" }))).toBe("neutral");
+    expect(dotFor(step({ t: 0, kind: "flag" }))).toBe("flag");
   });
 });
 
@@ -54,6 +59,15 @@ describe("buildRows", () => {
       step({ t: 1000, kind: "console", level: "warn" }),
       step({ t: 2000, kind: "net", status: 404 }),
     ]);
+    expect(rows.every((row) => row.kind !== "group")).toBe(true);
+  });
+
+  it("keeps reporter flags as landmarks (never grouped)", () => {
+    const rows = buildRows([
+      step({ t: 0, kind: "flag", text: "Flag: it broke" }),
+      step({ t: 500, kind: "flag", text: "Flag: it broke" }),
+    ]);
+    expect(rows).toHaveLength(2);
     expect(rows.every((row) => row.kind !== "group")).toBe(true);
   });
 
