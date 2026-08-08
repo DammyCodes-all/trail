@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { eventWithTime } from "@rrweb/types";
-import { AI_ENABLED_KEY, REPLAY_SERVER_URL, REPO_KEY } from "@/lib/constants";
+import { AI_ENABLED_KEY, REPLAY_SERVER_URL, REPO_HISTORY_KEY } from "@/lib/constants";
 import {
   getAllEvents,
   getReport,
@@ -15,7 +15,7 @@ import {
   buildSections,
   suggestTitle,
 } from "@/lib/report";
-import { suggestRepo, normalizeRepo } from "@/lib/repo";
+import { normalizeRepo, pushRepoHistory } from "@/lib/repo";
 import {
   fetchAllIssueTemplates,
   fetchIssueTemplate,
@@ -69,6 +69,9 @@ function App() {
   // masking is the primary line of defense; this is the permanent backstop.
   const redact = true;
   const [repo, setRepo] = useState("");
+  // Previously-used repos, most recent first — suggestions for the repo field
+  // while typing. The field itself starts empty: no autofill.
+  const [repoHistory, setRepoHistory] = useState<string[]>([]);
   const [template, setTemplate] = useState<IssueTemplate | null>(null);
   const [allTemplates, setAllTemplates] = useState<IssueTemplate[]>([]);
   const [templateState, setTemplateState] = useState<
@@ -96,9 +99,11 @@ function App() {
 
   useEffect(() => {
     void (async () => {
-      const { [REPO_KEY]: savedRepo } =
-        await browser.storage.local.get(REPO_KEY);
-      setRepo(typeof savedRepo === "string" ? savedRepo : "");
+      const { [REPO_HISTORY_KEY]: savedHistory } =
+        await browser.storage.local.get(REPO_HISTORY_KEY);
+      if (Array.isArray(savedHistory)) {
+        setRepoHistory(savedHistory.filter((r): r is string => typeof r === "string"));
+      }
 
       // Shared link mode: fetch the session from the replay server, import it
       // into local history, then hand off to the plain ?report= reopen path —
@@ -175,18 +180,6 @@ function App() {
         if (typeof value === "boolean") setAiEnabled(value);
       });
   }, []);
-
-  // Phase 5: suggest a repo from the recorded pages when the field is empty.
-  // Prefill only — not persisted — so the user can dismiss it by typing.
-  const repoSuggestedOnce = useRef(false);
-  useEffect(() => {
-    if (repo || repoSuggestedOnce.current || !events.length) return;
-    const s = suggestRepo(events.map((e) => e.url));
-    if (s) {
-      repoSuggestedOnce.current = true;
-      setRepo(s);
-    }
-  }, [events, repo]);
 
   const timeline = useMemo(
     () => buildTimeline(events),
@@ -309,7 +302,6 @@ function App() {
     w.__trailAIState = aiState;
     w.__trailReplayLink = replayLink;
     w.__trailReplayTime = currentReplayTime;
-    w.__trailSuggestedRepo = repoSuggestedOnce.current ? repo : null;
   }, [
     timeline,
     rrwebEvents,
@@ -325,9 +317,10 @@ function App() {
     loading,
   ]);
 
-  const setRepoAndSave = (value: string) => {
+  // Typing in the repo field only updates local state. A repo joins the
+  // suggestion history when the user actually opens the issue (see openIssue).
+  const handleRepoChange = (value: string) => {
     setRepo(value);
-    void browser.storage.local.set({ [REPO_KEY]: value });
   };
 
   const copyMarkdown = async () => {
@@ -387,6 +380,11 @@ function App() {
       });
     }
     void browser.tabs.create({ url: issue.url });
+    const used = pushRepoHistory(repoHistory, repo);
+    if (used !== repoHistory) {
+      setRepoHistory(used);
+      void browser.storage.local.set({ [REPO_HISTORY_KEY]: used });
+    }
   };
 
   const handleCreateIssue = () => setIssueDialogOpen(true);
@@ -651,7 +649,8 @@ function App() {
         open={issueDialogOpen}
         onOpenChange={setIssueDialogOpen}
         repo={repo}
-        onRepoChange={setRepoAndSave}
+        onRepoChange={handleRepoChange}
+        repoHistory={repoHistory}
         labels={labels}
         onLabelsChange={setLabels}
         issueReady={!!issue}

@@ -1,53 +1,25 @@
-// Suggest the most likely GitHub repo for a report from the pages it visited.
-// Pure URL heuristics — github.com/owner/repo pages (paths beyond the repo
-// stripped) and GitHub Pages hosts (owner.github.io/repo). A suggestion, never
-// a guarantee: returns null when nothing plausible is found.
+// The repository field is never autofilled: the user types, and TRAIL
+// offers previously-used repos as suggestions. This module keeps that
+// history pure and small — deduped, most-recent-first, capped — plus the
+// canonicalization used everywhere a repo string leaves the field.
 
-const REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+export const REPO_HISTORY_LIMIT = 10;
 
-// Sub-paths of a repo page that still identify the repo itself.
-const REPO_PATHS = new Set([
-  'tree', 'blob', 'issues', 'pull', 'pulls', 'releases', 'wiki', 'actions',
-  'settings', 'labels', 'discussions', 'security', 'projects', 'milestones',
-  'pulse', 'network', 'graphs', 'commits', 'branches', 'tags', 'compare',
-  'code', 'watchers', 'forks', 'stars', 'issues2', 'copy', 'activity',
-]);
+// Push a used repo onto the history: normalized, deduped case-insensitively,
+// most-recent-first, capped. Returns a new array — callers persist it.
+export function pushRepoHistory(history: string[], repo: string): string[] {
+  const norm = normalizeRepo(repo).trim().toLowerCase();
+  if (!norm || !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(norm)) return history;
+  const rest = history.filter((r) => r.toLowerCase() !== norm);
+  return [norm, ...rest].slice(0, REPO_HISTORY_LIMIT);
+}
 
-const parseUrl = (u: string): { host: string; path: string } | null => {
-  try {
-    const parsed = new URL(u);
-    return {
-      host: parsed.host.toLowerCase(),
-      path: parsed.pathname.replace(/^\/+/, '').replace(/\/+$/, ''),
-    };
-  } catch {
-    return null;
-  }
-};
-
-export function suggestRepo(urls: string[]): string | null {
-  for (const u of urls) {
-    const parsed = parseUrl(u);
-    if (!parsed) continue;
-
-    if (parsed.host === 'github.com' || parsed.host.endsWith('.github.com')) {
-      const [owner, repo, ...rest] = parsed.path.split('/');
-      if (!owner || !repo) continue;
-      if (rest.length && !REPO_PATHS.has(rest[0]!)) continue;
-      const candidate = `${owner}/${repo}`;
-      if (REPO_RE.test(candidate)) return candidate;
-      continue;
-    }
-
-    if (parsed.host.endsWith('.github.io')) {
-      const owner = parsed.host.replace(/\.github\.io$/, '');
-      const [repo] = parsed.path.split('/');
-      if (!owner || !repo) continue;
-      const candidate = `${owner}/${repo}`;
-      if (REPO_RE.test(candidate)) return candidate;
-    }
-  }
-  return null;
+// Repos from history that contain the query (case-insensitive, anywhere in
+// the string). History order is preserved: most recent first.
+export function filterRepoHistory(history: string[], query: string): string[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return history;
+  return history.filter((r) => r.toLowerCase().includes(q));
 }
 
 // Accept any of the ways users express a repo: a full GitHub link
@@ -85,5 +57,7 @@ export function normalizeRepo(value: string): string {
   }
 
   candidate = candidate.replace(/\.git$/i, '');
-  return REPO_RE.test(candidate) ? candidate : raw;
+  return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(candidate)
+    ? candidate
+    : raw;
 }

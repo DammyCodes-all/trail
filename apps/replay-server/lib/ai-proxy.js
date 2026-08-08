@@ -10,9 +10,9 @@ const GROQ_BASE =
   process.env.AI_BASE_URL ?? "https://api.groq.com/openai/v1";
 const MODEL = process.env.AI_MODEL ?? "openai/gpt-oss-120b";
 const MAX_ATTEMPTS = 2; // one retry covers transient 5xx / 429 / empty completions
-// Generous cap for a report JSON (~1-2k tokens of output); keeps latency and
-// cost bounded no matter how the model behaves.
-const MAX_TOKENS = 6000;
+// Generous cap for a report JSON (structured summaries + template field
+// values); keeps latency and cost bounded no matter how the model behaves.
+const MAX_TOKENS = 15000;
 const TEMPERATURE = 0.3;
 
 // Rough tokens ≈ chars / 4 (English). Used only for the size log line.
@@ -38,6 +38,11 @@ const SYSTEM_PROMPT = [
   "- Write concise, specific prose a maintainer can act on.",
   "- If the chosen template has a field for describing the issue (e.g. 'Summary',",
   "  'Describe the bug', 'What happened'), put the natural-language summary there.",
+  "- When the templates list is empty (the repo has no issue template), structure",
+  "  the 'summary' field as the industry-standard bug report: **Problem** (one",
+  "  line), **Expected vs Actual** (what should happen vs what actually",
+  "  happened), **Root cause** (only when the digest's evidence supports it),",
+  "  **Impact** (who/what is affected). One or two sentences per label, concise.",
   "- Return exactly one JSON object. No Markdown, no code fences, no commentary.",
   "  Example shape:",
   '  {"title": "short issue title", "summary": "prose",',

@@ -18,7 +18,9 @@ export const MSG_START_RECORDER = 'trail:start-recorder';
 
 // chrome.storage.local keys for persisted preferences
 export const REDACT_KEY = 'trail:autoRedact';
-export const REPO_KEY = 'trail:repo';
+// Previously-used repos, most recent first — offered as suggestions while the
+// user types in the repository field (never autofilled).
+export const REPO_HISTORY_KEY = 'trail:repoHistory';
 // AI report enhancements: opt-out toggle (default on). The Groq API key
 // lives on the replay server — the extension never sees or stores it.
 export const AI_ENABLED_KEY = 'trail:aiEnabled';

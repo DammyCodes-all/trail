@@ -1,33 +1,74 @@
-import { suggestRepo } from '../lib/repo.ts';
+import {
+  filterRepoHistory,
+  normalizeRepo,
+  pushRepoHistory,
+  REPO_HISTORY_LIMIT,
+} from '../lib/repo.ts';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(`ASSERTION FAILED: ${msg}`);
 }
 
-// github.com repo pages, with and without extra path segments.
-assert(suggestRepo(['https://github.com/acme/widget']) === 'acme/widget', 'plain repo page');
-assert(suggestRepo(['https://github.com/acme/widget/tree/main']) === 'acme/widget', 'tree path stripped');
-assert(suggestRepo(['https://github.com/acme/widget/blob/main/src/x.ts']) === 'acme/widget', 'blob path stripped');
-assert(suggestRepo(['https://github.com/acme/widget/issues/12']) === 'acme/widget', 'issues path stripped');
-assert(suggestRepo(['https://www.github.com/acme/widget']) === 'acme/widget', 'www subdomain');
-assert(suggestRepo(['https://github.com/acme/widget-name_2.x']) === 'acme/widget-name_2.x', 'dotted/underscored repo names');
+// normalizeRepo: full links, shorthand, garbage.
+assert(normalizeRepo('https://github.com/acme/widget/issues/3') === 'acme/widget', 'full issue link');
+assert(normalizeRepo('https://github.com/acme/widget') === 'acme/widget', 'full repo link');
+assert(normalizeRepo('https://www.github.com/acme/widget') === 'acme/widget', 'www host');
+assert(normalizeRepo('acme/widget') === 'acme/widget', 'bare owner/repo');
+assert(normalizeRepo('github.com/acme/widget') === 'acme/widget', 'github.com shorthand');
+assert(normalizeRepo('acme/widget.git') === 'acme/widget', 'trailing .git');
+assert(normalizeRepo('https://example.com/acme/widget') === 'https://example.com/acme/widget', 'non-github link untouched');
+assert(normalizeRepo('') === '', 'empty untouched');
+assert(normalizeRepo('not a repo') === 'not a repo', 'garbage untouched');
 
-// Non-repo and invalid inputs.
-assert(suggestRepo(['https://github.com/acme']) === null, 'user profile is not a repo');
-assert(suggestRepo(['https://github.com/']) === null, 'bare github.com');
-assert(suggestRepo(['http://localhost:8899/page1.html', 'https://example.com/']) === null, 'non-github pages');
-assert(suggestRepo([]) === null, 'no urls');
-assert(suggestRepo(['not a url']) === null, 'unparseable urls');
-
-// GitHub Pages.
-assert(suggestRepo(['https://alice.github.io/app']) === 'alice/app', 'github.io with repo');
-assert(suggestRepo(['https://alice.github.io/']) === null, 'github.io without repo');
-assert(suggestRepo(['https://alice.github.io/docs/guide']) === 'alice/docs', 'first path segment as repo');
-
-// First plausible match wins; a later unrelated page doesn't override it.
+// pushRepoHistory: dedupe, order, cap, validation.
 assert(
-  suggestRepo(['http://localhost:8899/page1.html', 'https://github.com/acme/widget', 'https://example.com/']) === 'acme/widget',
-  'first matching page wins',
+  JSON.stringify(pushRepoHistory([], 'Acme/Widget')) === JSON.stringify(['acme/widget']),
+  'normalized on push',
+);
+assert(
+  JSON.stringify(pushRepoHistory(['acme/widget', 'other/app'], 'acme/widget')) ===
+    JSON.stringify(['acme/widget', 'other/app']),
+  're-pushing a known repo does not duplicate',
+);
+assert(
+  JSON.stringify(pushRepoHistory(['acme/widget'], 'ACME/Widget')) ===
+    JSON.stringify(['acme/widget']),
+  'case-insensitive dedupe',
+);
+assert(
+  JSON.stringify(pushRepoHistory(['other/app'], 'acme/widget')) ===
+    JSON.stringify(['acme/widget', 'other/app']),
+  'most recent first',
+);
+assert(
+  pushRepoHistory([], 'not a repo').length === 0,
+  'unrecognized repo rejected',
+);
+const big = Array.from({ length: REPO_HISTORY_LIMIT }, (_, i) => `r${i}/app`);
+assert(pushRepoHistory(big, 'new/app').length === REPO_HISTORY_LIMIT, 'capped at limit');
+assert(
+  JSON.stringify(pushRepoHistory(big, 'new/app')) ===
+    JSON.stringify(['new/app', 'r0/app', 'r1/app', 'r2/app', 'r3/app', 'r4/app', 'r5/app', 'r6/app', 'r7/app', 'r8/app']),
+  'newest pushed in, oldest dropped',
+);
+
+// filterRepoHistory: substring, case-insensitive, empty query = everything.
+const hist = ['acme/widget', 'acme/other', 'other/app'];
+assert(
+  JSON.stringify(filterRepoHistory(hist, 'acme')) === JSON.stringify(['acme/widget', 'acme/other']),
+  'substring match keeps history order',
+);
+assert(
+  JSON.stringify(filterRepoHistory(hist, 'WIDGET')) === JSON.stringify(['acme/widget']),
+  'case-insensitive query',
+);
+assert(
+  JSON.stringify(filterRepoHistory(hist, 'zzz')) === JSON.stringify([]),
+  'no matches',
+);
+assert(
+  JSON.stringify(filterRepoHistory(hist, '')) === JSON.stringify(hist),
+  'empty query returns all',
 );
 
 console.log('REPO SPIKE PASS');

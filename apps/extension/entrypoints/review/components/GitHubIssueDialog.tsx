@@ -1,3 +1,5 @@
+import { useMemo, useState } from "react";
+import { Combobox } from "@base-ui/react/combobox";
 import { Check, Info, Loader2, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import type { IssueTemplate } from "@/lib/templates";
 import type { AIStatus } from "@/lib/ai";
+import { filterRepoHistory } from "@/lib/repo";
 
 // Static explanation of what the AI pass sends and never sees. Shown on
 // hover of the info icon; the digest is built from console messages, failed
@@ -43,6 +46,7 @@ export function GitHubIssueDialog({
   onOpenChange,
   repo,
   onRepoChange,
+  repoHistory,
   labels,
   onLabelsChange,
   issueReady,
@@ -58,6 +62,7 @@ export function GitHubIssueDialog({
   onOpenChange: (open: boolean) => void;
   repo: string;
   onRepoChange: (value: string) => void;
+  repoHistory: string[];
   labels: string;
   onLabelsChange: (value: string) => void;
   issueReady: boolean;
@@ -69,6 +74,16 @@ export function GitHubIssueDialog({
   reportTooLong: boolean;
   onOpenIssue: () => void;
 }) {
+  // Suggestion popup for the repository field: opens as the user types and
+  // offers previously-used repos. The field itself is never autofilled.
+  const [repoPopupOpen, setRepoPopupOpen] = useState(false);
+  const repoMatches = useMemo(
+    () => filterRepoHistory(repoHistory, repo),
+    [repoHistory, repo],
+  );
+  const showRepoPopup =
+    repoPopupOpen && repo.trim().length > 0 && repoMatches.length > 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -82,15 +97,52 @@ export function GitHubIssueDialog({
         <div className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="trail-repo">Repository</Label>
-            <Input
-              id="trail-repo"
-              className="repo font-mono"
-              placeholder="https://github.com/acme/widget"
+            <Combobox.Root
+              open={showRepoPopup}
+              onOpenChange={setRepoPopupOpen}
+              inputValue={repo}
+              onInputValueChange={(value) => {
+                onRepoChange(value ?? "");
+                setRepoPopupOpen(true);
+              }}
               value={repo}
-              onChange={(event) => onRepoChange(event.target.value)}
-              spellCheck={false}
-              autoComplete="off"
-            />
+              onValueChange={(value) =>
+                onRepoChange(typeof value === "string" ? value : "")
+              }
+              autoHighlight
+            >
+              <Combobox.Input
+                id="trail-repo"
+                className="repo h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 font-mono text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
+                placeholder="https://github.com/acme/widget"
+                spellCheck={false}
+                autoComplete="off"
+                onFocus={() => repo.trim() && setRepoPopupOpen(true)}
+              />
+              {showRepoPopup && (
+                <Combobox.Portal>
+                  <Combobox.Positioner
+                    sideOffset={4}
+                    className="z-[60]"
+                    align="start"
+                  >
+                    <Combobox.Popup className="w-[var(--anchor-width)] rounded-lg border border-border-strong bg-popover p-1 text-popover-foreground shadow-2xl shadow-black/50 outline-none">
+                      <Combobox.List>
+                        {repoMatches.map((r) => (
+                          <Combobox.Item
+                            key={r}
+                            value={r}
+                            className="flex min-h-8 cursor-default items-center gap-2 rounded-md px-2.5 py-1 font-mono text-sm outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                          >
+                            {r}
+                          </Combobox.Item>
+                        ))}
+                      </Combobox.List>
+                    </Combobox.Popup>
+                  </Combobox.Positioner>
+                </Combobox.Portal>
+              )}
+            </Combobox.Root>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="trail-labels">Labels <span className="font-normal text-muted-foreground">(optional)</span></Label>
