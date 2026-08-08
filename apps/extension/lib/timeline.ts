@@ -1,3 +1,4 @@
+import { foldRepeatedConsoles, type FoldedConsole } from './fold.ts';
 import type { StoredEvent } from './types.ts';
 
 export type StepKind = 'nav' | 'click' | 'input' | 'console' | 'net' | 'flag';
@@ -10,14 +11,18 @@ export interface TimelineStep {
   status?: number;
   // true when the typed value is hidden (masked at capture, or by the redaction backstop)
   masked?: boolean;
+  // how many times a repeated console message fired (set when folding kicked in)
+  count?: number;
 }
 
 // Reduce captured events to a chronological, human-readable play-by-play. The same
 // list feeds the on-screen timeline and the report's "Steps to Reproduce".
 export function buildTimeline(events: StoredEvent[], redact = true): TimelineStep[] {
-  const nonRrweb = events
-    .filter((e) => e.k !== 'rrweb')
-    .sort((a, b) => a.t - b.t);
+  const nonRrweb = foldRepeatedConsoles(
+    events
+      .filter((e) => e.k !== 'rrweb')
+      .sort((a, b) => a.t - b.t),
+  );
 
   const steps: TimelineStep[] = [];
   let lastUrl = '';
@@ -59,9 +64,18 @@ export function buildTimeline(events: StoredEvent[], redact = true): TimelineSte
         });
         break;
       }
-      case 'console':
-        steps.push({ t: e.t, kind: 'console', level: e.lv, text: `Console ${e.lv}: ${e.msg}` });
+      case 'console': {
+        const step: TimelineStep = {
+          t: e.t,
+          kind: 'console',
+          level: e.lv,
+          text: `Console ${e.lv}: ${e.msg}`,
+        };
+        const count = (e as FoldedConsole).count;
+        if (count > 1) step.count = count;
+        steps.push(step);
         break;
+      }
       case 'net':
         steps.push({
           t: e.t,

@@ -27,6 +27,12 @@ const PAGE2 = `<!doctype html>
   <a href="/page1.html">Back</a>
   <script>
     console.error('page2 load error: payment gateway unreachable');
+    // A KaTeX-style warning burst (deny-listed at capture) and a generic
+    // repeated warning (folds into one timeline row) fire 3x each.
+    for (var i = 0; i < 3; i++) {
+      console.warn("LaTeX-incompatible input and strict mode is set to 'warn': In LaTeX, \\ or \\newline does nothing in display mode [newLineInDisplayMode]");
+      console.warn('throttled api');
+    }
     window.__pay = function () {
       console.error('simulated payment failure');
       fetch('/fail', { headers: { 'Authorization': 'Bearer hunter2' } }).catch(function () {});

@@ -1,5 +1,6 @@
 import { buildReportFacts, formatDuration } from './facts.ts';
 import { isBeaconTarget, isFailedRequest } from './summary.ts';
+import { foldRepeatedConsoles, type FoldedConsole } from './fold.ts';
 import { buildTimeline } from './timeline.ts';
 import { formatElapsedTime } from './time.ts';
 import type { StoredEvent, TrailReport } from './types.ts';
@@ -168,7 +169,9 @@ export function buildSections(
   const actions = timeline.filter((s) => s.kind === 'nav' || s.kind === 'click' || s.kind === 'input');
   const steps = actions.map((s, i) => `${i + 1}. ${s.text}`).join('\n');
 
-  const consoles = events.filter((e) => e.k === 'console');
+  const consoles = foldRepeatedConsoles(events).filter(
+    (e): e is FoldedConsole => e.k === 'console',
+  );
   const nets = events.filter(isFailedNet);
 
   // Reporter flags: each flag is its own moment. Bullets carry the time offset
@@ -221,7 +224,10 @@ export function buildSections(
                 e.k === 'console' &&
                 (e.stack ?? '').split('\n').slice(0, 10).join('\n').trim()
               ) || '';
-              const first = `- \`${e.lv}\` at ${pathOf(e.url)}: ${e.msg || 'Console error'}`;
+              // Repeated identical messages fold into one bullet with a count,
+              // so a noisy loop can't write the same line a hundred times.
+              const repeat = e.count > 1 ? ` (×${e.count})` : '';
+              const first = `- \`${e.lv}\` at ${pathOf(e.url)}: ${e.msg || 'Console error'}${repeat}`;
               return stack ? `${first}\n\n${fenced(stack)}` : first;
             })
             .join('\n')

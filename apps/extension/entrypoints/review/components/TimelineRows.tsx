@@ -167,7 +167,14 @@ export function TimelineRow({
               tone === "neutral" && !isNavigation && "text-foreground/85",
             )}
           />
-          {status ? (
+          {step.count && step.count > 1 ? (
+            <span
+              title={`${step.count} occurrences`}
+              className="mt-1 rounded-sm bg-muted px-2 py-0.5 font-mono text-[10px] font-medium text-muted-foreground"
+            >
+              ×{step.count}
+            </span>
+          ) : status ? (
             <span className="pt-0.5 font-mono text-xs font-semibold text-destructive">
               {status}
             </span>

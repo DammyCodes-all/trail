@@ -141,6 +141,33 @@ describe("buildSections", () => {
     expect(consoleSection?.text).toContain("- `error` at /: boom\n\n```\nTypeError: boom\n    at a (x.js:1:1)\n```");
   });
 
+  it("folds repeated identical console messages into one bullet with a count", () => {
+    const repeated = Array.from({ length: 100 }, (_, i) =>
+      event({ k: "console", t: 600 + i, lv: "warn", msg: "throttled api" }),
+    );
+    const sections = buildSections(report, repeated, { redact: true });
+    const consoleSection = sections.find((s) => s.name === "Console Errors");
+    const bullets = consoleSection!.text
+      .split("\n")
+      .filter((l) => l.startsWith("- "));
+    expect(bullets).toHaveLength(1);
+    expect(bullets[0]).toBe("- `warn` at /: throttled api (×100)");
+  });
+
+  it("does not fold identical messages that differ by level or page", () => {
+    const mixed = [
+      event({ k: "console", t: 600, lv: "warn", msg: "same" }),
+      event({ k: "console", t: 610, lv: "error", msg: "same" }),
+      event({ k: "console", t: 620, url: "https://other.example", lv: "warn", msg: "same" }),
+    ];
+    const sections = buildSections(report, mixed, { redact: true });
+    const consoleSection = sections.find((s) => s.name === "Console Errors");
+    const bullets = consoleSection!.text
+      .split("\n")
+      .filter((l) => l.startsWith("- "));
+    expect(bullets).toHaveLength(3);
+  });
+
   it("collapses a large Failed Requests list behind a details toggle, keeps small ones plain", () => {
     const many = Array.from({ length: 8 }, (_, i) =>
       event({ k: "net", t: 700 + i, status: 500, method: "GET", target: `/api/fail/${i}` }),

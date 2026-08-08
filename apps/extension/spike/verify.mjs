@@ -357,6 +357,19 @@ function main() {
         ),
         'typing in the overlay flag form is never captured as an input event',
       );
+      // Noise control: the KaTeX-style warnings are deny-listed at capture
+      // (zero events), while a generic repeated warning stays captured raw and
+      // is folded later by the timeline/report layers.
+      assert(
+        !s1.some(
+          (e) => e.k === 'console' && e.msg.includes('LaTeX-incompatible'),
+        ),
+        'KaTeX-style warnings are filtered at capture',
+      );
+      assert(
+        s1.filter((e) => e.k === 'console' && e.msg === 'throttled api').length === 3,
+        'generic repeated warnings stay captured (folding is presentation-layer)',
+      );
       console.log('SPIKE 1 PASS');
 
       // Phase 3: stopping auto-opens the review tab with replay + timeline + export.
@@ -400,6 +413,15 @@ function main() {
           (s) => s.kind === 'flag' && s.text.includes('Total shows $9.98'),
         ),
         'review timeline shows the reporter flag as its own in-lane marker',
+      );
+      const throttledSteps = reviewHooks.timeline.filter((s) =>
+        s.text.includes('throttled api'),
+      );
+      assert(throttledSteps.length === 1, 'repeated warnings fold into one timeline step');
+      assert(throttledSteps[0].count === 3, 'folded step carries the repeat count');
+      assert(
+        reviewHooks.timeline.every((s) => !s.text.includes('LaTeX')),
+        'deny-listed warnings never reach the review timeline',
       );
       // AI enhancements must not fire on review load: no dialog, no repo, no
       // template — the enhancement call runs only at submission time.
@@ -466,12 +488,23 @@ function main() {
         !reviewHooks.markdown.includes('## Flagged moments'),
         'report has no banner flagged-moments section',
       );
+      assert(
+        reviewHooks.markdown.includes(
+          '- `warn` at /page2.html: throttled api (×3)',
+        ),
+        'report folds repeated warnings into one counted bullet',
+      );
+      assert(
+        !reviewHooks.markdown.includes('LaTeX'),
+        'deny-listed warnings never reach the report',
+      );
       const incidentUi = await review.evaluate(() => ({
         text: document.body.innerText,
         repoVisible: !!document.querySelector('.repo'),
         title: window.__trailTitle,
       }));
       assert(!incidentUi.text.includes('High severity'), 'review omits the severity label');
+      assert(incidentUi.text.includes('×3'), 'folded console row shows the repeat-count chip');
       assert(incidentUi.text.includes('Evidence timeline'), 'review leads with chronological evidence');
       assert(incidentUi.text.includes('Session replay'), 'review shows the session replay');
       assert(incidentUi.text.includes('Network') && incidentUi.text.includes('Console'), 'review exposes grouped runtime evidence');
