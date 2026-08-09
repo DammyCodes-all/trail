@@ -26,8 +26,9 @@ export const REDACT_KEY = 'trail:autoRedact';
 // Previously-used repos, most recent first — offered as suggestions while the
 // user types in the repository field (never autofilled).
 export const REPO_HISTORY_KEY = 'trail:repoHistory';
-// AI report enhancements: opt-out toggle (default on). The Groq API key
-// lives on the replay server — the extension never sees or stores it.
+// AI report enhancements: opt-out toggle (default on). The API keys
+// (OpenRouter for the report pass, Groq for the title pass) live on the
+// replay server — the extension never sees or stores them.
 export const AI_ENABLED_KEY = 'trail:aiEnabled';
 // chrome.storage.local key for the AI-result cache (session hash + repo →
 // AI result). Re-opening the same session reuses the cached enhancement so a

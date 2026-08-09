@@ -2,12 +2,18 @@
 //   POST /api/replays/presign       → { id, uploadUrl } (uploads via PUT)
 //   PUT  /api/replays/upload/<id>   → store the session body
 //   GET  /api/replays/<id>          → session JSON
-//   POST /api/ai/enhance            → proxy a report-enhancement to Groq
+//   POST /api/ai/enhance            → proxy a report-enhancement to OpenRouter
 //   POST /api/ai/title              → proxy a title-only completion to Groq
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { put, get, isBlobMode } from "../lib/storage.js";
-import { isAiMode, proxyEnhance, proxyTitle } from "../lib/ai-proxy.js";
+import {
+  isAiMode,
+  isGroqConfigured,
+  isOpenRouterConfigured,
+  proxyEnhance,
+  proxyTitle,
+} from "../lib/ai-proxy.js";
 import { aiEnhanceLimiter, tryConsume } from "../lib/rate-limit.js";
 
 const PORT = Number(process.env.REPLAY_PORT ?? 8898);
@@ -27,7 +33,7 @@ const clientIp = (req) =>
   "unknown";
 
 async function handleAiEnhance(req, res) {
-  if (!isAiMode()) {
+  if (!isOpenRouterConfigured()) {
     json(res, 501, { error: "ai_not_configured" });
     return;
   }
@@ -77,7 +83,7 @@ async function handleAiEnhance(req, res) {
 }
 
 async function handleAiTitle(req, res) {
-  if (!isAiMode()) {
+  if (!isGroqConfigured()) {
     json(res, 501, { error: "ai_not_configured" });
     return;
   }

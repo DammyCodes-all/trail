@@ -1,9 +1,9 @@
-// POST /api/ai/enhance → proxy a report-enhancement call to Groq.
+// POST /api/ai/enhance → proxy a report-enhancement call to OpenRouter.
 // Thin route: validate the body, rate-limit per IP, delegate to the shared
 // proxy (lib/ai-proxy.js), map errors. The extension owns parsing and the
 // deterministic fallback — the server never inspects report content.
 
-import { isAiMode, proxyEnhance } from "../../lib/ai-proxy.js";
+import { isOpenRouterConfigured, proxyEnhance } from "../../lib/ai-proxy.js";
 import { aiEnhanceLimiter, tryConsume } from "../../lib/rate-limit.js";
 
 export const config = { runtime: "nodejs" };
@@ -15,7 +15,7 @@ const clientIp = (request: Request): string =>
   "unknown";
 
 export async function POST(request: Request): Promise<Response> {
-  if (!isAiMode()) {
+  if (!isOpenRouterConfigured()) {
     return Response.json({ error: "ai_not_configured" }, { status: 501 });
   }
 
