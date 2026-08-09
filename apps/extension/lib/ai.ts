@@ -10,6 +10,7 @@
 
 import { REPLAY_SERVER_URL } from './constants.ts';
 import { formatDuration, type ReportFacts } from './facts.ts';
+import { foldRepeatedConsoles } from './fold.ts';
 import { isBeaconTarget, isFailedRequest } from './summary.ts';
 import type { TimelineStep } from './timeline.ts';
 import type { IssueTemplate } from './templates.ts';
@@ -63,6 +64,10 @@ export interface SessionDigest {
     trail: string;
     recorded: string;
   };
+  // Whole-session counts (folded consoles, beacon-filtered failed requests) so
+  // the model can weigh the failure type even when per-evidence arrays were
+  // trimmed by the budget — the same guarantee the title digest's stats line.
+  stats: string;
   steps: string[];
   consoleErrors: Array<{ level: string; page: string; message: string; stack: string }>;
   failedRequests: Array<{ method: string; target: string; status: number; error: string; body: string }>;
@@ -70,13 +75,6 @@ export interface SessionDigest {
   // outcome. High-signal intent — see the proxy's SYSTEM_PROMPT for how the
   // model is told to treat them.
   flags: Array<{ at: string; expected?: string; actual?: string }>;
-  templates: Array<{
-    filename: string;
-    name: string;
-    about?: string;
-    labels?: string[];
-    fields: Array<{ id: string; label: string }>;
-  }>;
   repo?: string;
   note?: string;
 }
@@ -113,12 +111,15 @@ export function buildSessionDigest(
   events: StoredEvent[],
   timeline: TimelineStep[],
   facts: ReportFacts,
-  templates: IssueTemplate[],
   repo?: string,
 ): SessionDigest {
+  // Steps are scrubbed like the title digest: nav URLs become host+path so
+  // query-string tokens and session ids never reach the model.
   const steps = timeline
     .filter((s) => s.kind === 'nav' || s.kind === 'click' || s.kind === 'input')
-    .map((s) => truncate(s.text, MAX_STEP_CHARS))
+    .map((s) =>
+      truncate(s.kind === 'nav' ? navStepText(s.text) : s.text, MAX_STEP_CHARS),
+    )
     .slice(-40);
 
   const consoles = events
@@ -146,6 +147,18 @@ export function buildSessionDigest(
       error: e.err ?? '',
       body: e.body ? truncate(e.body, MAX_BODY_CHARS) : '',
     }));
+
+  // Whole-session counts behind the trimmed arrays: folded consoles (a noisy
+  // loop is one error, not a hundred) and beacon-filtered failed requests, so
+  // the numbers match the evidence the model actually sees.
+  const foldedErrors = foldRepeatedConsoles(events).filter(
+    (e) => e.k === 'console' && e.lv === 'error',
+  ).length;
+  const failedCount = events.filter(
+    (e) => e.k === 'net' && isFailedRequest(e.status) && !isBeaconTarget(e.target),
+  ).length;
+  const flagCount = events.filter((e) => e.k === 'flag').length;
+  const stats = `${flagCount} flagged moments · ${foldedErrors} console errors · ${failedCount} failed requests in ${formatDuration(facts.durationMs)}`;
 
   // Reporter flags: the user's own expected/actual notes, offset like the
   // timeline so the model can anchor them to the surrounding steps. Last five
@@ -196,17 +209,11 @@ export function buildSessionDigest(
       trail: facts.extensionVersion,
       recorded: new Date(report?.startedAt ?? Date.now()).toISOString(),
     },
+    stats,
     steps,
     consoleErrors: consoles,
     failedRequests: nets,
     flags,
-    templates: templates.map((t) => ({
-      filename: t.filename,
-      name: t.name,
-      about: t.about,
-      labels: t.labels,
-      fields: t.fields,
-    })),
     repo,
     ...(note ? { note } : {}),
   };
@@ -325,17 +332,26 @@ export function buildTitleDigest(
 // POST the digest to the replay server's AI proxy. Any failure — network,
 // timeout, server without a key, upstream error, unparseable completion —
 // resolves to a status the caller maps straight into the fallback matrix.
+// `chosenTemplate` is the exact template the review page will shape the issue
+// onto; the server tells the model to map onto it, so its field values are
+// never silently discarded.
 export async function generateEnhancements(
   digest: SessionDigest,
   templates: IssueTemplate[],
   repo: string,
+  chosenTemplate: IssueTemplate | null,
   signal?: AbortSignal,
 ): Promise<EnhanceOutcome> {
   try {
     const res = await fetch(`${REPLAY_SERVER_URL}/api/ai/enhance`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ digest, templates, repo }),
+      body: JSON.stringify({
+        digest,
+        templates,
+        repo,
+        ...(chosenTemplate ? { chosenTemplate } : {}),
+      }),
       signal,
     });
     if (res.status === 501) return { ok: false, status: 'server-off' };

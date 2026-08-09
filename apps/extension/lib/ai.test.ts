@@ -113,7 +113,7 @@ describe("sanitizeAIResult", () => {
         labels: Array.from({ length: 30 }, (_, i) => `l${i}`),
       }),
     );
-    expect(out?.title?.length).toBe(120);
+    expect(out?.title?.length).toBe(100);
     expect(out?.steps?.length).toBe(50);
     expect(out?.labels?.length).toBe(20);
   });
@@ -227,7 +227,7 @@ describe("shapeSections with Summary (fallback parity)", () => {
 
 describe("buildSessionDigest", () => {
   it("keeps the timeline, environment, and evidence within caps", () => {
-    const digest = buildSessionDigest(report, events, timeline, facts, []);
+    const digest = buildSessionDigest(report, events, timeline, facts);
     expect(digest.steps.some((s) => s.includes("Submit"))).toBe(true);
     expect(digest.environment.browser).toBeTruthy();
     expect(digest.consoleErrors).toHaveLength(1);
@@ -236,7 +236,7 @@ describe("buildSessionDigest", () => {
 
   it("truncates long bodies", () => {
     const long = event({ k: "net", t: 700, status: 500, method: "GET", target: "/api/long", body: "z".repeat(3000) });
-    const digest = buildSessionDigest(report, [...events, long], timeline, facts, []);
+    const digest = buildSessionDigest(report, [...events, long], timeline, facts);
     const body = digest.failedRequests.find((r) => r.target === "/api/long")?.body;
     expect(body?.length).toBeLessThanOrEqual(1512);
     expect(body).toContain("(truncated)");
@@ -249,7 +249,7 @@ describe("buildSessionDigest", () => {
         event({ k: "console", t: 900 + i, lv: "error", msg: "m".repeat(900) }),
       ),
     ];
-    const digest = buildSessionDigest(report, many, timeline, facts, []);
+    const digest = buildSessionDigest(report, many, timeline, facts);
     const total = digest.consoleErrors.reduce(
       (sum, c) => sum + c.message.length + c.stack.length,
       0,
@@ -259,16 +259,40 @@ describe("buildSessionDigest", () => {
   });
 
   it("never includes typed values (timeline is redacted)", () => {
-    const digest = buildSessionDigest(report, events, timeline, facts, []);
+    const digest = buildSessionDigest(report, events, timeline, facts);
     const joined = JSON.stringify(digest);
     expect(joined).not.toContain("a@b.com");
   });
 
-  it("includes the repo and parsed templates", () => {
-    const digest = buildSessionDigest(report, events, timeline, facts, [MARKDOWN_TEMPLATE], "acme/widget");
+  it("keeps the repo; templates travel in the payload, not the digest", () => {
+    const digest = buildSessionDigest(report, events, timeline, facts, "acme/widget");
     expect(digest.repo).toBe("acme/widget");
-    expect(digest.templates[0]?.filename).toBe("bug_report.md");
-    expect(digest.templates[0]?.fields[0]).toEqual({ id: "describe-the-bug", label: "Describe the bug" });
+    expect("templates" in digest).toBe(false);
+  });
+
+  it("normalizes nav step URLs to host+path (no query strings)", () => {
+    const withNav = [
+      event({ k: "nav", t: 0, reload: false, url: "https://example.com/checkout?token=abc" }),
+      ...events.filter((e) => e.k !== "nav"),
+    ];
+    const digest = buildSessionDigest(report, withNav, buildTimeline(withNav), facts);
+    expect(digest.steps.some((s) => s.includes("token=abc"))).toBe(false);
+    expect(digest.steps.some((s) => s.includes("Navigate to example.com/checkout"))).toBe(true);
+    expect(JSON.stringify(digest)).not.toContain("token=abc");
+  });
+
+  it("counts stats post-fold and beacon-free, matching the arrays the model sees", () => {
+    const noisy = [
+      ...events,
+      event({ k: "console", t: 900, lv: "error", msg: "loop boom" }),
+      event({ k: "console", t: 950, lv: "error", msg: "loop boom" }),
+      event({ k: "console", t: 1000, lv: "error", msg: "loop boom" }),
+      event({ k: "net", t: 1100, status: 404, method: "GET", target: "https://analytics.example.com/collect" }),
+    ];
+    const digest = buildSessionDigest(report, noisy, buildTimeline(noisy), facts);
+    expect(digest.stats).toMatch(/2 console errors/);
+    expect(digest.stats).toMatch(/1 failed requests/);
+    expect(digest.stats).toMatch(/flagged moments/);
   });
 
   it("carries reporter flags with time offsets and notes", () => {
@@ -276,7 +300,7 @@ describe("buildSessionDigest", () => {
       ...events,
       event({ k: "flag", t: 900, expected: "Cart keeps items", actual: "Cart empties" }),
     ];
-    const digest = buildSessionDigest(report, flagged, timeline, facts, []);
+    const digest = buildSessionDigest(report, flagged, timeline, facts);
     expect(digest.flags).toEqual([
       { at: "00:00", expected: "Cart keeps items", actual: "Cart empties" },
     ]);
@@ -288,7 +312,7 @@ describe("buildSessionDigest", () => {
         event({ k: "flag", t: 900 + i, expected: `note ${i}` }),
       ),
     ];
-    const digest = buildSessionDigest(report, manyFlags, timeline, facts, []);
+    const digest = buildSessionDigest(report, manyFlags, timeline, facts);
     expect(digest.flags).toHaveLength(5);
     expect(digest.flags.at(-1)?.expected).toBe("note 6");
     expect(digest.flags.some((f) => f.at)).toBe(true);
@@ -455,7 +479,7 @@ describe("generateTitle (fallback matrix)", () => {
 });
 
 describe("generateEnhancements (fallback matrix)", () => {
-  const digest = buildSessionDigest(report, events, timeline, facts, []);
+  const digest = buildSessionDigest(report, events, timeline, facts);
   const okBody = JSON.stringify({ ok: true, content: JSON.stringify({ title: "T", summary: "S" }) });
 
   const mockFetch = (status: number, body: unknown, error = false) => {
@@ -470,7 +494,7 @@ describe("generateEnhancements (fallback matrix)", () => {
 
   it("returns the parsed result on 200", async () => {
     mockFetch(200, JSON.parse(okBody));
-    const out = await generateEnhancements(digest, [], "a/b");
+    const out = await generateEnhancements(digest, [], "a/b", null);
     expect(out.ok).toBe(true);
     expect(out.status).toBe("ready");
     expect(out.result?.title).toBe("T");
@@ -478,38 +502,52 @@ describe("generateEnhancements (fallback matrix)", () => {
 
   it("maps 501 to server-off", async () => {
     mockFetch(501, { error: "ai_not_configured" });
-    const out = await generateEnhancements(digest, [], "a/b");
+    const out = await generateEnhancements(digest, [], "a/b", null);
     expect(out.ok).toBe(false);
     expect(out.status).toBe("server-off");
   });
 
   it.each([429, 502, 504, 500])("maps %i to unavailable", async (status) => {
     mockFetch(status, { error: "x" });
-    const out = await generateEnhancements(digest, [], "a/b");
+    const out = await generateEnhancements(digest, [], "a/b", null);
     expect(out).toEqual({ ok: false, status: "unavailable" });
   });
 
   it("maps network failure to unavailable", async () => {
     mockFetch(0, null, true);
-    const out = await generateEnhancements(digest, [], "a/b");
+    const out = await generateEnhancements(digest, [], "a/b", null);
     expect(out).toEqual({ ok: false, status: "unavailable" });
   });
 
   it("maps an unparseable completion to unavailable", async () => {
     mockFetch(200, { ok: true, content: "not json" });
-    const out = await generateEnhancements(digest, [], "a/b");
+    const out = await generateEnhancements(digest, [], "a/b", null);
     expect(out).toEqual({ ok: false, status: "unavailable" });
   });
 
-  it("posts to the replay server AI route", async () => {
+  it("posts to the replay server AI route with template list and chosen template", async () => {
     const fetchMock = vi.fn(async () => new Response(okBody, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
-    await generateEnhancements(digest, [MARKDOWN_TEMPLATE], "a/b");
+    await generateEnhancements(digest, [MARKDOWN_TEMPLATE], "a/b", MARKDOWN_TEMPLATE);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe(`${REPLAY_SERVER_URL}/api/ai/enhance`);
-    const payload = JSON.parse(String(init.body)) as { repo: string; templates: unknown[] };
+    const payload = JSON.parse(String(init.body)) as {
+      repo: string;
+      templates: unknown[];
+      chosenTemplate: unknown;
+    };
     expect(payload.repo).toBe("a/b");
     expect(payload.templates).toHaveLength(1);
+    expect(payload.chosenTemplate).toEqual(MARKDOWN_TEMPLATE);
+  });
+
+  it("omits the chosen template when there is none", async () => {
+    const fetchMock = vi.fn(async () => new Response(okBody, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateEnhancements(digest, [], "a/b", null);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const payload = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect("chosenTemplate" in payload).toBe(false);
   });
 });
 

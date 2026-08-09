@@ -38,21 +38,25 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const { digest, templates, repo } = (body ?? {}) as {
+  const { digest, templates, repo, chosenTemplate } = (body ?? {}) as {
     digest?: unknown;
     templates?: unknown;
     repo?: unknown;
+    chosenTemplate?: unknown;
   };
   if (
     typeof digest !== "object" ||
     digest === null ||
     !Array.isArray(templates) ||
-    (typeof repo !== "string" && repo !== undefined)
+    (typeof repo !== "string" && repo !== undefined) ||
+    (typeof chosenTemplate !== "object" &&
+      chosenTemplate !== undefined &&
+      chosenTemplate !== null)
   ) {
     return Response.json({ error: "bad_payload" }, { status: 400 });
   }
 
-  const upstream = await proxyEnhance({ digest, templates, repo });
+  const upstream = await proxyEnhance({ digest, templates, repo, chosenTemplate });
   if (!upstream.ok) {
     return Response.json({ error: upstream.error }, { status: upstream.status });
   }

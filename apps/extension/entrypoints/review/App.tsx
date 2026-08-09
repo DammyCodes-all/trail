@@ -509,13 +509,13 @@ function App() {
         events,
         timeline,
         facts,
-        allTemplates,
         repoNorm,
       );
       const outcome = await generateEnhancements(
         digest,
         allTemplates,
         repoNorm,
+        template,
         controller.signal,
       );
       if (token !== aiGenToken.current) return;

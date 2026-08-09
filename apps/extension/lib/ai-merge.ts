@@ -17,7 +17,7 @@ export interface AIResult {
 }
 
 const LIMITS = {
-  title: 120,
+  title: 100,
   summary: 4000,
   step: 500,
   steps: 50,

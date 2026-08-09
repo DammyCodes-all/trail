@@ -63,18 +63,21 @@ async function handleAiEnhance(req, res) {
     json(res, 400, { error: "invalid_json" });
     return;
   }
-  const { digest, templates, repo } = body ?? {};
+  const { digest, templates, repo, chosenTemplate } = body ?? {};
   if (
     typeof digest !== "object" ||
     digest === null ||
     !Array.isArray(templates) ||
-    (typeof repo !== "string" && repo !== undefined)
+    (typeof repo !== "string" && repo !== undefined) ||
+    (typeof chosenTemplate !== "object" &&
+      chosenTemplate !== undefined &&
+      chosenTemplate !== null)
   ) {
     json(res, 400, { error: "bad_payload" });
     return;
   }
 
-  const upstream = await proxyEnhance({ digest, templates, repo });
+  const upstream = await proxyEnhance({ digest, templates, repo, chosenTemplate });
   if (!upstream.ok) {
     json(res, upstream.status, { error: upstream.error });
     return;
