@@ -1,6 +1,7 @@
-// Groq-backed report enhancements. The extension never holds an API
-// key: the replay server proxies POST /api/ai/enhance to Groq, and this
-// module builds the (redaction-safe) session digest and calls it.
+// Server-backed report enhancements. The extension never holds an API
+// key: the replay server proxies POST /api/ai/enhance to OpenRouter (and the
+// title-only /api/ai/title to Groq), and this module builds the
+// (redaction-safe) session digest and calls it.
 //
 // The digest is the model's whole world: as much context as fits a budget,
 // never rrweb events, never request/response headers, always capture-time
@@ -23,7 +24,7 @@ export type AIStatus =
   | 'generating'
   | 'ready'
   | 'disabled' // user opted out
-  | 'server-off' // replay server has no GROQ_API_KEY
+  | 'server-off' // replay server lacks the corresponding AI provider key
   | 'unavailable'; // network / rate limited / upstream / unparseable
 
 export interface EnhanceOutcome {

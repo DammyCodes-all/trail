@@ -1,18 +1,23 @@
-// The Groq proxy, shared by the Vercel function (api/ai/enhance.ts) and the
-// local twin (server/index.mjs) so the two can't drift. The API key lives here
-// in the server env — never in the extension.
+// The AI proxy, shared by the Vercel functions (api/ai/*.ts) and the local
+// twin (server/index.mjs) so the two can't drift. API keys live here in the
+// server env — never in the extension.
+//
+// Two providers, one job each: the full report enhancement (title, summary,
+// steps, labels) runs through OpenRouter, and the title-only call runs through
+// Groq. Each feature is enabled independently by its own key, so a missing key
+// degrades only that feature — the extension falls back to its deterministic
+// digest for whatever the server can't proxy.
 //
 // Error paths log the upstream status and error body (truncated) plus the
 // payload size, so context-length and rate-limit failures are diagnosable.
 // Prompts and completions are never logged.
 
-const GROQ_BASE =
-  process.env.AI_BASE_URL ?? "https://api.groq.com/openai/v1";
-const MODEL = process.env.AI_MODEL ?? "openai/gpt-oss-120b";
 const MAX_ATTEMPTS = 2; // one retry covers transient 5xx / 429 / empty completions
 // Generous cap for a report JSON (structured summaries + template field
 // values); keeps latency and cost bounded no matter how the model behaves.
-const MAX_TOKENS = 15000;
+// The default report route is OpenRouter's free Nemotron tier, whose output
+// is capped well below what a paid route allows, so this stays conservative.
+const MAX_TOKENS = 8192;
 // Cap for the title-only call: a one-line JSON title plus reasoning headroom.
 // Reasoning models can spend a small budget before emitting output, so this
 // is deliberately larger than the ~30 output tokens the title actually needs.
@@ -24,11 +29,34 @@ const charsToTokens = (chars) => Math.round(chars / 4);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// AI enhancements are enabled only when the server holds a Groq key.
-// The extension degrades to the deterministic report when this is false.
-export function isAiMode() {
+// AI enhancements are enabled per provider: the report pass needs the
+// OpenRouter key, the title pass needs the Groq key. isAiMode() reports
+// whether any provider is configured (used for the /health line only); the
+// routes gate on their own provider, so a missing key degrades that feature
+// while leaving the other untouched.
+export function isOpenRouterConfigured() {
+  return Boolean(process.env.OPENROUTER_API_KEY);
+}
+
+export function isGroqConfigured() {
   return Boolean(process.env.GROQ_API_KEY);
 }
+
+export function isAiMode() {
+  return isGroqConfigured() || isOpenRouterConfigured();
+}
+
+const openRouterConfig = () => ({
+  base: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY,
+  model: process.env.OPENROUTER_MODEL ?? "nvidia/nemotron-3-ultra-550b-a55b:free",
+});
+
+const groqConfig = () => ({
+  base: process.env.AI_BASE_URL ?? "https://api.groq.com/openai/v1",
+  apiKey: process.env.GROQ_API_KEY,
+  model: process.env.AI_MODEL ?? "openai/gpt-oss-120b",
+});
 
 const SYSTEM_PROMPT = [
   "You are the report writer for TRAIL, a browser extension that turns a captured bug",
@@ -90,32 +118,32 @@ const TITLE_SYSTEM_PROMPT = [
   "- Return exactly one JSON object. No Markdown, no code fences, no commentary.",
 ].join("\n");
 
-// POST a completion payload to Groq and return the model's raw completion
-// text. The extension owns parsing and validation — this is a dumb pipe.
-// Resolves { ok: true, content } on success, { ok: false, status, error }
-// otherwise; never throws. Shared by the full-report enhance call and the
-// title-only call so the retry/backoff/size-log machinery can't drift.
+// POST a completion payload to the configured provider and return the model's
+// raw completion text. The extension owns parsing and validation — this is a
+// dumb pipe. Resolves { ok: true, content } on success, { ok: false, status,
+// error } otherwise; never throws. Shared by the full-report enhance call and
+// the title-only call so the retry/backoff/size-log machinery can't drift.
 //
 // No timeout: slow first-token latency is tolerated; the per-IP rate limiter
 // caps abuse. One retry covers transient 5xx, 429 rate limits, and empty
 // completions.
-async function postCompletion(payload) {
+async function postCompletion(payload, config) {
   const logSize = () =>
     `payload ${payload.length} chars (~${charsToTokens(payload.length)} tokens)`;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
-      const res = await fetch(`${GROQ_BASE}/chat/completions`, {
+      const res = await fetch(`${config.base}/chat/completions`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          authorization: `Bearer ${config.apiKey}`,
         },
         body: payload,
       });
       if (!res.ok) {
-        const body = await res.text().catch(() => "");
+        const upstreamBody = await res.text().catch(() => "");
         console.error(
-          `[ai-proxy] attempt ${attempt} upstream ${res.status}, ${logSize()}: ${body.slice(0, 500)}`,
+          `[ai-proxy] attempt ${attempt} upstream ${res.status}, ${logSize()}: ${upstreamBody.slice(0, 500)}`,
         );
         // 429 is a rate/concurrency limit — transient like 5xx, so retry once
         // after a short backoff (honor Retry-After when the upstream sends it).
@@ -159,9 +187,12 @@ async function postCompletion(payload) {
   return { ok: false, status: 502, error: "upstream_error" };
 }
 
+// Full report enhancement: routed through OpenRouter. If no OpenRouter key is
+// configured, the route refuses before this runs.
 export async function proxyEnhance({ digest, templates, repo }) {
+  const config = openRouterConfig();
   const payload = JSON.stringify({
-    model: MODEL,
+    model: config.model,
     temperature: TEMPERATURE,
     max_tokens: MAX_TOKENS,
     response_format: { type: "json_object" },
@@ -178,14 +209,16 @@ export async function proxyEnhance({ digest, templates, repo }) {
       },
     ],
   });
-  return postCompletion(payload);
+  return postCompletion(payload, config);
 }
 
 // Title-only completion: a cheap, focused call for the report page's AI title
-// (no templates, no repo — the title is repo-independent).
+// (no templates, no repo — the title is repo-independent). Routed through
+// Groq, gated by its own key.
 export async function proxyTitle({ digest }) {
+  const config = groqConfig();
   const payload = JSON.stringify({
-    model: MODEL,
+    model: config.model,
     temperature: TEMPERATURE,
     max_tokens: TITLE_MAX_TOKENS,
     response_format: { type: "json_object" },
@@ -200,5 +233,5 @@ export async function proxyTitle({ digest }) {
       },
     ],
   });
-  return postCompletion(payload);
+  return postCompletion(payload, config);
 }
