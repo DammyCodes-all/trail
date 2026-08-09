@@ -31,6 +31,7 @@ import {
   writePlacement,
 } from "@/lib/overlay/placement";
 import { overlayStyles } from "@/lib/overlay/styles";
+import { isolateOverlayShadow } from "@/lib/overlay/isolation";
 
 type OverlayStatus = {
   recording: boolean;
@@ -559,6 +560,11 @@ export default defineContentScript({
     host.dataset.trailOverlay = "true";
     host.setAttribute("aria-hidden", "false");
     const shadow = host.attachShadow({ mode: "open" });
+    // A bubble-phase stop at the shadow boundary: the overlay's own handlers
+    // (flag keys, drag, buttons) still run on deeper nodes, while page
+    // keydown/click/focus handlers never see events that start in the
+    // overlay (see lib/overlay/isolation.ts for the full picture).
+    isolateOverlayShadow(shadow);
     const style = document.createElement("style");
     const mount = document.createElement("div");
     style.textContent = overlayStyles;

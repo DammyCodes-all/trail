@@ -255,6 +255,39 @@ function main() {
         const root = document.querySelector('#trail-recording-overlay')?.shadowRoot;
         const flagBtn = root?.querySelector('button[aria-label="Flag a problem"]');
         if (!flagBtn) return { ok: false, reason: 'flag button missing' };
+
+        // Isolation: page-side handlers must never hear events that originate
+        // inside the overlay (keyboard shortcuts, outside-clicks, focus moves).
+        // Bubble listeners on window — the phase sites almost always bind.
+        const leaked = [];
+        const tracked = ['keydown', 'keyup', 'input', 'wheel', 'mousedown', 'click', 'focusin', 'focusout'];
+        const listeners = tracked.map((type) => {
+          const fn = () => leaked.push(type);
+          window.addEventListener(type, fn, false);
+          return [type, fn];
+        });
+
+        // Probes on an inert node inside the overlay (the REC chip — nothing
+        // interactive, so no overlay behavior fires). Composed + bubbling, the
+        // same shape real browser events crossing the shadow boundary have.
+        const rec = root?.querySelector('.trail-overlay__rec');
+        if (!rec) return { ok: false, reason: 'rec chip missing' };
+        rec.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true, composed: true }));
+        rec.dispatchEvent(new KeyboardEvent('keyup', { key: 'p', bubbles: true, composed: true }));
+        rec.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, data: 'p' }));
+        rec.dispatchEvent(new WheelEvent('wheel', { bubbles: true, composed: true, cancelable: true, deltaY: 120 }));
+        rec.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true, cancelable: true }));
+        rec.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
+        // Real focus in/out of the overlay — pages track this for dirty markers.
+        flagBtn.focus();
+        flagBtn.blur();
+        await new Promise((r) => setTimeout(r, 50));
+        const leakedTypes = [...new Set(leaked)];
+        for (const [type, fn] of listeners) {
+          window.removeEventListener(type, fn, false);
+        }
+
+        // The real flag flow: open the form, type, submit.
         flagBtn.click();
         await new Promise((r) => setTimeout(r, 200));
         const expected = root?.querySelector('#trail-flag-expected');
@@ -272,10 +305,18 @@ function main() {
         setVal(actual, 'Total shows $9.98');
         root?.querySelector('button[type="submit"]')?.click();
         await new Promise((r) => setTimeout(r, 250));
-        return { ok: true, formClosed: !root?.querySelector('#trail-flag-expected') };
+        return {
+          ok: true,
+          leaked: leakedTypes,
+          formClosed: !root?.querySelector('#trail-flag-expected'),
+        };
       });
       console.log('flag flow:', flagFlow);
       assert(flagFlow.ok === true, `overlay flag button + form reachable (${flagFlow.reason ?? ''})`);
+      assert(
+        flagFlow.leaked?.length === 0,
+        `overlay events never reach the page (leaked: ${flagFlow.leaked?.join(', ') ?? 'unknown'})`,
+      );
       assert(flagFlow.formClosed === true, 'flag form collapses on submit');
       // The flag count badge is pushed by the background once the event lands.
       await testPage.waitForFunction(
