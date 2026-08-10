@@ -21,15 +21,16 @@ TRAIL does the remembering for you. No SDK, no app instrumentation, no account. 
 - Generates a deterministic Markdown report plus a prefilled GitHub new-issue URL. Optionally drafts an AI title, summary, reproduction steps, and labels — local-first, so the report never depends on a model or a key.
 - Maps the report onto the target repo's actual GitHub issue templates.
 - Saves every report to history. Reopening one restores the full review screen: replay, timeline, exported report.
-- Shares a session as a link. Paste it into another TRAIL popup and it imports into that person's history with the same review UI. Nothing uploads until you hit Share. Re-sharing an unchanged session reuses the existing link — the payload is hashed locally (title edits don't count), so it never re-uploads to blob storage.
+- Shares a session as a link that opens the **web viewer** (`/r/<id>`) — anyone can review it in the browser, no extension needed. With the TRAIL extension installed, the page hands off into the extension (a 10-second countdown with a "View in browser" fallback), where the session imports into history with the same review UI. Nothing uploads until you hit Share. Re-sharing an unchanged session reuses the existing link — the payload is hashed locally (title edits don't count), so it never re-uploads to blob storage.
 
 ## Tech stack
 
 - WXT + React for the extension
 - rrweb for session replay
 - IndexedDB for local history
+- Next.js for the web viewer (shared links)
+- `packages/review` — the review UI and pure report/timeline/share logic, shared between the extension and the web viewer
 - Vercel Blob for shared replays, local files in dev
-- Next.js scaffold for the landing page
 - Puppeteer for end-to-end verification
 
 ## Getting started
@@ -45,12 +46,18 @@ pnpm install
 Three processes, all local:
 
 1. **The extension.** `pnpm dev:extension` builds and launches Chrome with the unpacked extension loaded. Start a report, reproduce a bug, stop. The review tab opens with the replay and timeline.
-2. **The replay server.** `pnpm dev:replay` runs on http://localhost:8898. Needed for shareable links. The extension points at it by default, so there's nothing to configure. Recipients paste a link into their own popup; the session is fetched from the link's own host, so both sides can run different servers.
-3. **The landing page** (optional). `pnpm dev:web` serves the Next.js scaffold on http://localhost:3000.
+2. **The replay server.** `pnpm dev:replay` runs on http://localhost:8898. Needed for shareable links. The extension and web viewer point at it by default, so there's nothing to configure. Recipients fetch the session from the link's own host, so both sides can run different servers.
+3. **The web viewer.** `pnpm dev:web` serves the Next.js app on http://localhost:3000. It renders shared links (`/r/<id>`) inline for anyone — and hands off into the extension when it's installed.
 
-Everything runs against local storage: reports in the extension's IndexedDB, shared replays in `apps/replay-server/.data/`. No accounts, no API keys. Three env vars exist, none needed for local dev: `BLOB_READ_WRITE_TOKEN` flips the share server to Vercel Blob for production (blobs are public with deterministic UUID paths, so a share link is a secret link — the id is unguessable, and reads are plain GETs), `WXT_PUBLIC_REPLAY_SERVER_URL` points a production extension build at the deployed server instead of the local twin (put it in `apps/extension/.env`, which is gitignored), and the AI proxy keys on the replay server — `OPENROUTER_API_KEY` (report enhancements) and `GROQ_API_KEY` (title pass), each optional and independent — turn on the corresponding AI passes; without a key that pass degrades to the local deterministic digest, so the report still works either way.
+Everything runs against local storage: reports in the extension's IndexedDB, shared replays in `apps/replay-server/.data/`. No accounts, no API keys. Env vars, none needed for local dev:
 
-To check a change: `pnpm verify:extension` runs the typecheck, a production build, and a Puppeteer spike that drives a real page through the whole capture path. For a manual install: `pnpm build:extension`, then load `.output/chrome-mv3` from `chrome://extensions`. Want all three at once? `pnpm dev:all`.
+- `BLOB_READ_WRITE_TOKEN` flips the share server to Vercel Blob for production (blobs are public with deterministic UUID paths, so a share link is a secret link — the id is unguessable, and reads are plain GETs).
+- `WXT_PUBLIC_REPLAY_SERVER_URL` points a production extension build at the deployed server instead of the local twin (put it in `apps/extension/.env`, which is gitignored).
+- `NEXT_PUBLIC_REPLAY_SERVER_URL` does the same for the web viewer's payload fetches (put it in `apps/web/.env.local`).
+- `WXT_PUBLIC_WEB_URL` / `NEXT_PUBLIC_WEB_URL` override the web viewer's base URL (default `http://localhost:3000`) — share links point here, and the extension's handoff bridge only answers pages on this origin, so the two must agree.
+- The AI proxy keys on the replay server — `OPENROUTER_API_KEY` (report enhancements) and `GROQ_API_KEY` (title pass), each optional and independent — turn on the corresponding AI passes; without a key that pass degrades to the local deterministic digest, so the report still works either way.
+
+To check a change: `pnpm verify:extension` runs the typecheck, a production build, and a Puppeteer spike that drives a real page through the whole capture path (including sharing a session and importing it over the extension bridge from the web origin). For a manual install: `pnpm build:extension`, then load `.output/chrome-mv3` from `chrome://extensions`. Want all three at once? `pnpm dev:all`.
 
 ## How it works
 
@@ -62,6 +69,10 @@ To check a change: `pnpm verify:extension` runs the typecheck, a production buil
 6. **Export.** Enter the target repo — the field starts empty, never autofilled; previously-used repos surface as suggestions while you type. TRAIL fetches the repo's GitHub issue templates and maps the report onto the actual template fields (no template? the AI writes the industry-standard bug-report structure: Problem, Expected vs Actual, Root cause, Impact). While you review, a local AI pass drafts a title, summary, reproduction steps, and labels from the redaction-safe session digest — sent to the replay server's AI proxy (the report pass via OpenRouter, the title via Groq; each skipped unless its provider key is set), cached by session hash, and merged so the final output is a deterministic Markdown report, plus a prefilled GitHub new-issue URL, with clipboard and `.md` download as fallbacks.
 7. **Submit.** The prefilled GitHub page opens in a new tab. You review and submit it in GitHub's own UI. TRAIL never touches your GitHub account.
 8. **Later.** The report is saved to history. Reopening it restores the same review screen.
+
+### The web viewer
+
+A share link points at the web viewer (`/r/<id>`), which renders the same review UI — replay, timeline, evidence, report, exports — for anyone. The session payload lives on the replay server under the same id; the viewer fetches it, imports it into its own local store (separate from the extension's history), and never uploads anything. When the TRAIL extension is installed, the viewer detects it (a postMessage probe through the content-script relay), shows an **Open in TRAIL** gate with a 10-second countdown, and hands the session over to the extension — which opens its own review tab and saves it to that profile's history. No extension, or the handoff times out? The viewer just renders the review inline.
 
 ### How it's built
 
@@ -82,13 +93,13 @@ Repo layout:
 ```
 apps/extension        The extension itself (WXT + React + rrweb)
 apps/replay-server    Replay share server: store a session, serve it back as JSON + AI proxy
-apps/web              Next.js landing page (still the scaffold)
+apps/web              Web viewer: renders shared /r/<id> links, hands off to the extension
+packages/review       Review UI + pure report/timeline/share logic, shared by both surfaces
 packages/tokens       @trail/tokens — design tokens as CSS
 ```
 
 ## Roadmap
 
-- A real landing page (currently the Next.js scaffold)
 - AI duplicate-issue detection
 - Direct GitHub API submission
 - Linear/Jira support
