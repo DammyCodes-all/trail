@@ -1,4 +1,4 @@
-import type { MetaEvent } from "@/lib/types";
+import type { MetaEvent } from "@trail/review/lib/types";
 import type { RecordContext } from "./context";
 
 // Capture-time environment, emitted at every document boot. The Environment

@@ -7,6 +7,10 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
+/* The review UI lives in the @trail/review workspace package (outside this
+ * project root) — point Tailwind's scanner at it explicitly. */
+@source '../../../packages/review/src';
+
 @import '@trail/tokens/tokens.css';
 @import '@trail/tokens/theme.css';
 

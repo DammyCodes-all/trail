@@ -1,11 +1,13 @@
 import {
   MSG_BATCH,
+  MSG_OPEN_SHARE,
   MSG_OVERLAY_STATUS,
   MSG_REDACT,
   MSG_START_RECORDER,
   MSG_STOP_RECORDER,
   POST_MESSAGE_KEY,
-} from '@/lib/constants';
+  WEB_ORIGIN,
+} from '@trail/review/lib/constants';
 
 declare global {
   interface Window {
@@ -35,6 +37,28 @@ export default defineContentScript({
       if (data[POST_MESSAGE_KEY] === true) buf.push(data.d);
       else if (data[POST_MESSAGE_KEY] === 'stopped') stoppedResolve?.();
       else if (data[POST_MESSAGE_KEY] === 'boot') void checkSession();
+      // Presence probe: the web app's handoff gate asks "is TRAIL installed?"
+      // and the relay answers with an ack so the page can show the Open-in-TRAIL
+      // gate instead of falling straight into the inline review.
+      else if (data[POST_MESSAGE_KEY] === 'probe') {
+        window.postMessage({ [POST_MESSAGE_KEY]: 'probe-ack' }, '*');
+      }
+      // Handoff bridge: the web app (/r/<id> → "Review in TRAIL") posts the
+      // share link; the relay forwards it to the background, which opens the
+      // extension's own review tab. Origin-gated so any old page can't do it.
+      else if (
+        data[POST_MESSAGE_KEY] === 'open-share' &&
+        e.origin === WEB_ORIGIN
+      ) {
+        // Forward the ack back to the page so the web UI can stop waiting
+        // (the handoff page switches to "opening in TRAIL…" on ok).
+        send({ type: MSG_OPEN_SHARE, link: data.link }).then((r) => {
+          window.postMessage(
+            { [POST_MESSAGE_KEY]: 'open-ack', ok: r?.ok === true },
+            '*',
+          );
+        });
+      }
     });
 
     const send = (msg: Record<string, unknown>) =>

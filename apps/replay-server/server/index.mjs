@@ -22,8 +22,20 @@ const MAX_AI_BODY = 1024 * 1024; // AI digests are ~10KB; this is abuse headroom
 
 const ID_RE = /^[A-Za-z0-9.-]{1,64}$/;
 
+// The web viewer (/r/<id>) is a plain browser page on another origin, so
+// every route answers cross-origin. Replay IDs are unguessable secrets and AI
+// bodies are redacted digests — a wide-open CORS is the right trade here.
+const CORS_HEADERS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, PUT, OPTIONS",
+  "access-control-allow-headers": "content-type",
+};
+
 const json = (res, code, data) => {
-  res.writeHead(code, { "content-type": "application/json" });
+  res.writeHead(code, {
+    "content-type": "application/json",
+    ...CORS_HEADERS,
+  });
   res.end(JSON.stringify(data));
 };
 
@@ -131,6 +143,11 @@ async function handleAiTitle(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, CORS_HEADERS);
+    res.end();
+    return;
+  }
   const path = new URL(req.url, `http://localhost:${PORT}`).pathname;
 
   if (req.method === "GET" && path === "/") {
@@ -159,7 +176,7 @@ const server = http.createServer(async (req, res) => {
     for await (const chunk of req) {
       total += chunk.length;
       if (total > MAX_BODY) {
-        res.writeHead(413, { "content-type": "text/plain" });
+        res.writeHead(413, { "content-type": "text/plain", ...CORS_HEADERS });
         res.end("replay too large");
         return;
       }
@@ -203,12 +220,12 @@ const server = http.createServer(async (req, res) => {
       json(res, 404, { error: "not found" });
       return;
     }
-    res.writeHead(200, { "content-type": "application/json" });
+    res.writeHead(200, { "content-type": "application/json", ...CORS_HEADERS });
     res.end(JSON.stringify(data));
     return;
   }
 
-  res.writeHead(404, { "content-type": "text/plain" });
+  res.writeHead(404, { "content-type": "text/plain", ...CORS_HEADERS });
   res.end("not found");
 });
 

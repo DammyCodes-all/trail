@@ -1,5 +1,5 @@
-import { ZERO_COUNTS } from "./summary";
-import type { TrailCounts, TrailSession } from "@/lib/types";
+import { ZERO_COUNTS } from "@trail/review/lib/summary";
+import type { TrailCounts, TrailSession } from "@trail/review/lib/types";
 
 // Session + live-count state lives in chrome.storage.session so it survives the
 // SW going to sleep but dies with the browser session. All read-modify-write

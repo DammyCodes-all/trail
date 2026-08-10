@@ -1,10 +1,10 @@
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { PulsatingButton } from "@/components/ui/pulsating-button";
+import { Button } from "@trail/review/ui/button";
+import { Label } from "@trail/review/ui/label";
+import { PulsatingButton } from "@trail/review/ui/pulsating-button";
 import {
   Switch,
   SwitchThumb,
-} from "@/components/animate-ui/primitives/base/switch";
+} from "@trail/review/animate-ui/primitives/base/switch";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 
 export function SetupScreen({

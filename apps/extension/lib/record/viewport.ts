@@ -1,4 +1,4 @@
-import type { ViewportEvent } from "@/lib/types";
+import type { ViewportEvent } from "@trail/review/lib/types";
 import type { RecordContext } from "./context";
 
 // Material viewport resizes only: a responsive-layout bug needs the resize

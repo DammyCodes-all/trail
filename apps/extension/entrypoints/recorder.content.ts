@@ -1,4 +1,4 @@
-import { POST_MESSAGE_KEY, FLAG_KEY } from "@/lib/constants";
+import { POST_MESSAGE_KEY, FLAG_KEY } from "@trail/review/lib/constants";
 import type { RecordContext } from "@/lib/record/context";
 import { instrumentConsole } from "@/lib/record/console";
 import { instrumentClicks, instrumentInputs } from "@/lib/record/interactions";
@@ -14,7 +14,7 @@ import {
 import { emitMeta } from "@/lib/record/meta";
 import { createRrweb } from "@/lib/record/rrweb";
 import { cap } from "@/lib/record/format";
-import type { FlagEvent, NavEvent } from "@/lib/types";
+import type { FlagEvent, NavEvent } from "@trail/review/lib/types";
 
 declare global {
   interface Window {

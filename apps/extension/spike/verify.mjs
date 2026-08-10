@@ -11,6 +11,10 @@ const REPLAY_SRV = path.resolve(__dirname, '..', '..', 'replay-server', 'server'
 const PORT = 8899;
 const BASE = `http://localhost:${PORT}`;
 const REPLAY_BASE = 'http://localhost:8898';
+// The extension's dev default web app origin (constants.ts fallback). Share
+// links point here; this spike resolves them to the replay twin's payload
+// route, since the web app itself is exercised by the separate verify:web.
+const WEB_BASE = 'http://localhost:3000';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -163,6 +167,7 @@ async function killServiceWorker(page) {
 function main() {
   let testPageSrv;
   let replaySrv;
+  let webHandoffSrv;
   let browser;
   return new Promise(async (resolve) => {
     try {
@@ -171,6 +176,12 @@ function main() {
         stdio: 'ignore',
       });
       await sleep(800);
+
+      // ---- web origin stand-in (the real web app is covered by verify:web) ----
+      webHandoffSrv = spawn(process.execPath, [path.join(__dirname, 'web-handoff.mjs')], {
+        stdio: 'ignore',
+      });
+      await sleep(500);
 
       // ---- replay share server (local twin) ----
       replaySrv = spawn(process.execPath, [REPLAY_SRV], { stdio: 'ignore' });
@@ -1130,7 +1141,7 @@ function main() {
           .catch(() => null);
         if (
           typeof link === 'string' &&
-          link.startsWith(`${REPLAY_BASE}/api/replays/`)
+          link.startsWith(`${WEB_BASE}/r/`)
         ) {
           break;
         }
@@ -1143,8 +1154,8 @@ function main() {
       console.log('SPIKE3: replay-link wait OK');
       console.log('share link:', link);
       assert(
-        new RegExp(`^${REPLAY_BASE}/api/replays/[A-Za-z0-9.-]{1,64}$`).test(link),
-        'share link points at the replay JSON route',
+        new RegExp(`^${WEB_BASE}/r/[A-Za-z0-9.-]{1,64}$`).test(link),
+        'share link points at the web app review route',
       );
       const reviewHooks3 = await shareReview.evaluate(() => ({
         timeline: window.__trailTimeline,
@@ -1153,10 +1164,17 @@ function main() {
       }));
 
       // The link must serve the full session: versioned, report + all kinds.
-      const payload = await shareReview.evaluate(async (l) => {
-        const r = await fetch(l);
-        return { status: r.status, body: await r.json() };
-      }, link);
+      // Web links resolve to this deployment's replay server payload route
+      // (the web app itself isn't running in this spike).
+      const payload = await shareReview.evaluate(
+        async (base, l) => {
+          const id = l.split('/').pop();
+          const r = await fetch(`${base}/api/replays/${id}`);
+          return { status: r.status, body: await r.json() };
+        },
+        REPLAY_BASE,
+        link,
+      );
       assert(payload.status === 200, 'share link serves the session JSON');
       assert(payload.body.v === 2, 'shared payload is versioned (v: 2)');
       assert(
@@ -1192,13 +1210,27 @@ function main() {
         `public player routes removed (/r/ and .json — got ${gone.page}/${gone.json})`,
       );
 
-      // Paste the link into a fresh popup → review tab auto-imports the session.
+      // Handoff via the web bridge: a page on the web origin posts the share
+      // link; the relay forwards it to the background, which opens the review
+      // tab and acks back through the relay. (The popup no longer pastes links
+      // — that input was removed when the web app took over sharing.)
+      const handoffPage = async (link) => {
+        const page = await browser.newPage();
+        await page.goto(`${WEB_BASE}/handoff.html?link=${encodeURIComponent(link)}`);
+        await page.waitForFunction(
+          () => window.__trailAck !== null,
+          { timeout: 10000, polling: 100 },
+        );
+        return page;
+      };
+
       popup = await openPopup(browser, extId);
       const beforeImport = await popup.evaluate(
         () => document.querySelectorAll('.report').length,
       );
-      await popup.type('#share-link', link);
-      await popup.click('#open-shared');
+      const handoff1 = await handoffPage(link);
+      const ack1 = await handoff1.evaluate(() => window.__trailAck);
+      assert(ack1.ok === true, 'bridge acks the handoff (ok:true)');
       const sharedTarget = await browser.waitForTarget(
         (t) => t.type() === 'page' && t.url().includes('review.html?share='),
         { timeout: 10000 },
@@ -1241,6 +1273,7 @@ function main() {
       );
       assert(importedHooks.title.length > 0, 'imported report keeps its title');
       console.log('imported seq:', importedSeq, '| title:', importedHooks.title);
+      await handoff1.close();
       await shared.close();
 
       // Auto-save: history gained exactly one row; re-paste dedupes.
@@ -1252,8 +1285,10 @@ function main() {
         afterImport === beforeImport + 1,
         `auto-save adds exactly one history row (${beforeImport} → ${afterImport})`,
       );
-      await popup.type('#share-link', link);
-      await popup.click('#open-shared');
+      // Re-handoff the same link: dedupes to the already-saved report.
+      const handoff2 = await handoffPage(link);
+      const ack2 = await handoff2.evaluate(() => window.__trailAck);
+      assert(ack2.ok === true, 'bridge acks the re-handoff');
       const dupTarget = await browser.waitForTarget(
         (t) => t.type() === 'page' && t.url().includes('review.html?share='),
         { timeout: 10000 },
@@ -1280,18 +1315,28 @@ function main() {
         `re-paste does not duplicate history (${afterDup})`,
       );
 
-      // Invalid link rejected in the popup before any tab opens.
-      await popup.type('#share-link', 'https://example.com/not-a-trail-link');
-      await popup.click('#open-shared');
-      const shareError = await popup.evaluate(() =>
-        document.querySelector('#share-error')?.textContent ?? '',
+      // Invalid link: the background rejects it (no tab opens) and the bridge
+      // acks with ok:false.
+      const beforeInvalid = browser.targets().length;
+      const handoff3 = await handoffPage('https://example.com/not-a-trail-link');
+      const ack3 = await handoff3.evaluate(() => window.__trailAck);
+      assert(ack3.ok === false, 'bridge rejects a non-TRAIL link (ok:false)');
+      await sleep(3000);
+      const reviewTabs = browser.targets().filter(
+        (t) => t.type() === 'page' && t.url().includes('review.html?share='),
       );
-      assert(shareError.length > 0, 'popup rejects a non-TRAIL link inline');
+      assert(
+        reviewTabs.length === 0 &&
+          browser.targets().length === beforeInvalid + 1,
+        'no review tab opens for an invalid link',
+      );
+      await handoff3.close();
       console.log('SPIKE 3 PASS');
 
       await browser.close();
       testPageSrv.kill();
       replaySrv?.kill();
+      webHandoffSrv?.kill();
       console.log('\nALL SPIKES PASS');
       resolve(true);
     } catch (err) {
@@ -1303,6 +1348,9 @@ function main() {
       } catch {}
       try {
         replaySrv?.kill();
+      } catch {}
+      try {
+        webHandoffSrv?.kill();
       } catch {}
       console.error('\nFAILURE:', err.message);
       process.exitCode = 1;

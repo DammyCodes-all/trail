@@ -66,7 +66,7 @@ export const redactHeaders = (
 // a secret (email, card, JWT/Bearer, provider-prefixed key, long token runs).
 // ---------------------------------------------------------------------------
 
-import { TRUNCATED_MARKER } from "@/lib/pretty";
+import { TRUNCATED_MARKER } from "@trail/review/lib/pretty";
 
 export const REDACTED = "[redacted]";
 

@@ -1,4 +1,4 @@
-import type { ConsoleEvent } from "@/lib/types";
+import type { ConsoleEvent } from "@trail/review/lib/types";
 import type { RecordContext } from "./context";
 import { fmt } from "./format";
 import { isNoisyConsole } from "./noise";

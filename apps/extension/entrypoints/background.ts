@@ -1,5 +1,6 @@
 import {
   MSG_BATCH,
+  MSG_OPEN_SHARE,
   MSG_OVERLAY_STATUS,
   MSG_OVERLAY_UPDATE,
   MSG_REDACT,
@@ -9,7 +10,7 @@ import {
   MSG_STOP,
   MSG_STOP_RECORDER,
   REDACT_KEY,
-} from "@/lib/constants";
+} from "@trail/review/lib/constants";
 import {
   addEvents,
   clearEvents,
@@ -22,7 +23,9 @@ import {
   registerRecorderScripts,
   unregisterRecorderScripts,
 } from "@/lib/recorder-scripts";
-import { suggestTitle } from "@/lib/report";
+import { suggestTitle } from "@trail/review/lib/report";
+import { isShareLink } from "@trail/review/lib/share";
+import { WEB_HOST } from "@trail/review/lib/constants";
 import {
   clearCounts,
   clearFlagCount,
@@ -38,8 +41,8 @@ import {
   countSummary,
   totalCounts,
   ZERO_COUNTS,
-} from "@/lib/summary";
-import type { TrailCounts, TrailSession } from "@/lib/types";
+} from "@trail/review/lib/summary";
+import type { TrailCounts, TrailSession } from "@trail/review/lib/types";
 
 // Serializes MSG_BATCH handling: handlers share read-modify-write on counts, and
 // two near-simultaneous flushes (interval + visibilitychange) would lose increments.
@@ -292,6 +295,29 @@ export default defineBackground(() => {
             counts: ZERO_COUNTS,
             error: (err as Error).message,
           });
+        }
+      })();
+      return true;
+    }
+
+    if (msg?.type === MSG_OPEN_SHARE) {
+      void (async () => {
+        try {
+          // Only answer links that point at the web app's share route — the
+          // popup used to validate these; the bridge keeps the same bar.
+          const link = typeof msg.link === 'string' ? msg.link : '';
+          if (!link || !isShareLink(link) || !new URL(link).hostname.endsWith(WEB_HOST)) {
+            sendResponse({ ok: false, error: 'invalid share link' });
+            return;
+          }
+          await browser.tabs.create({
+            url: browser.runtime.getURL(
+              `/review.html?share=${encodeURIComponent(link)}`,
+            ),
+          });
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: (err as Error).message });
         }
       })();
       return true;

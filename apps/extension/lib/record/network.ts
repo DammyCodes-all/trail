@@ -1,8 +1,8 @@
-import type { NetEvent } from "@/lib/types";
+import type { NetEvent } from "@trail/review/lib/types";
 import type { RecordContext } from "./context";
 import { bodyText, requestBodyText } from "./format";
 import { redactBody, redactHeaders, redactText, redactUrl } from "./redaction";
-import { isFailedRequest } from "@/lib/summary";
+import { isFailedRequest } from "@trail/review/lib/summary";
 
 // Best-effort normalization of anything fetch/XHR expose as "headers":
 // Headers instances, [name, value][] arrays, and plain records. Sensitive

@@ -1,4 +1,4 @@
-import type { KeyEvent } from "@/lib/types";
+import type { KeyEvent } from "@trail/review/lib/types";
 import type { RecordContext } from "./context";
 import { labelFor } from "./labels";
 

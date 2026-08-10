@@ -1,4 +1,4 @@
-import type { HoverEvent } from "@/lib/types";
+import type { HoverEvent } from "@trail/review/lib/types";
 import type { RecordContext } from "./context";
 import { labelFor } from "./labels";
 

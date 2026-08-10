@@ -6,17 +6,17 @@ import {
   useMotionValue,
   useReducedMotion,
 } from "motion/react";
-import { SlidingNumber } from "@/components/animate-ui/primitives/texts/sliding-number";
+import { SlidingNumber } from "@trail/review/animate-ui/primitives/texts/sliding-number";
 import {
   FLAG_KEY,
   MSG_OVERLAY_STATUS,
   MSG_OVERLAY_UPDATE,
   MSG_STOP,
   POST_MESSAGE_KEY,
-} from "@/lib/constants";
-import { totalCounts } from "@/lib/summary";
-import { formatElapsedTime } from "@/lib/time";
-import type { TrailCounts } from "@/lib/types";
+} from "@trail/review/lib/constants";
+import { totalCounts } from "@trail/review/lib/summary";
+import { formatElapsedTime } from "@trail/review/lib/time";
+import type { TrailCounts } from "@trail/review/lib/types";
 import {
   bounded,
   coordsForPlacement,

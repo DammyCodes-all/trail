@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { MSG_START, MSG_STATUS, MSG_STOP, REDACT_KEY } from "@/lib/constants";
+import { MSG_START, MSG_STATUS, MSG_STOP, REDACT_KEY, WEB_URL } from "@trail/review/lib/constants";
 import { getAllEvents, getReports, getSessionEvents, updateReportSummary } from "@/lib/db";
-import { isShareLink } from "@/lib/share";
-import { countSummary, ZERO_COUNTS } from "@/lib/summary";
-import type { StoredEvent, TrailCounts, TrailReport } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { CirclePlus, Link2 } from "lucide-react";
-import { TrailLogo } from "@/components/ui/trail-logo";
+import { countSummary, ZERO_COUNTS } from "@trail/review/lib/summary";
+import type { StoredEvent, TrailCounts, TrailReport } from "@trail/review/lib/types";
+import { Badge } from "@trail/review/ui/badge";
+import { Button } from "@trail/review/ui/button";
+import { Separator } from "@trail/review/ui/separator";
+import { CirclePlus, ExternalLink } from "lucide-react";
+import { TrailLogo } from "@trail/review/ui/trail-logo";
 import { HistoryList } from "./components/HistoryList";
 import { RecordingScreen } from "./components/RecordingScreen";
 import { SetupScreen } from "./components/SetupScreen";
@@ -25,8 +23,6 @@ function App() {
   const [autoRedact, setAutoRedact] = useState(true);
   const [reports, setReports] = useState<TrailReport[]>([]);
   const [events, setEvents] = useState<StoredEvent[]>([]);
-  const [shareLink, setShareLink] = useState("");
-  const [shareError, setShareError] = useState("");
 
   const refresh = async () => {
     const s = await browser.runtime.sendMessage({ type: MSG_STATUS });
@@ -121,21 +117,6 @@ function App() {
       url: browser.runtime.getURL(`/review.html?report=${seq}`),
     });
 
-  // A shared TRAIL link pasted here opens the review tab, which fetches the
-  // session and saves it to this profile's history automatically.
-  const openSharedLink = (value: string) => {
-    const link = value.trim();
-    if (!isShareLink(link)) {
-      setShareError("Paste a TRAIL share link (https://…/api/replays/…).");
-      return;
-    }
-    setShareError("");
-    setShareLink("");
-    void browser.tabs.create({
-      url: browser.runtime.getURL(`/review.html?share=${encodeURIComponent(link)}`),
-    });
-  };
-
   useEffect(() => {
     if (!events.length) return;
     // Test hook: lets an automated driver assert on raw captured data.
@@ -191,36 +172,17 @@ function App() {
               <CirclePlus data-icon="inline-start" aria-hidden="true" />
               Start Report
             </Button>
-            <div className="flex items-center gap-1.5">
-              <Input
-                id="share-link"
-                className="h-9 flex-1 rounded-md border-border-strong bg-muted/40 font-mono text-[11px]"
-                placeholder="Paste a TRAIL share link"
-                value={shareLink}
-                onChange={(e) => setShareLink(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") openSharedLink(shareLink);
-                }}
-              />
-              <Button
-                id="open-shared"
-                className="h-9 shrink-0 rounded-md px-3"
-                variant="outline"
-                disabled={!shareLink.trim()}
-                onClick={() => openSharedLink(shareLink)}
-              >
-                <Link2 data-icon="inline-start" aria-hidden="true" />
-                Open report
-              </Button>
-            </div>
-            {shareError && (
-              <p
-                id="share-error"
-                className="text-[11px] leading-snug text-destructive"
-              >
-                {shareError}
-              </p>
-            )}
+            <Button
+              className="h-11 w-full"
+              id="open-web"
+              variant="outline"
+              onClick={() => {
+                void browser.tabs.create({ url: WEB_URL });
+              }}
+            >
+              <ExternalLink data-icon="inline-start" aria-hidden="true" />
+              Open TRAIL web app
+            </Button>
           </div>
 
           <Separator className="my-1 shrink-0" />

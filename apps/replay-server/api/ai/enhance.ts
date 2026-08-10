@@ -5,6 +5,7 @@
 
 import { isOpenRouterConfigured, proxyEnhance } from "../../lib/ai-proxy.js";
 import { aiEnhanceLimiter, tryConsume } from "../../lib/rate-limit.js";
+import { optionsResponse, withCors } from "../../lib/cors.js";
 
 export const config = { runtime: "nodejs" };
 
@@ -15,6 +16,14 @@ const clientIp = (request: Request): string =>
   "unknown";
 
 export async function POST(request: Request): Promise<Response> {
+  return withCors(await handle(request));
+}
+
+export function OPTIONS(): Response {
+  return optionsResponse();
+}
+
+async function handle(request: Request): Promise<Response> {
   if (!isOpenRouterConfigured()) {
     return Response.json({ error: "ai_not_configured" }, { status: 501 });
   }

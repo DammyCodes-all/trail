@@ -1,0 +1,45 @@
+{
+  "name": "@trail/review",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TRAIL's review UI and pure report/timeline/share logic, shared between the extension and the web app.",
+  "exports": {
+    ".": "./src/app.tsx",
+    "./app": "./src/app.tsx",
+    "./replay": "./src/replay.tsx",
+    "./components/*": "./src/components/*.tsx",
+    "./animate-ui/*": "./src/animate-ui/*.tsx",
+    "./hooks/*": "./src/hooks/*.tsx",
+    "./lib/get-strict-context": "./src/lib/get-strict-context.tsx",
+    "./lib/*": "./src/lib/*.ts",
+    "./ui/*": "./src/ui/*.tsx"
+  },
+  "scripts": {
+    "compile": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@base-ui-components/react": "1.0.0-rc.0",
+    "@base-ui/react": "^1.6.0",
+    "@rrweb/types": "^2.1.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "highlight.js": "^11.11.1",
+    "idb": "^8.0.3",
+    "lucide-react": "^1.28.0",
+    "motion": "^12.43.0",
+    "react": "^19.2.4",
+    "react-use-measure": "^2.1.7",
+    "rrweb-player": "^2.1.1",
+    "sileo": "^0.1.5",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "vite": "^7.0.0"
+  }
+}

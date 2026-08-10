@@ -1,4 +1,4 @@
-import { RECORDER_ID } from "@/lib/constants";
+import { RECORDER_ID } from "@trail/review/lib/constants";
 import type { ScriptPublicPath } from "wxt/utils/inject-script";
 
 const RECORDER_JS = "/content-scripts/recorder.js" as ScriptPublicPath;

@@ -1,4 +1,4 @@
-import type { FormSubmitEvent } from "@/lib/types";
+import type { FormSubmitEvent } from "@trail/review/lib/types";
 import type { RecordContext } from "./context";
 import { cap } from "./format";
 import { formLabelFor, labelFor } from "./labels";

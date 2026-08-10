@@ -9,11 +9,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+} from "@trail/review/ui/alert-dialog";
+import { Button } from "@trail/review/ui/button";
+import { Input } from "@trail/review/ui/input";
 import { deleteReport } from "@/lib/db";
-import type { TrailReport } from "@/lib/types";
+import type { TrailReport } from "@trail/review/lib/types";
 import { ClipboardList, Globe, Search, Trash2 } from "lucide-react";
 
 const hostOf = (url: string): string | null => {

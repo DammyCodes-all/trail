@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "motion/react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import type { TrailCounts } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { Button } from "@trail/review/ui/button";
+import { Card } from "@trail/review/ui/card";
+import type { TrailCounts } from "@trail/review/lib/types";
+import { cn } from "@trail/review/lib/utils";
 import {
   Keyboard,
   MousePointerClick,

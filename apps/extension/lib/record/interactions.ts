@@ -1,4 +1,4 @@
-import type { ClickEvent, InputEvent } from "@/lib/types";
+import type { ClickEvent, InputEvent } from "@trail/review/lib/types";
 import type { RecordContext } from "./context";
 import { cap } from "./format";
 import { labelFor } from "./labels";
