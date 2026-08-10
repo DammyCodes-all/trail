@@ -181,3 +181,137 @@ export const instrumentNetwork = (ctx: RecordContext) => {
     return callSend.apply(this, a);
   };
 };
+
+// Resource elements that fail to load (images, scripts, stylesheets, media)
+// are invisible to the fetch/XHR patches — yet a broken image or missing CSS
+// is often the one visible bug. The capture-phase error listener fires for
+// element load errors; the uncaught-error path (target = window) is filtered
+// out by the tag check. Favicon and prefetch links are the classic
+// meaningless 404 noise and are skipped.
+export const instrumentResourceErrors = (ctx: RecordContext) => {
+  const { emit, isActive, pageUrl } = ctx;
+  addEventListener(
+    "error",
+    (e) => {
+      if (!isActive()) return;
+      const target = e.target as HTMLElement | null;
+      if (!target || typeof target.tagName !== "string") return;
+      if (
+        target.tagName !== "IMG" &&
+        target.tagName !== "VIDEO" &&
+        target.tagName !== "AUDIO" &&
+        target.tagName !== "SCRIPT" &&
+        target.tagName !== "SOURCE" &&
+        target.tagName !== "LINK"
+      ) {
+        return;
+      }
+      if (target.tagName === "LINK") {
+        const rel = (target as HTMLLinkElement).rel || "";
+        // icon/prefetch/dns-prefetch/preload pings fail constantly and mean
+        // nothing to the bug at hand.
+        if (/\b(icon|prefetch|dns-prefetch|preload|prerender)\b/.test(rel)) return;
+      }
+      const src =
+        (target as HTMLImageElement).src ||
+        (target as HTMLScriptElement).src ||
+        (target as HTMLSourceElement).src ||
+        (target as HTMLLinkElement).href ||
+        "";
+      if (!src) return;
+      // The error event carries no HTTP status. Recover it from the
+      // performance buffer where the browser exposes it (responseStatus):
+      // a 404 avatar is a moderate failure, while the hardcoded 0 would
+      // mislabel it and every other real 4xx as a network-level crash.
+      // Absent (no response recorded in Safari/Firefox fallbacks, or the
+      // connection itself failed), status stays 0 — which is truthful.
+      let status = 0;
+      const entries = performance.getEntriesByName(src, "resource") as
+        | PerformanceResourceTiming[]
+        | undefined;
+      if (entries) {
+        for (let i = entries.length - 1; i >= 0; i--) {
+          const responseStatus = entries[i]!.responseStatus;
+          if (typeof responseStatus === "number" && responseStatus > 0) {
+            status = responseStatus;
+            break;
+          }
+        }
+      }
+      const ev: NetEvent = {
+        k: "net",
+        target: redactUrl(src),
+        method: "GET",
+        status,
+        err: "Failed to load resource",
+        t: Date.now(),
+        via: "resource",
+        url: pageUrl(),
+      };
+      emit(ev);
+    },
+    true,
+  );
+};
+
+// WebSocket connections failing are invisible to fetch/XHR patching. A
+// real-time app whose socket dies is a common, real bug — and the close
+// codes carry the story. Clean closures (1000 normal, 1001 going away, 1005
+// no status) are skipped; everything else is a failure worth reporting.
+// Wrapped as a plain function so the page's own constructor calls keep
+// working; the prototype is borrowed from the original class so page
+// `instanceof WebSocket` checks (and prototype-plumbing libraries) are
+// unaffected.
+export const instrumentWebSockets = (ctx: RecordContext) => {
+  const { emit, isActive, pageUrl } = ctx;
+  const OrigWebSocket = window.WebSocket;
+  if (typeof OrigWebSocket !== "function") return;
+  const WrappedWebSocket = function (
+    this: WebSocket,
+    ...args: ConstructorParameters<typeof WebSocket>
+  ) {
+    const instance = new OrigWebSocket(...args);
+    const url = String(args[0] ?? "");
+    instance.addEventListener("close", (event) => {
+      if (!isActive()) return;
+      const code = (event as CloseEvent).code;
+      if (code === 1000 || code === 1001 || code === 1005) return;
+      if (!url) return;
+      // Timestamped at CLOSE, not at connect: a socket that connects then
+      // dies two minutes later is a failure that happened two minutes in —
+      // anchoring it to construction puts the step at the top of the
+      // timeline, misordering the repro. Same for the page context: the
+      // page that matters is the one the close happened on.
+      const ev: NetEvent = {
+        k: "net",
+        target: redactUrl(url),
+        method: "WS",
+        status: 0,
+        err: `WebSocket closed (${code})`,
+        t: Date.now(),
+        via: "ws",
+        url: pageUrl(),
+      };
+      emit(ev);
+    });
+    return instance;
+  } as unknown as typeof WebSocket;
+  // Instances are created by the original class, so instanceof must be
+  // anchored on its prototype — otherwise page code doing
+  // `socket instanceof WebSocket` sees the fresh wrapper prototype and
+  // reports false for every socket.
+  WrappedWebSocket.prototype = OrigWebSocket.prototype;
+  // The wrapped constructor must not drop the protocol constants the page
+  // (and libraries) read off `WebSocket`: CONNECTING, OPEN, CLOSING, CLOSED.
+  const Wrapped = WrappedWebSocket as typeof WebSocket & {
+    CONNECTING: number;
+    OPEN: number;
+    CLOSING: number;
+    CLOSED: number;
+  };
+  Wrapped.CONNECTING = OrigWebSocket.CONNECTING;
+  Wrapped.OPEN = OrigWebSocket.OPEN;
+  Wrapped.CLOSING = OrigWebSocket.CLOSING;
+  Wrapped.CLOSED = OrigWebSocket.CLOSED;
+  window.WebSocket = Wrapped;
+};
