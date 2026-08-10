@@ -11,8 +11,8 @@
 import { REPLAY_SERVER_URL } from './constants.ts';
 import { formatDuration, type ReportFacts } from './facts.ts';
 import { foldRepeatedConsoles } from './fold.ts';
-import { isBeaconTarget, isFailedRequest } from './summary.ts';
-import type { TimelineStep } from './timeline.ts';
+import { countKeySignals, isBeaconTarget, isFailedRequest } from './summary.ts';
+import { isReproStep, type TimelineStep } from './timeline.ts';
 import type { IssueTemplate } from './templates.ts';
 import { formatElapsedTime } from './time.ts';
 import type { StoredEvent, TrailReport } from './types.ts';
@@ -106,6 +106,16 @@ const navStepText = (text: string): string => {
   return m ? `${m[1]!} ${hostPathOf(m[2]!)}` : text;
 };
 
+// What counts as a repro step is timeline.ts's call (STEP_KINDS), so the
+// model's picture of the session is the deterministic report's picture.
+const trimSteps = (timeline: TimelineStep[]) =>
+  timeline
+    .filter((s) => isReproStep(s.kind))
+    .map((s) =>
+      truncate(s.kind === 'nav' ? navStepText(s.text) : s.text, MAX_STEP_CHARS),
+    )
+    .slice(-40);
+
 export function buildSessionDigest(
   report: Pick<TrailReport, 'startedAt' | 'endedAt' | 'url'> | null,
   events: StoredEvent[],
@@ -115,12 +125,7 @@ export function buildSessionDigest(
 ): SessionDigest {
   // Steps are scrubbed like the title digest: nav URLs become host+path so
   // query-string tokens and session ids never reach the model.
-  const steps = timeline
-    .filter((s) => s.kind === 'nav' || s.kind === 'click' || s.kind === 'input')
-    .map((s) =>
-      truncate(s.kind === 'nav' ? navStepText(s.text) : s.text, MAX_STEP_CHARS),
-    )
-    .slice(-40);
+  const steps = trimSteps(timeline);
 
   const consoles = events
     .filter((e): e is Extract<StoredEvent, { k: 'console' }> => e.k === 'console')
@@ -150,15 +155,11 @@ export function buildSessionDigest(
 
   // Whole-session counts behind the trimmed arrays: folded consoles (a noisy
   // loop is one error, not a hundred) and beacon-filtered failed requests, so
-  // the numbers match the evidence the model actually sees.
-  const foldedErrors = foldRepeatedConsoles(events).filter(
-    (e) => e.k === 'console' && e.lv === 'error',
-  ).length;
-  const failedCount = events.filter(
-    (e) => e.k === 'net' && isFailedRequest(e.status) && !isBeaconTarget(e.target),
-  ).length;
+  // the numbers match the evidence the model actually sees — and match the
+  // title digest's numbers exactly (single source, countKeySignals).
+  const { foldedErrors, failedRequests } = countKeySignals(events);
   const flagCount = events.filter((e) => e.k === 'flag').length;
-  const stats = `${flagCount} flagged moments · ${foldedErrors} console errors · ${failedCount} failed requests in ${formatDuration(facts.durationMs)}`;
+  const stats = `${flagCount} flagged moments · ${foldedErrors} console errors · ${failedRequests} failed requests in ${formatDuration(facts.durationMs)}`;
 
   // Reporter flags: the user's own expected/actual notes, offset like the
   // timeline so the model can anchor them to the surrounding steps. Last five
@@ -248,12 +249,7 @@ export function buildTitleDigest(
   timeline: TimelineStep[],
   facts: ReportFacts,
 ): TitleDigest {
-  const steps = timeline
-    .filter((s) => s.kind === 'nav' || s.kind === 'click' || s.kind === 'input')
-    .map((s) =>
-      truncate(s.kind === 'nav' ? navStepText(s.text) : s.text, MAX_STEP_CHARS),
-    )
-    .slice(-TITLE_MAX_STEPS);
+  const steps = trimSteps(timeline).slice(-TITLE_MAX_STEPS);
 
   const consoles = events
     .filter((e): e is Extract<StoredEvent, { k: 'console' }> => e.k === 'console')
@@ -312,6 +308,9 @@ export function buildTitleDigest(
     }
   }
 
+  // Same folded/beacon-filtered numbers the report digest uses — the title
+  // pass and the enhance pass must never tell the model different counts.
+  const { foldedErrors, failedRequests } = countKeySignals(events);
   return {
     environment: {
       browser: facts.browser,
@@ -321,7 +320,7 @@ export function buildTitleDigest(
       trail: facts.extensionVersion,
       recorded: new Date(report?.startedAt ?? Date.now()).toISOString(),
     },
-    stats: `${flagCount} flagged moments · ${facts.consoleErrors} console errors · ${facts.failedRequests} failed requests in ${formatDuration(facts.durationMs)}`,
+    stats: `${flagCount} flagged moments · ${foldedErrors} console errors · ${failedRequests} failed requests in ${formatDuration(facts.durationMs)}`,
     steps,
     consoleErrors: consoles,
     failedRequests: nets,

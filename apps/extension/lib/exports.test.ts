@@ -71,7 +71,7 @@ describe("buildMetadataJson", () => {
       browser: "b",
       os: "o",
       extensionVersion: "e",
-      counts: { click: 1, input: 2, console: 3, net: 4 },
+      counts: { click: 1, input: 2, key: 3, submit: 4, viewport: 5, console: 3, net: 4 },
     });
     expect(JSON.parse(json)).toMatchObject({
       title: "t",
