@@ -1,7 +1,7 @@
 import { buildReportFacts, formatDuration } from './facts.ts';
 import { isBeaconTarget, isFailedRequest } from './summary.ts';
 import { foldRepeatedConsoles, type FoldedConsole } from './fold.ts';
-import { buildTimeline } from './timeline.ts';
+import { buildTimeline, isReproStep } from './timeline.ts';
 import { formatElapsedTime } from './time.ts';
 import type { StoredEvent, TrailReport } from './types.ts';
 
@@ -117,9 +117,14 @@ const pathOf = (url: string): string => {
 
 // The Environment section must derive from the same report the header facts
 // use — otherwise a saved session shows one duration/URL in the header and a
-// different one in the issue body.
-const envLines = (report: ReportSummary, events: StoredEvent[]) => {
-  const facts = buildReportFacts(events, report);
+// different one in the issue body. The caller's already-built timeline is
+// reused so a render never sorts the session twice.
+const envLines = (
+  report: ReportSummary,
+  events: StoredEvent[],
+  timeline: ReturnType<typeof buildTimeline>,
+) => {
+  const facts = buildReportFacts(events, report, {}, timeline);
   // Recorded is the capture start (like the AI digest's), never the render
   // time — re-exporting a cached session must not change the report.
   const recorded = new Date(report?.startedAt ?? Date.now()).toISOString();
@@ -127,6 +132,7 @@ const envLines = (report: ReportSummary, events: StoredEvent[]) => {
     `- Browser: ${facts.browser}`,
     `- OS: ${facts.os}`,
     `- Page: ${facts.url || 'Unknown'}`,
+    ...(facts.viewport ? [`- Viewport: ${facts.viewport}`] : []),
     `- Duration: ${formatDuration(facts.durationMs)}`,
     `- TRAIL: ${facts.extensionVersion}`,
     `- Recorded: ${recorded}`,
@@ -157,6 +163,12 @@ const shortTarget = (target: string, max = 220): string => {
   }
 };
 
+// Steps are capped so one section can't eat the whole issue-URL budget: a
+// 300-action session stays reproducible without silently dropping the
+// console/failed-request sections. The newest steps win — the immediate
+// lead-up to the failure is what the maintainer needs first.
+const MAX_STEPS = 100;
+
 // Build the report sections (also what buildIssueUrl fits to a byte budget).
 // Callers that already built the timeline (the review page memoizes it) pass
 // it in so a render never sorts the events more than once.
@@ -166,8 +178,15 @@ export function buildSections(
   opts: ReportOptions,
   timeline: ReturnType<typeof buildTimeline> = buildTimeline(events, opts.redact),
 ): ReportSection[] {
-  const actions = timeline.filter((s) => s.kind === 'nav' || s.kind === 'click' || s.kind === 'input');
-  const steps = actions.map((s, i) => `${i + 1}. ${s.text}`).join('\n');
+  // What counts as a repro step is timeline.ts's call (STEP_KINDS) — the AI
+  // digests filter through the same set.
+  const actions = timeline.filter((s) => isReproStep(s.kind));
+  const omitted = Math.max(0, actions.length - MAX_STEPS);
+  const kept = omitted ? actions.slice(-MAX_STEPS) : actions;
+  const list = kept.map((s, i) => `${i + 1}. ${s.text}`).join('\n');
+  const steps = list
+    ? `${omitted ? `> …${omitted} earlier step${omitted === 1 ? '' : 's'} omitted.\n\n` : ''}${list}`
+    : 'No actions recorded.';
 
   const consoles = foldRepeatedConsoles(events).filter(
     (e): e is FoldedConsole => e.k === 'console',
@@ -181,7 +200,10 @@ export function buildSections(
   const flags = events
     .filter((e) => e.k === 'flag')
     .sort((a, b) => a.t - b.t);
-  const t0 = events[0]?.t ?? 0;
+  // Anchor offsets to the same chronological baseline the timeline uses
+  // (its first step), never to insertion order — the report's @mm:ss must
+  // match what the user sees on screen.
+  const t0 = timeline[0]?.t ?? events[0]?.t ?? 0;
   const flagNote = (
     f: Extract<StoredEvent, { k: 'flag' }>,
     pick: (f: Extract<StoredEvent, { k: 'flag' }>) => string | undefined,
@@ -236,7 +258,7 @@ export function buildSections(
     {
       name: 'Environment',
       priority: SECTION_PRIORITIES.Environment!,
-      text: envLines(report, events),
+      text: envLines(report, events, timeline),
     },
   );
 
