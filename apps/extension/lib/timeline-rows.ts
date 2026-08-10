@@ -54,10 +54,12 @@ export const filterModes = Object.keys(filterLabels) as FilterMode[];
 
 export const GROUP_GAP = 2000;
 
-// Compress repetitive interaction runs (consecutive identical clicks/inputs
-// within GROUP_GAP) into one expandable row. Navigation, console and network
-// steps are landmarks and never group. Presentation-only: buildTimeline() and
-// the report markdown are untouched.
+// Compress repetitive interaction runs (consecutive identical clicks, typed
+// inputs, Enter presses, form submits, or same-control hovers within
+// GROUP_GAP) into one expandable row. Navigation, console, network, flag and
+// viewport steps are landmarks and never group — they are the coordinates a
+// reviewer navigates by. Presentation-only: buildTimeline() and the report
+// markdown are untouched.
 export type GroupRow = {
   kind: "group";
   steps: TimelineStep[];
@@ -65,6 +67,9 @@ export type GroupRow = {
   end: number;
 };
 export type Row = TimelineStep | GroupRow;
+
+// What counts as a compressible interaction run.
+const GROUPED_KINDS = new Set(["click", "input", "key", "submit", "hover"]);
 
 export function buildRows(steps: TimelineStep[]): Row[] {
   const rows: Row[] = [];
@@ -84,7 +89,7 @@ export function buildRows(steps: TimelineStep[]): Row[] {
       }
     }
     rows.push(
-      step.kind === "click" || step.kind === "input"
+      GROUPED_KINDS.has(step.kind)
         ? { kind: "group", steps: [step], start: step.t, end: step.t }
         : step,
     );
