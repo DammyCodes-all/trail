@@ -70,7 +70,8 @@ export function isAiMode() {
 const openRouterConfig = () => ({
   base: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
   apiKey: process.env.OPENROUTER_API_KEY,
-  model: process.env.OPENROUTER_MODEL ?? "nvidia/nemotron-3-ultra-550b-a55b:free",
+  model:
+    process.env.OPENROUTER_MODEL ?? "nvidia/nemotron-3-ultra-550b-a55b:free",
 });
 
 const groqConfig = () => ({
@@ -222,7 +223,12 @@ async function postCompletion(payload, config) {
 // exact template the extension will shape the issue onto (may be undefined
 // when the repo has no template); the model is told to map onto it so its
 // field values are never silently discarded.
-export async function proxyEnhance({ digest, templates, repo, chosenTemplate }) {
+export async function proxyEnhance({
+  digest,
+  templates,
+  repo,
+  chosenTemplate,
+}) {
   const config = openRouterConfig();
   const payload = JSON.stringify({
     model: config.model,
