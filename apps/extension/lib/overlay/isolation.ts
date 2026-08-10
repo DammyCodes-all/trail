@@ -49,6 +49,32 @@ const ISOLATED_EVENTS = [
   "focusout",
 ] as const;
 
+// The bubble stop above cannot silence one focus case: a page element that
+// BLURS because the overlay gained focus (opening the flag form). That
+// blur's event never touches the shadow boundary — its path runs from the
+// page element straight to window — so it sails past the shadow-root
+// listener. It is still an overlay caused focus side effect, matched not by
+// path but by `relatedTarget` (the new focus landing inside the overlay;
+// retargeted to the overlay host at window scope for cross-boundary
+// listeners). Stopping at window capture is the last reliable point: page
+// handlers below it — capture on document, every bubble handler anywhere —
+// are silenced like the boundary stop silences the composed cases. The
+// blurred element's own (target-phase) handlers run even later and are
+// silenced too; that is the isolation contract: page logic must not trip
+// because the reporter focused the overlay's form.
+const suppressFocusSteal = (shadow: ShadowRoot): (() => void) => {
+  const isOverlayNode = (node: EventTarget | null): boolean =>
+    node instanceof Node && (node === shadow.host || shadow.contains(node));
+  const stop = (e: Event) => {
+    const fe = e as FocusEvent;
+    if (fe.type === "focusout" && isOverlayNode(fe.relatedTarget)) {
+      e.stopImmediatePropagation();
+    }
+  };
+  window.addEventListener("focusout", stop, true);
+  return () => window.removeEventListener("focusout", stop, true);
+};
+
 // Attach the isolation stop to an overlay shadow root. Returns a detach
 // function (unused today — the overlay lives for the page's lifetime — but
 // kept for symmetric teardown and tests).
@@ -59,9 +85,11 @@ export function isolateOverlayShadow(shadow: ShadowRoot): () => void {
   for (const type of ISOLATED_EVENTS) {
     shadow.addEventListener(type, stop, false);
   }
+  const detachSteal = suppressFocusSteal(shadow);
   return () => {
     for (const type of ISOLATED_EVENTS) {
       shadow.removeEventListener(type, stop, false);
     }
+    detachSteal();
   };
 }
