@@ -59,7 +59,9 @@ export const instrumentClicks = (ctx: RecordContext) => {
   );
 };
 
-// Typed input, masked by default (see lib/record/redaction.ts).
+// Typed input, masked by default (see lib/record/redaction.ts). File inputs
+// are their own case: the synthetic value is a meaningless fake path, so the
+// event carries the selected file names instead and reads as an upload step.
 export const instrumentInputs = (
   ctx: RecordContext,
   redact: () => boolean,
@@ -71,6 +73,24 @@ export const instrumentInputs = (
       if (!isActive()) return;
       const el = e.target as HTMLInputElement;
       if (!el.matches?.("input,textarea,select")) return;
+      if (el instanceof HTMLInputElement && el.type === "file") {
+        const files = Array.from(el.files ?? [])
+          .map((f) => cap(f.name, 60) ?? "")
+          .filter(Boolean)
+          .slice(0, 3);
+        if (!files.length) return;
+        const ev: InputEvent = {
+          k: "input",
+          label: labelFor(el) ?? `<${el.tagName.toLowerCase()}>`,
+          t: Date.now(),
+          url: pageUrl(),
+          masked: false,
+          value: "",
+          files,
+        };
+        emit(ev);
+        return;
+      }
       const hide = shouldMaskInput(el, redact());
       const ev: InputEvent = {
         k: "input",
