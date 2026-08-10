@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { MSG_START, MSG_STATUS, MSG_STOP, REDACT_KEY, WEB_URL } from "@trail/review/lib/constants";
+import { MSG_START, MSG_STATUS, MSG_STOP, REDACT_KEY } from "@trail/review/lib/constants";
 import { getAllEvents, getReports, getSessionEvents, updateReportSummary } from "@/lib/db";
 import { countSummary, ZERO_COUNTS } from "@trail/review/lib/summary";
 import type { StoredEvent, TrailCounts, TrailReport } from "@trail/review/lib/types";
 import { Badge } from "@trail/review/ui/badge";
 import { Button } from "@trail/review/ui/button";
 import { Separator } from "@trail/review/ui/separator";
-import { CirclePlus, ExternalLink } from "lucide-react";
+import { CirclePlus } from "lucide-react";
 import { TrailLogo } from "@trail/review/ui/trail-logo";
 import { HistoryList } from "./components/HistoryList";
 import { RecordingScreen } from "./components/RecordingScreen";
@@ -172,18 +172,7 @@ function App() {
               <CirclePlus data-icon="inline-start" aria-hidden="true" />
               Start Report
             </Button>
-            <Button
-              className="h-11 w-full"
-              id="open-web"
-              variant="outline"
-              onClick={() => {
-                void browser.tabs.create({ url: WEB_URL });
-              }}
-            >
-              <ExternalLink data-icon="inline-start" aria-hidden="true" />
-              Open TRAIL web app
-            </Button>
-          </div>
+            </div>
 
           <Separator className="my-1 shrink-0" />
 
