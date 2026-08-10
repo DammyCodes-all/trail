@@ -62,7 +62,15 @@ export function TimelineCard({
         if (filter === "errors") return toneFor(step) === "error";
         if (filter === "network") return step.kind === "net";
         if (filter === "user") {
-          return step.kind === "nav" || step.kind === "click" || step.kind === "input";
+          return (
+            step.kind === "nav" ||
+            step.kind === "click" ||
+            step.kind === "input" ||
+            step.kind === "key" ||
+            step.kind === "submit" ||
+            step.kind === "hover" ||
+            step.kind === "viewport"
+          );
         }
         if (filter === "console") return step.kind === "console";
         return true;

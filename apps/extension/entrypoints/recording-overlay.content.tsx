@@ -46,7 +46,15 @@ type OverlayMessage = Partial<OverlayStatus> & {
   version?: number;
 };
 
-const ZERO_COUNTS: TrailCounts = { click: 0, input: 0, console: 0, net: 0 };
+const ZERO_COUNTS: TrailCounts = {
+  click: 0,
+  input: 0,
+  key: 0,
+  submit: 0,
+  viewport: 0,
+  console: 0,
+  net: 0,
+};
 
 const normalizeCounts = (counts?: Partial<TrailCounts>): TrailCounts => ({
   ...ZERO_COUNTS,

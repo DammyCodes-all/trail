@@ -33,7 +33,12 @@ import {
   setFlagCount,
   setSession,
 } from "@/lib/session";
-import { countEvents, countSummary, totalCounts, ZERO_COUNTS } from "@/lib/summary";
+import {
+  countEvents,
+  countSummary,
+  totalCounts,
+  ZERO_COUNTS,
+} from "@/lib/summary";
 import type { TrailCounts, TrailSession } from "@/lib/types";
 
 // Serializes MSG_BATCH handling: handlers share read-modify-write on counts, and
@@ -222,6 +227,9 @@ export default defineBackground(() => {
           const added = countEvents(msg.batch as Array<{ k: string }>);
           counts.click += added.click;
           counts.input += added.input;
+          counts.key += added.key;
+          counts.submit += added.submit;
+          counts.viewport += added.viewport;
           counts.console += added.console;
           counts.net += added.net;
           const countsChanged = totalCounts(added) > 0;
