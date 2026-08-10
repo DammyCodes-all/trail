@@ -6,10 +6,14 @@ import {
 } from "react";
 import {
   ChevronDown,
+  CornerDownLeft,
   Flag,
+  Focus,
   Globe2,
   Keyboard,
+  Monitor,
   MousePointer2,
+  Send,
   Terminal,
   WifiOff,
 } from "lucide-react";
@@ -28,6 +32,10 @@ export const iconByKind = {
   nav: Globe2,
   click: MousePointer2,
   input: Keyboard,
+  key: CornerDownLeft,
+  submit: Send,
+  hover: Focus,
+  viewport: Monitor,
   console: Terminal,
   net: WifiOff,
   flag: Flag,
