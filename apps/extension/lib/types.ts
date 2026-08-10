@@ -1,5 +1,17 @@
 export interface BaseTrailEvent {
-  k: 'click' | 'input' | 'console' | 'net' | 'nav' | 'rrweb' | 'flag';
+  k:
+    | 'click'
+    | 'input'
+    | 'key'
+    | 'submit'
+    | 'console'
+    | 'net'
+    | 'nav'
+    | 'hover'
+    | 'viewport'
+    | 'meta'
+    | 'rrweb'
+    | 'flag';
   t: number;
   url: string;
 }
@@ -21,11 +33,70 @@ export interface ClickEvent extends BaseTrailEvent {
   tag: string;
 }
 
+// Enter pressed on a form control. Keyboard-driven repros ("type a query,
+// press Enter") produce no click and often no change event — without this
+// step they would leave no trace at all. Only Enter is captured; other keys
+// are the page's own business.
+export interface KeyEvent extends BaseTrailEvent {
+  k: 'key';
+  key: 'Enter';
+  label: string;
+  tag: string;
+}
+
+// A form submission: entered via keyboard, by clicking a submit control, or
+// programmatically. Carries the form's context so the step reads
+// "Submitted form Sign-in (POST /api/login)". When the submit was caused by
+// clicking a button, `submitter` records that button's identity so the
+// timeline can fold the click into this step causally (SubmitEvent.submitter
+// is ground truth — no time-window guessing).
+export interface FormSubmitEvent extends BaseTrailEvent {
+  k: 'submit';
+  label: string;
+  method: string;
+  action: string;
+  submitter?: { label: string; tag: string };
+}
+
+// A hover that reveals UI: menu buttons (aria-haspopup) and role-based menu
+// surfaces only. A hover without a follow-up action is usually not the bug —
+// but menu-open bugs are unreproducible from steps alone, and the replay
+// cannot show :hover state, so the step is the only trace.
+export interface HoverEvent extends BaseTrailEvent {
+  k: 'hover';
+  label: string;
+  tag: string;
+  // The role/attribute that qualified this element (aria-haspopup, menu, …).
+  reason: string;
+}
+
+// A material viewport resize (responsive-layout bugs need the resize step).
+export interface ViewportEvent extends BaseTrailEvent {
+  k: 'viewport';
+  w: number;
+  h: number;
+}
+
+// Capture-time environment: the UA and viewport of the machine that
+// RECORDED, so the Environment section describes the recordee even when the
+// report is rendered on (or shared to) a different machine. Emitted at every
+// document boot; the earliest one wins.
+export interface MetaEvent extends BaseTrailEvent {
+  k: 'meta';
+  userAgent: string;
+  viewportW: number;
+  viewportH: number;
+  dpr: number;
+}
+
 export interface InputEvent extends BaseTrailEvent {
   k: 'input';
   label: string;
   masked: boolean;
   value: string;
+  // File inputs: the selected file names (capped). When present, the step
+  // reads "Uploaded N files to <label>" instead of a typed value.
+  files?: string[];
 }
 
 export interface ConsoleEvent extends BaseTrailEvent {
@@ -40,7 +111,10 @@ export interface NetEvent extends BaseTrailEvent {
   target: string;
   method: string;
   status: number;
-  via: 'fetch' | 'xhr';
+  // How the request left the page. 'fetch'/'xhr' are instrumented network
+  // calls; 'resource' is an element that failed to load (img, script, CSS —
+  // invisible to fetch/XHR); 'ws' is an abnormal WebSocket closure.
+  via: 'fetch' | 'xhr' | 'resource' | 'ws';
   err?: string;
   // Response body of the failed request, capped and truncated by the recorder.
   body?: string;
@@ -68,6 +142,11 @@ export interface FlagEvent extends BaseTrailEvent {
 
 export type TrailEvent =
   | ClickEvent
+  | KeyEvent
+  | FormSubmitEvent
+  | HoverEvent
+  | ViewportEvent
+  | MetaEvent
   | InputEvent
   | ConsoleEvent
   | NetEvent
@@ -80,6 +159,12 @@ export type StoredEvent = TrailEvent & { seq: number };
 export interface TrailCounts {
   click: number;
   input: number;
+  // Keyboard/forms are interactions too — counted like clicks, and folded
+  // into the "Interactions" tally. Hovers are deliberately NOT counted: they
+  // are ambient (a navbar sweep ticks the counter), timeline steps only.
+  key: number;
+  submit: number;
+  viewport: number;
   console: number;
   net: number;
 }

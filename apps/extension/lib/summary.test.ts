@@ -4,6 +4,7 @@ import {
   countSummary,
   isBeaconTarget,
   isFailedRequest,
+  latchesSessionSeverity,
   severityOfStatus,
   totalCounts,
   ZERO_COUNTS,
@@ -28,7 +29,15 @@ describe("countEvents", () => {
       event({ k: "nav" }),
       event({ k: "rrweb", ev: {} }),
     ];
-    expect(countEvents(events)).toEqual({ click: 2, input: 1, console: 1, net: 1 });
+    expect(countEvents(events)).toEqual({
+      click: 2,
+      input: 1,
+      key: 0,
+      submit: 0,
+      viewport: 0,
+      console: 1,
+      net: 1,
+    });
   });
 
   it("ignores unknown kinds", () => {
@@ -43,8 +52,10 @@ describe("countEvents", () => {
 });
 
 describe("totalCounts", () => {
-  it("sums all four counters", () => {
-    expect(totalCounts({ click: 1, input: 2, console: 3, net: 4 })).toBe(10);
+  it("sums all counters", () => {
+    expect(
+      totalCounts({ click: 1, input: 2, key: 3, submit: 4, viewport: 5, console: 3, net: 4 }),
+    ).toBe(22);
   });
 });
 
@@ -108,5 +119,23 @@ describe("severityOfStatus", () => {
   it("marks client errors moderate", () => {
     expect(severityOfStatus(400)).toBe("moderate");
     expect(severityOfStatus(404)).toBe("moderate");
+  });
+});
+
+describe("latchesSessionSeverity", () => {
+  it("escalates critical page-level failures", () => {
+    expect(latchesSessionSeverity({ status: 0 })).toBe(true);
+    expect(latchesSessionSeverity({ status: 503, via: "fetch" })).toBe(true);
+    expect(latchesSessionSeverity({ status: 1006, via: "ws" })).toBe(true);
+  });
+
+  it("never escalates from resource element failures", () => {
+    expect(latchesSessionSeverity({ status: 0, via: "resource" })).toBe(false);
+    expect(latchesSessionSeverity({ status: 500, via: "resource" })).toBe(false);
+  });
+
+  it("keeps moderate statuses moderate", () => {
+    expect(latchesSessionSeverity({ status: 404, via: "fetch" })).toBe(false);
+    expect(latchesSessionSeverity({ status: 404, via: "resource" })).toBe(false);
   });
 });
