@@ -44,19 +44,27 @@ export const AI_CACHE_KEY = 'trail:aiCache';
 export const SHARE_CACHE_KEY = 'trail:shareCache';
 
 // Shared-package env reads. The extension inlines WXT_PUBLIC_* at build time,
-// the web app inlines NEXT_PUBLIC_*; the fallbacks cover local dev on both
-// sides. `globalThis.process` is the web fallback for bundlers that inline
-// process.env.NEXT_PUBLIC_* instead of import.meta.env (guarded so the
-// identifier never throws in a browser). `?? {}` covers runtimes where
-// import.meta.env itself is undefined (Next SSR).
+// the web app inlines NEXT_PUBLIC_* by statically replacing
+// `process.env.NEXT_PUBLIC_*` member accesses — a replacement that only works
+// for literal accesses (`process.env[key]` lookups survive untouched and then
+// throw in the browser, where no `process` exists). Each variable therefore
+// gets a dedicated static access below, guarded so bundlers that define no
+// `process` (the extension's browser build) short-circuit instead of
+// evaluating it. `?? {}` covers runtimes where import.meta.env itself is
+// undefined (Next SSR).
 const env = (import.meta.env ?? {}) as Record<string, string | undefined>;
 
-const nextPublicEnv = (key: string): string | undefined =>
-  (globalThis as Record<string, unknown>).process
-    ? ((globalThis as Record<string, unknown>).process as {
-        env?: Record<string, string | undefined>;
-      }).env?.[key]
-    : undefined;
+const nextPublicEnv = (key: string): string | undefined => {
+  if (typeof process === "undefined") return undefined;
+  switch (key) {
+    case "NEXT_PUBLIC_REPLAY_SERVER_URL":
+      return process.env.NEXT_PUBLIC_REPLAY_SERVER_URL;
+    case "NEXT_PUBLIC_WEB_URL":
+      return process.env.NEXT_PUBLIC_WEB_URL;
+    default:
+      return undefined;
+  }
+};
 
 // Base URL of the replay share server (see replay-server/). Points at the local
 // twin by default; production builds override via WXT_PUBLIC_REPLAY_SERVER_URL

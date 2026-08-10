@@ -11,8 +11,9 @@ import { createWebLoader } from "@/lib/loader";
 // How long the handoff gate waits before opening TRAIL on its own.
 const HANDOFF_COUNTDOWN_SECS = 10;
 // How long the probe (and the open-share round-trip) may take before we fall
-// back to the inline review.
-const PROBE_TIMEOUT_MS = 500;
+// back to the inline review. 500ms is too tight for a relay injected at
+// document_idle on a cold tab — a false "absent" skips the gate entirely.
+const PROBE_TIMEOUT_MS = 1000;
 const OPEN_ACK_TIMEOUT_MS = 3000;
 
 type ExtensionState = "probing" | "present" | "absent";
@@ -128,6 +129,8 @@ export default function SharedView({
           <button
             id="handoff-inline"
             className="text-[13px] text-muted-foreground underline-offset-4 hover:underline"
+            // "failed" doubles as "dismissed": the inline review is the
+            // non-handoff terminal state.
             onClick={() => setHandoff("failed")}
           >
             View in browser instead

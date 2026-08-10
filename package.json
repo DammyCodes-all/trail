@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "TRAIL monorepo: a browser extension that turns a live bug reproduction into a maintainer-ready GitHub issue.",
   "private": true,
+  "packageManager": "pnpm@11.21.0",
   "scripts": {
     "dev:extension": "pnpm --filter trail-extension dev",
     "build:extension": "pnpm --filter trail-extension build",
@@ -10,13 +11,6 @@
     "dev:replay": "pnpm --filter trail-replay-server dev",
     "dev:web": "pnpm --filter web dev",
     "dev:all": "pnpm -r --parallel dev"
-  },
-  "devEngines": {
-    "packageManager": {
-      "name": "pnpm",
-      "version": "^11.16.0",
-      "onFail": "download"
-    }
   },
   "type": "module"
 }

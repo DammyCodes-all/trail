@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { REPLAY_SERVER_URL, WEB_URL } from "@trail/review/lib/constants";
 import type { SharedReportPayload } from "@trail/review/lib/types";
 import SharedView from "@/components/shared-view";
@@ -7,21 +8,26 @@ import { SharedReplayError } from "./shared-error";
 
 const ID_RE = /^[A-Za-z0-9.-]{1,64}$/;
 
-async function fetchPayload(id: string): Promise<SharedReportPayload | null> {
-  try {
-    const res = await fetch(`${REPLAY_SERVER_URL}/api/replays/${id}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const payload = (await res.json()) as SharedReportPayload;
-    if (payload?.v !== 2 || !Array.isArray(payload.events) || !payload.report) {
+// Wrapped in React cache() so generateMetadata and the page component share a
+// single payload fetch per request — the session JSON can be megabytes and the
+// no-store fetch would otherwise hit the replay server twice.
+const fetchPayload = cache(
+  async (id: string): Promise<SharedReportPayload | null> => {
+    try {
+      const res = await fetch(`${REPLAY_SERVER_URL}/api/replays/${id}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return null;
+      const payload = (await res.json()) as SharedReportPayload;
+      if (payload?.v !== 2 || !Array.isArray(payload.events) || !payload.report) {
+        return null;
+      }
+      return payload;
+    } catch {
       return null;
     }
-    return payload;
-  } catch {
-    return null;
-  }
-}
+  },
+);
 
 export async function generateMetadata({
   params,

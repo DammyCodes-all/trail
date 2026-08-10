@@ -25,7 +25,7 @@ import {
 } from "@/lib/recorder-scripts";
 import { suggestTitle } from "@trail/review/lib/report";
 import { isShareLink } from "@trail/review/lib/share";
-import { WEB_HOST } from "@trail/review/lib/constants";
+import { WEB_ORIGIN } from "@trail/review/lib/constants";
 import {
   clearCounts,
   clearFlagCount,
@@ -305,8 +305,10 @@ export default defineBackground(() => {
         try {
           // Only answer links that point at the web app's share route — the
           // popup used to validate these; the bridge keeps the same bar.
+          // Origin exact-match, not hostname suffix: trailing-host matches
+          // would admit sibling domains like `notrail.dev` for `trail.dev`.
           const link = typeof msg.link === 'string' ? msg.link : '';
-          if (!link || !isShareLink(link) || !new URL(link).hostname.endsWith(WEB_HOST)) {
+          if (!link || !isShareLink(link) || new URL(link).origin !== WEB_ORIGIN) {
             sendResponse({ ok: false, error: 'invalid share link' });
             return;
           }

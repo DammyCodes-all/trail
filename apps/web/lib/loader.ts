@@ -33,7 +33,14 @@ export function createWebLoader(
     },
     platform: {
       openTab: (url: string) => window.open(url, "_blank", "noopener"),
-      closeTab: () => window.close(),
+      closeTab: () => {
+        // Same constraint as the shared-error screen: close() works only on
+        // script-opened tabs, so fall back to back history when refused.
+        window.close();
+        window.setTimeout(() => {
+          if (window.history.length > 1) window.history.back();
+        }, 200);
+      },
       // The web viewer has a local store of its own, so title edits persist
       // across reloads of the same link.
       persistTitle: (reportId: number, title: string) =>

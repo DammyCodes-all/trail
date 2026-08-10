@@ -1,9 +1,12 @@
+"use client";
+
 import { TrailLogo } from "@trail/review/ui/trail-logo";
 import { Button } from "@trail/review/ui/button";
 
 // Server-rendered "unavailable" screen (payload fetch failed, unknown id, or
 // the replay server is unreachable) — matches the review app's error look so
-// the two states feel like one product.
+// the two states feel like one product. Closure is client-side because the
+// screen is served from a server component.
 export function SharedReplayError() {
   return (
     <div className="grid min-h-screen place-items-center px-6">
@@ -20,7 +23,15 @@ export function SharedReplayError() {
         </p>
         <Button
           className="mt-6 min-h-10 rounded-sm bg-white px-4 py-2.5 text-black hover:bg-white/90"
-          onClick={() => window.close()}
+          onClick={() => {
+            // Browsers only honor close() for script-opened tabs; a share
+            // link lands in a user-opened one, so fall back to back history
+            // after the close attempt is refused.
+            window.close();
+            window.setTimeout(() => {
+              if (window.history.length > 1) window.history.back();
+            }, 200);
+          }}
         >
           Close tab
         </Button>
