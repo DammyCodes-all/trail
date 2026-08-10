@@ -1,6 +1,6 @@
-import type { StoredEvent, TrailReport } from "./types";
+import type { MetaEvent, StoredEvent, TrailReport } from "./types";
 import { buildTimeline } from "./timeline";
-import { isFailedRequest, severityOfStatus } from "./summary";
+import { isFailedRequest, latchesSessionSeverity } from "./summary";
 
 export type ReportSeverity = "high" | "medium" | "low";
 
@@ -16,6 +16,9 @@ export interface ReportFacts {
   extensionVersion: string;
   url: string;
   host: string;
+  // "WxH", captured at capture time; absent for sessions recorded before
+  // meta events existed.
+  viewport?: string;
 }
 
 interface FactOptions {
@@ -103,7 +106,7 @@ export function buildReportFacts(
       else consoleWarnings++;
     } else if (event.k === "net" && isFailedRequest(event.status)) {
       failedRequests++;
-      if (severityOfStatus(event.status) === "critical") {
+      if (latchesSessionSeverity(event)) {
         criticalNetworkFailure = true;
       }
     }
@@ -127,10 +130,22 @@ export function buildReportFacts(
     if (url) host = url;
   }
 
+  // The environment the session was RECORDED in, not the machine rendering
+  // it: a shared report opened on a different browser must still describe the
+  // recordee. The earliest meta event of the session wins; absent that
+  // (pre-meta sessions, staged tests), fall back to the rendering machine.
+  let meta: MetaEvent | undefined;
+  for (const event of events) {
+    if (event.k === "meta" && (!meta || event.t < meta.t)) meta = event;
+  }
   const userAgent =
     options.userAgent ??
+    meta?.userAgent ??
     (typeof navigator === "undefined" ? "" : navigator.userAgent);
   const environment = parseUserAgent(userAgent);
+  const viewport = meta
+    ? `${meta.viewportW}×${meta.viewportH}`
+    : undefined;
   const extensionVersion =
     options.extensionVersion ??
     (typeof browser === "undefined"
@@ -149,6 +164,7 @@ export function buildReportFacts(
     extensionVersion,
     url,
     host,
+    viewport,
   };
 }
 
