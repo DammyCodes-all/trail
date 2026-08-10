@@ -2,7 +2,16 @@ import { POST_MESSAGE_KEY, FLAG_KEY } from "@/lib/constants";
 import type { RecordContext } from "@/lib/record/context";
 import { instrumentConsole } from "@/lib/record/console";
 import { instrumentClicks, instrumentInputs } from "@/lib/record/interactions";
-import { instrumentNetwork } from "@/lib/record/network";
+import { instrumentKeys } from "@/lib/record/keys";
+import { instrumentSubmits } from "@/lib/record/forms";
+import { instrumentHovers } from "@/lib/record/hover";
+import { instrumentViewport } from "@/lib/record/viewport";
+import {
+  instrumentNetwork,
+  instrumentResourceErrors,
+  instrumentWebSockets,
+} from "@/lib/record/network";
+import { emitMeta } from "@/lib/record/meta";
 import { createRrweb } from "@/lib/record/rrweb";
 import { cap } from "@/lib/record/format";
 import type { FlagEvent, NavEvent } from "@/lib/types";
@@ -47,8 +56,14 @@ export default defineContentScript({
 
     instrumentConsole(ctx);
     instrumentNetwork(ctx);
+    instrumentResourceErrors(ctx);
+    instrumentWebSockets(ctx);
     instrumentClicks(ctx);
     instrumentInputs(ctx, () => autoRedact);
+    instrumentKeys(ctx);
+    instrumentSubmits(ctx);
+    instrumentHovers(ctx);
+    instrumentViewport(ctx);
 
     addEventListener("message", (e) => {
       if (e.data?.[POST_MESSAGE_KEY] === "stop") {
@@ -105,6 +120,9 @@ export default defineContentScript({
         ?.type === 1;
     const nav: NavEvent = { k: "nav", t: Date.now(), url: location.href, reload };
     ctx.emit(nav);
+    // Capture-time environment: rides the same boot path as nav, so stray-tab
+    // boots are dropped by the background's session gate exactly like nav is.
+    emitMeta(ctx);
 
     // Announce the boot: a page that loaded mid-session inherits this recorder,
     // and the relay decides whether it belongs here by re-checking the session.

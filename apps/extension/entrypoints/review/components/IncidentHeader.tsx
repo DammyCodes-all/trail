@@ -193,7 +193,7 @@ export function IncidentHeader({
           <Fact
             icon={MousePointer2}
             label="Interactions"
-            value={counts.click + counts.input}
+            value={counts.click + counts.input + counts.key + counts.submit}
           />
         </div>
         <div className="lg:px-5">
