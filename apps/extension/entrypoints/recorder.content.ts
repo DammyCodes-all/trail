@@ -87,16 +87,30 @@ export default defineContentScript({
           if (rrweb.running) rrweb.restart();
         }
       } else if (e.data?.[POST_MESSAGE_KEY] === FLAG_KEY) {
-        // The overlay's ⚑ button: a reporter-marked moment, captured like any
-        // other event so it flows through the same relay/batch/db pipeline.
+        // The overlay posts per flag flow: an 'open' when the form appears, a
+        // 'cancel' when it's dismissed without submitting, and a 'submit' with
+        // the notes. Only submits (and legacy notes-only events) carry text;
+        // the window edges are marker events. Events from before phase existed
+        // carry neither and read as submits.
         if (!active) return;
-        const d = e.data.d as { expected?: string; actual?: string } | undefined;
+        const d = e.data.d as
+          | { expected?: string; actual?: string; phase?: 'open' | 'submit' | 'cancel' }
+          | undefined;
+        const rawPhase = d?.phase;
+        const phase =
+          rawPhase === 'open' ||
+          rawPhase === 'submit' ||
+          rawPhase === 'cancel'
+            ? rawPhase
+            : undefined;
+        const notes = phase !== 'open' && phase !== 'cancel';
         const flag: FlagEvent = {
-          k: "flag",
+          k: 'flag',
           t: Date.now(),
           url: location.href,
-          expected: cap(d?.expected ?? "", 240) || undefined,
-          actual: cap(d?.actual ?? "", 240) || undefined,
+          phase,
+          expected: notes ? cap(d?.expected ?? '', 240) || undefined : undefined,
+          actual: notes ? cap(d?.actual ?? '', 240) || undefined : undefined,
         };
         ctx.emit(flag);
       }

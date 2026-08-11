@@ -237,8 +237,10 @@ export default defineBackground(() => {
           counts.net += added.net;
           const countsChanged = totalCounts(added) > 0;
           await setCounts(counts);
-          const addedFlags = (msg.batch as Array<{ k: string }>).filter(
-            (e) => e.k === "flag",
+          const addedFlags = (msg.batch as Array<{ k: string; phase?: string }>).filter(
+            // Only submits are flags to the reporter — an 'open'/'cancel' is a
+            // window edge of the report-writing window, not a flagged moment.
+            (e) => e.k === "flag" && e.phase !== "open" && e.phase !== "cancel",
           ).length;
           if (addedFlags > 0) {
             await setFlagCount((await getFlagCount()) + addedFlags);
