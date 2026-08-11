@@ -137,12 +137,15 @@ export interface RrwebEvent extends BaseTrailEvent {
 //
 // `phase` distinguishes the captured moments of the flag flow: 'open' (the
 // flag form appeared — the start of the report-writing window), 'submit' (the
-// flag was submitted, carrying the notes) and 'cancel' (the form was closed
+// flag was submitted, carrying the note) and 'cancel' (the form was closed
 // without submitting). Events recorded before `phase` existed have no phase
-// and are treated as submits.
+// and are treated as submits. `note` is the reporter's single free-form
+// account (expected vs actual is extracted downstream); `expected`/`actual`
+// are the legacy two-field form and still read for old sessions.
 export interface FlagEvent extends BaseTrailEvent {
   k: 'flag';
   phase?: 'open' | 'submit' | 'cancel';
+  note?: string;
   expected?: string;
   actual?: string;
 }

@@ -89,7 +89,12 @@ function App() {
         type: MSG_START,
         tabId: tab?.id,
       });
-      if (resp && !resp.ok) alert(resp.error);
+      if (resp && !resp.ok) {
+        alert(resp.error);
+        return;
+      }
+      // Recording is live: the popup has nothing left to do.
+      window.close();
     } finally {
       setBusy(false);
     }
@@ -98,14 +103,19 @@ function App() {
   const stop = async () => {
     setBusy(true);
     try {
-      await browser.runtime.sendMessage({ type: MSG_STOP });
+      const res = (await browser.runtime.sendMessage({
+        type: MSG_STOP,
+      })) as { ok?: boolean; seq?: number } | undefined;
       const [evs, reps] = await Promise.all([getAllEvents(), getReports()]);
       setEvents(evs);
       setReports(reps);
       await refresh();
-      // The demo payoff: stop recording, drop straight into the review tab.
+      // The demo payoff: stop recording, drop straight into the review tab —
+      // linked to the saved report so the AI title lands and persists there.
       await browser.tabs.create({
-        url: browser.runtime.getURL("/review.html"),
+        url: browser.runtime.getURL(
+          res?.seq ? `/review.html?report=${res.seq}` : "/review.html",
+        ),
       });
     } finally {
       setBusy(false);

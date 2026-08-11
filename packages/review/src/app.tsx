@@ -274,12 +274,19 @@ export function ReviewApp({
   // AI title seeds the editable field only while the user hasn't typed — the
   // same guard the repo suggestion uses, so AI never clobbers a mid-edit.
   // A landed enhance title also wins over a still-pending page-load title.
+  // Persist on landing, not just on blur, so the popup's history entry shows
+  // the AI title even if the tab is closed without touching the field.
   useEffect(() => {
     if (aiResult?.title) {
       enhanceTitleLandedRef.current = true;
-      if (!titleEditedRef.current) setTitle(aiResult.title);
+      if (!titleEditedRef.current) {
+        setTitle(aiResult.title);
+        if (reportId && aiResult.title !== report?.title) {
+          platform.persistTitle?.(reportId, aiResult.title);
+        }
+      }
     }
-  }, [aiResult]);
+  }, [aiResult, reportId, report?.title]);
 
   // Mirror aiEnabled into a ref: async title/enhance completions read it at
   // seed time, so toggling AI off mid-flight drops a late result.
@@ -589,6 +596,9 @@ export function ReviewApp({
           aiEnabledRef.current
         ) {
           setTitle(cached.title);
+          if (reportId && cached.title !== report?.title) {
+            platform.persistTitle?.(reportId, cached.title);
+          }
         }
         setTitleAIState("ready");
         return;
@@ -609,6 +619,9 @@ export function ReviewApp({
           aiEnabledRef.current
         ) {
           setTitle(outcome.title);
+          if (reportId && outcome.title !== report?.title) {
+            platform.persistTitle?.(reportId, outcome.title);
+          }
         }
         void rememberAIResult(key, { title: outcome.title });
         setTitleAIState("ready");

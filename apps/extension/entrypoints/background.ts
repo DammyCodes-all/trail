@@ -132,7 +132,7 @@ async function startRecording(
   return { ok: true };
 }
 
-async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
+async function stopRecording(): Promise<{ ok: boolean; error?: string; seq?: number }> {
   const session = await getSession();
   try {
     await unregisterRecorderScripts();
@@ -158,11 +158,12 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
 
   // Save a report entry for the popup's history list. Best-effort: never fail a
   // stop because history writing hiccuped.
+  let seq: number | undefined;
   if (session) {
     try {
       const events = await getAllEvents();
       const summary = countSummary(events);
-      const seq = await saveReport({
+      seq = await saveReport({
         title: suggestTitle(events),
         repo: "",
         startedAt: session.startedAt,
@@ -180,11 +181,14 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string }> {
       // history is best-effort
     }
   }
-  return { ok: true };
+  return { ok: true, seq };
 }
 
-async function openReviewPage(): Promise<void> {
-  await browser.tabs.create({ url: browser.runtime.getURL("/review.html") });
+async function openReviewPage(seq?: number): Promise<void> {
+  const suffix = seq ? `?report=${seq}` : "";
+  await browser.tabs.create({
+    url: browser.runtime.getURL(`/review.html${suffix}`),
+  });
 }
 
 export default defineBackground(() => {
@@ -274,9 +278,10 @@ export default defineBackground(() => {
     if (msg?.type === MSG_STOP) {
       void (async () => {
         try {
-          sendResponse(await stopRecording());
+          const res = await stopRecording();
+          sendResponse(res);
           if (msg?.source === "overlay") {
-            await openReviewPage();
+            await openReviewPage(res?.seq);
           }
         } catch (err) {
           sendResponse({ ok: false, error: (err as Error).message });

@@ -46,10 +46,10 @@ const fenced = (s: string): string => {
 export function suggestTitle(events: StoredEvent[]): string {
   const ordered = [...events].sort((a, b) => a.t - b.t);
   const flag = ordered.find(
-    (e) => e.k === 'flag' && Boolean((e.actual || e.expected)?.trim()),
+    (e) => e.k === 'flag' && Boolean((e.note || e.actual || e.expected)?.trim()),
   );
   if (flag && flag.k === 'flag') {
-    return (flag.actual || flag.expected || '').trim().slice(0, 70);
+    return (flag.note || flag.actual || flag.expected || '').trim().slice(0, 70);
   }
   const consoleErr = ordered.find((e) => e.k === 'console' && e.lv === 'error');
   if (consoleErr && consoleErr.k === 'console') {
@@ -87,9 +87,11 @@ export function suggestTitle(events: StoredEvent[]): string {
 
 const SECTION_PRIORITIES: Record<string, number> = {
   'Steps to Reproduce': 1,
-  // The reporter's expected/actual notes sit right after the repro steps —
-  // the canonical position for them in a professional bug report — and before
-  // the technical evidence sections.
+  // The reporter's notes sit right after the repro steps — the canonical
+  // position for them in a professional bug report — and before the technical
+  // evidence sections. (Legacy sessions may also carry the expected/actual
+  // split, ordered the same way.)
+  'Reporter Notes': 1.2,
   'Expected Behavior': 1.25,
   'Actual Behavior': 1.35,
   'Console Errors': 2,
@@ -194,9 +196,10 @@ export function buildSections(
   const nets = events.filter(isFailedNet);
 
   // Reporter flags: each flag is its own moment. Bullets carry the time offset
-  // so N flags read as N distinct moments, never one merged pair. Sections are
-  // only emitted when the reporter left that note — a flag without notes stays
-  // a timeline marker and a hint for the AI, not report text.
+  // so N flags read as N distinct moments, never one merged pair. The modern
+  // form is a single free-form note ('Reporter Notes'); legacy expected/actual
+  // sessions still render their two sections. A flag without text stays a
+  // timeline marker and a hint for the AI, not report text.
   const flags = events
     .filter((e) => e.k === 'flag')
     .sort((a, b) => a.t - b.t);
@@ -208,6 +211,7 @@ export function buildSections(
     f: Extract<StoredEvent, { k: 'flag' }>,
     pick: (f: Extract<StoredEvent, { k: 'flag' }>) => string | undefined,
   ) => `- \`@${formatElapsedTime(f.t - t0)}\` — ${pick(f) ?? ''}`.trim();
+  const reporterNotes = flags.filter((f) => f.note?.trim());
   const expectedNotes = flags.filter((f) => f.expected?.trim());
   const actualNotes = flags.filter((f) => f.actual?.trim());
 
@@ -219,6 +223,13 @@ export function buildSections(
     },
   ];
 
+  if (reporterNotes.length) {
+    sections.push({
+      name: 'Reporter Notes',
+      priority: SECTION_PRIORITIES['Reporter Notes']!,
+      text: reporterNotes.map((f) => flagNote(f, (x) => x.note)).join('\n'),
+    });
+  }
   if (expectedNotes.length) {
     sections.push({
       name: 'Expected Behavior',

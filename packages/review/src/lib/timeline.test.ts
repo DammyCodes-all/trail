@@ -148,13 +148,13 @@ describe("buildTimeline flag windows", () => {
     const steps = buildTimeline([
       nav,
       event({ k: "flag", t: 1000, phase: "open" }),
-      event({ k: "flag", t: 1000 + 42_000, phase: "submit", expected: "works", actual: "broken" }),
+      event({ k: "flag", t: 1000 + 42_000, phase: "submit", note: "Expected $4.99 but the total showed $9.98" }),
     ]);
     expect(steps.map((s) => s.kind)).toEqual(["nav", "flag"]);
     expect(steps[1]).toMatchObject({
       t: 43_000,
       kind: "flag",
-      text: 'Flag: "works" — "broken" (42s of report writing)',
+      text: 'Flag: "Expected $4.99 but the total showed $9.98" (42s of report writing)',
     });
   });
 
@@ -181,6 +181,23 @@ describe("buildTimeline flag windows", () => {
     ]);
     expect(steps.map((s) => s.kind)).toEqual(["nav", "flag", "flag"]);
     expect(steps[1]).toMatchObject({ text: "Flagged this moment" });
+    // Legacy two-field sessions keep their expected/actual rendering.
     expect(steps[2]).toMatchObject({ text: 'Flag: "works" — "broken"' });
+  });
+
+  it("prefers the note over legacy expected/actual fields", () => {
+    const steps = buildTimeline([
+      nav,
+      event({
+        k: "flag",
+        t: 5000,
+        note: "The total showed double the price",
+        expected: "works",
+        actual: "broken",
+      }),
+    ]);
+    expect(steps[1]).toMatchObject({
+      text: 'Flag: "The total showed double the price"',
+    });
   });
 });
