@@ -189,6 +189,7 @@ export const ReplayPanel = forwardRef<
             <ReplayPlayer
               ref={replayRef}
               events={events}
+              speed={speed}
               onCurrentTimeChange={onCurrentTimeChange}
               onDurationChange={setDuration}
               onPlayingChange={setIsPlaying}

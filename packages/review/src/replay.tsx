@@ -1,7 +1,14 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from "react";
 import { EventType, type eventWithTime } from "@rrweb/types";
 import Player from "rrweb-player";
 import "rrweb-player/dist/style.css";
+import { thinEvents } from "@trail/review/lib/replay/thin";
 
 export interface ReplayPlayerHandle {
   seek: (timeOffset: number, play?: boolean) => void;
@@ -12,6 +19,7 @@ export interface ReplayPlayerHandle {
 
 interface ReplayPlayerProps {
   events: eventWithTime[];
+  speed?: number;
   onCurrentTimeChange?: (timeOffset: number) => void;
   onDurationChange?: (duration: number) => void;
   onPlayingChange?: (playing: boolean) => void;
@@ -28,6 +36,7 @@ export const ReplayPlayer = forwardRef<
 >(function ReplayPlayer(
   {
     events,
+    speed = 1,
     onCurrentTimeChange,
     onDurationChange,
     onPlayingChange,
@@ -41,12 +50,25 @@ export const ReplayPlayer = forwardRef<
     onDurationChange,
     onPlayingChange,
   });
+  // Position and play state tracked inside the player: a rebuild (speed
+  // change) must resume exactly where the old instance was.
+  const lastTimeRef = useRef(0);
+  const wasPlayingRef = useRef(false);
 
   callbackRef.current = {
     onCurrentTimeChange,
     onDurationChange,
     onPlayingChange,
   };
+
+  // At high speed the replayer executes every due event in one burst per
+  // frame, so the cursor stream is thinned per speed. 1x and 0.5x share the
+  // full recording (same reference), so those speed changes never rebuild the
+  // player — the transport applies them via setSpeed instead.
+  const playEvents = useMemo(
+    () => thinEvents(events, speed),
+    [events, speed],
+  );
 
   useImperativeHandle(
     forwardedRef,
@@ -63,12 +85,12 @@ export const ReplayPlayer = forwardRef<
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || !events.length) return;
+    if (!container || !playEvents.length) return;
 
     let frame = 0;
     let measuredWidth = 0;
     let measuredHeight = 0;
-    const meta = events.find((event) => event.type === EventType.Meta);
+    const meta = playEvents.find((event) => event.type === EventType.Meta);
     const viewportRatio =
       meta && meta.data.width > 0 && meta.data.height > 0
         ? meta.data.width / meta.data.height
@@ -92,11 +114,11 @@ export const ReplayPlayer = forwardRef<
     const player = new Player({
       target: container,
       props: {
-        events,
+        events: playEvents,
         ...initial,
         autoPlay: false,
         showController: false,
-        speed: 1,
+        speed,
         speedOption: [0.5, 1, 2, 4],
       },
     }) as PlayerInstance;
@@ -105,22 +127,37 @@ export const ReplayPlayer = forwardRef<
     player.addEventListener("ui-update-current-time", (detail) => {
       const payload = (detail as { payload?: unknown })?.payload ?? detail;
       if (typeof payload === "number") {
+        lastTimeRef.current = payload;
         callbackRef.current.onCurrentTimeChange?.(payload);
       }
     });
     player.addEventListener("ui-update-player-state", (detail) => {
       const payload = (detail as { payload?: unknown })?.payload ?? detail;
       if (typeof payload === "string") {
+        wasPlayingRef.current = payload === "playing";
         callbackRef.current.onPlayingChange?.(payload === "playing");
       }
     });
     player.addEventListener("finish", () => {
+      wasPlayingRef.current = false;
       callbackRef.current.onPlayingChange?.(false);
     });
 
     const metadata = player.getMetaData();
     callbackRef.current.onDurationChange?.(metadata.totalTime);
     callbackRef.current.onPlayingChange?.(false);
+
+  // The player is rebuilt whenever the (thinned) event stream changes: when
+  // the recording is replaced, or when the speed crosses the 1x boundary and
+  // the cursor stream gets thinned/unthinned. Resume where the previous
+  // instance was. (Speed changes within a thinned regime — 0.5x↔1x, 2x↔4x —
+  // apply via setSpeed and never rebuild.)
+    if (wasPlayingRef.current || lastTimeRef.current > 0) {
+      player.goto(
+        Math.min(lastTimeRef.current, metadata.totalTime),
+        wasPlayingRef.current,
+      );
+    }
 
     const resizePlayer = (availableWidth: number) => {
       const next = dimensions(availableWidth);
@@ -158,7 +195,7 @@ export const ReplayPlayer = forwardRef<
       playerRef.current = null;
       player.$destroy();
     };
-  }, [events]);
+  }, [playEvents]);
 
   return <div ref={containerRef} className="replay w-full" />;
 });

@@ -3,19 +3,24 @@ import { EventType, IncrementalSource, type eventWithTime } from "@rrweb/types";
 // rrweb's replayer advances time once per animation frame and executes every
 // event that has come due in a single synchronous burst, so at high speed
 // dozens of micro-events (cursor positions, scroll ticks) land in the same
-// frame and the replay stutters. Thinning the stream to roughly one cursor
-// step per frame keeps 2x/4x playback legible without touching DOM mutations,
-// whose node-id references make them non-droppable.
+// frame and the replay stutters. Cursor positions are thinned at replay time
+// because rrweb records them unthrottled. Scroll needs no replay-time
+// thinning: capture throttles it to one event per 200ms (sampling.scroll in
+// rrweb.ts), which stays ~50ms apart in replay time even at 4x. DOM
+// mutations are never touched — their node-id references make them
+// non-droppable.
 export const thinEvents = (
   events: eventWithTime[],
   speed: number,
 ): eventWithTime[] => {
   if (speed <= 1 || events.length === 0) return events;
 
-  const minMouseGap = 1000 / speed; // replay-ms between kept cursor positions
-  const scrollGap = 200; // replay-ms between kept scroll events
+  // Kept cursor positions are minMouseGap recording-ms apart: 1000ms of
+  // recording per kept step, i.e. 1000/speed² ms of replay time (~15 frames
+  // at 2x, ~4 frames at 4x) — sparse enough that a per-frame burst stays
+  // small, dense enough that the cursor still tracks the real path.
+  const minMouseGap = 1000 / speed;
   let lastMouseAt = -Infinity;
-  let lastScrollAt = -Infinity;
   let changed = false;
 
   const thinned = events.map((event) => {
@@ -50,15 +55,6 @@ export const thinEvents = (
       if (kept.length === positions.length) return event;
       changed = true;
       return { ...event, data: { ...data, positions: kept } };
-    }
-
-    if (data.source === IncrementalSource.Scroll) {
-      if (event.timestamp - lastScrollAt < scrollGap) {
-        changed = true;
-        return null;
-      }
-      lastScrollAt = event.timestamp;
-      return event;
     }
 
     return event;
