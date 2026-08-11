@@ -74,12 +74,12 @@ function RecordingOverlay() {
   });
   const [positioned, setPositioned] = React.useState(false);
   const [flagOpen, setFlagOpen] = React.useState(false);
-  const [flagExpected, setFlagExpected] = React.useState("");
-  const [flagActual, setFlagActual] = React.useState("");
+  const [flagNote, setFlagNote] = React.useState("");
   const [flagToast, setFlagToast] = React.useState<string | null>(null);
+
   const panelRef = React.useRef<HTMLDivElement>(null);
   const flagButtonRef = React.useRef<HTMLButtonElement>(null);
-  const flagExpectedRef = React.useRef<HTMLTextAreaElement>(null);
+  const flagNoteRef = React.useRef<HTMLTextAreaElement>(null);
   const sizeRef = React.useRef<Size>({ width: 232, height: 108 });
   const flagToastTimerRef = React.useRef(0);
   const statusVersionRef = React.useRef(0);
@@ -217,14 +217,13 @@ function RecordingOverlay() {
     if (status.recording) return;
     setFlagOpen(false);
     setFlagToast(null);
-    setFlagExpected("");
-    setFlagActual("");
+    setFlagNote("");
   }, [status.recording]);
 
-  // The reporter must land in the first field the instant the form opens —
-  // this happens mid-frustration, so no extra click.
+  // The reporter must land in the field the instant the form opens — this
+  // happens mid-frustration, so no extra click.
   React.useEffect(() => {
-    if (flagOpen) flagExpectedRef.current?.focus();
+    if (flagOpen) flagNoteRef.current?.focus();
   }, [flagOpen]);
 
   // Opening the flag form starts the report-writing window; the replay
@@ -245,16 +244,15 @@ function RecordingOverlay() {
     flagToastTimerRef.current = window.setTimeout(() => setFlagToast(null), 1600);
   };
 
-  const submitFlag = (expected: string, actual: string) => {
+  const submitFlag = (note: string) => {
     // Post to the page window like the relay's start/stop commands; the
     // MAIN-world recorder turns it into a captured 'flag' event.
     window.postMessage(
-      { [POST_MESSAGE_KEY]: FLAG_KEY, d: { phase: "submit", expected, actual } },
+      { [POST_MESSAGE_KEY]: FLAG_KEY, d: { phase: "submit", note } },
       "*",
     );
     setFlagOpen(false);
-    setFlagExpected("");
-    setFlagActual("");
+    setFlagNote("");
     const at = formatElapsedTime(
       Date.now() - (status.startedAt ?? Date.now()),
     );
@@ -271,8 +269,7 @@ function RecordingOverlay() {
       "*",
     );
     setFlagOpen(false);
-    setFlagExpected("");
-    setFlagActual("");
+    setFlagNote("");
     flagButtonRef.current?.focus();
   };
 
@@ -284,26 +281,7 @@ function RecordingOverlay() {
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (e.currentTarget === flagExpectedRef.current) {
-        // Enter in the first field moves on to the second; the last field
-        // (handled in its own handler) submits.
-        const form = e.currentTarget.form;
-        (form?.querySelector<HTMLTextAreaElement>("textarea:last-of-type"))?.focus();
-        return;
-      }
-      submitFlag(flagExpected, flagActual);
-    }
-  };
-
-  const onFlagActualKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      cancelFlag();
-      return;
-    }
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      submitFlag(flagExpected, flagActual);
+      submitFlag(flagNote);
     }
   };
 
@@ -501,34 +479,19 @@ function RecordingOverlay() {
           onMouseDownCapture={(event) => event.stopPropagation()}
           onSubmit={(event) => {
             event.preventDefault();
-            submitFlag(flagExpected, flagActual);
+            submitFlag(flagNote);
           }}
         >
           <div className="trail-overlay__field">
-            <label htmlFor="trail-flag-expected">
-              Expected behavior
-            </label>
+            <label htmlFor="trail-flag-note">What went wrong?</label>
             <textarea
-              ref={flagExpectedRef}
-              id="trail-flag-expected"
-              rows={2}
-              value={flagExpected}
-              onChange={(e) => setFlagExpected(e.target.value)}
+              ref={flagNoteRef}
+              id="trail-flag-note"
+              rows={3}
+              value={flagNote}
+              onChange={(e) => setFlagNote(e.target.value)}
               onKeyDown={onFlagKeyDown}
-              placeholder="Optional, e.g. Checkout should accept the total"
-            />
-          </div>
-          <div className="trail-overlay__field">
-            <label htmlFor="trail-flag-actual">
-              Current behavior
-            </label>
-            <textarea
-              id="trail-flag-actual"
-              rows={2}
-              value={flagActual}
-              onChange={(e) => setFlagActual(e.target.value)}
-              onKeyDown={onFlagActualKeyDown}
-              placeholder="Optional, e.g. The total shows double the price"
+              placeholder="What happened, and what did you expect instead?"
             />
           </div>
           <div className="trail-overlay__form-row">

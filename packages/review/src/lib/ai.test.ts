@@ -236,6 +236,27 @@ describe("shapeSections with Summary (fallback parity)", () => {
     expect(actual?.text).toContain("Cart empties");
   });
 
+  it("never misroutes a modern Reporter Notes section onto expected/actual fields", () => {
+    const flaggedEvents = [
+      ...events,
+      event({
+        k: "flag",
+        t: 900,
+        note: "Expected the cart to keep items but it emptied",
+      }),
+    ];
+    const sections = buildSections(report, flaggedEvents, { redact: true });
+    const out = shapeSections(MARKDOWN_TEMPLATE, sections).sections;
+    const expected = out.find((s) => s.name === "Expected behavior");
+    const actual = out.find((s) => s.name === "Actual behavior");
+    // The single note is verbatim report text, not a structured split: it must
+    // not be (mis)claimed by the expected/actual fields — the AI extracts the
+    // split; the deterministic fallback keeps the note whole as an extra.
+    expect(expected?.text).toBe("_No response_");
+    expect(actual?.text).toBe("_No response_");
+    expect(out.some((s) => s.text.includes("cart to keep items"))).toBe(true);
+  });
+
   it("does not misroute a field that merely mentions 'happened' mid-sentence", () => {
     const deploymentTemplate: IssueTemplate = {
       ...MARKDOWN_TEMPLATE,
@@ -329,6 +350,17 @@ describe("buildSessionDigest", () => {
   it("carries reporter flags with time offsets and notes", () => {
     const flagged = [
       ...events,
+      event({ k: "flag", t: 900, note: "Cart keeps items but emptied on reload" }),
+    ];
+    const digest = buildSessionDigest(report, flagged, timeline, facts);
+    expect(digest.flags).toEqual([
+      { at: "00:00", note: "Cart keeps items but emptied on reload" },
+    ]);
+  });
+
+  it("still carries legacy expected/actual flags as stored", () => {
+    const flagged = [
+      ...events,
       event({ k: "flag", t: 900, expected: "Cart keeps items", actual: "Cart empties" }),
     ];
     const digest = buildSessionDigest(report, flagged, timeline, facts);
@@ -345,25 +377,24 @@ describe("buildSessionDigest", () => {
         k: "flag",
         t: 40_900,
         phase: "submit",
-        expected: "Cart keeps items",
-        actual: "Cart empties",
+        note: "Checkout should have worked",
       }),
     ];
     const digest = buildSessionDigest(report, flagged, timeline, facts);
     expect(digest.stats).toMatch(/1 flagged moments/);
     expect(digest.flags).toHaveLength(1);
-    expect(digest.flags[0]).toMatchObject({ expected: "Cart keeps items" });
+    expect(digest.flags[0]).toMatchObject({ note: "Checkout should have worked" });
   });
 
-  it("includes flags without notes and caps the flag list", () => {
+  it("caps the flag list, keeping the newest", () => {
     const manyFlags = [
       ...Array.from({ length: 7 }, (_, i) =>
-        event({ k: "flag", t: 900 + i, expected: `note ${i}` }),
+        event({ k: "flag", t: 900 + i, note: `note ${i}` }),
       ),
     ];
     const digest = buildSessionDigest(report, manyFlags, timeline, facts);
     expect(digest.flags).toHaveLength(5);
-    expect(digest.flags.at(-1)?.expected).toBe("note 6");
+    expect(digest.flags.at(-1)?.note).toBe("note 6");
     expect(digest.flags.some((f) => f.at)).toBe(true);
   });
 });
@@ -371,11 +402,11 @@ describe("buildSessionDigest", () => {
 describe("buildTitleDigest", () => {
   it("keeps every flag — the title's strongest signal is never capped", () => {
     const manyFlags = Array.from({ length: 7 }, (_, i) =>
-      event({ k: "flag", t: 900 + i, expected: `note ${i}` }),
+      event({ k: "flag", t: 900 + i, note: `note ${i}` }),
     );
     const digest = buildTitleDigest(report, [...events, ...manyFlags], timeline, facts);
     expect(digest.flags).toHaveLength(7);
-    expect(digest.flags.at(-1)?.expected).toBe("note 6");
+    expect(digest.flags.at(-1)?.note).toBe("note 6");
   });
 
   it("normalizes nav step URLs to host+path (no query strings)", () => {
