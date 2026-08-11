@@ -41,15 +41,29 @@ describe("suggestTitle", () => {
   it("prefers a flagged note over an incidental console error", () => {
     const flagged = [
       ...events,
-      event({ k: "flag", t: 900, expected: "Total shows the final price" }),
+      event({ k: "flag", t: 900, note: "Total shows the final price" }),
     ];
     expect(suggestTitle(flagged)).toBe("Total shows the final price");
   });
 
-  it("uses the actual note when the flag has no expected note", () => {
+  it("uses the legacy actual note when the flag has no note", () => {
     expect(
       suggestTitle([event({ k: "flag", t: 900, actual: "Total doubles" })]),
     ).toBe("Total doubles");
+  });
+
+  it("prefers the note over legacy expected/actual fields", () => {
+    expect(
+      suggestTitle([
+        event({
+          k: "flag",
+          t: 900,
+          note: "Cart empties on reload",
+          expected: "Cart keeps items",
+          actual: "Cart empties",
+        }),
+      ]),
+    ).toBe("Cart empties on reload");
   });
 
   it("ignores flags without notes for the title", () => {
@@ -201,7 +215,7 @@ describe("buildSections", () => {
     ]);
   });
 
-  it("emits Expected/Actual sections between steps and console errors", () => {
+  it("emits a Reporter Notes section between steps and console errors", () => {
     const sections = buildSections(
       report,
       [
@@ -209,26 +223,24 @@ describe("buildSections", () => {
         event({
           k: "flag",
           t: 650,
-          expected: "The total should be $4.99",
-          actual: "The total shows $9.98",
+          note: "The total should be $4.99 but it showed $9.98",
         }),
       ],
       { redact: true },
     );
     expect(sections.map((s) => s.name)).toEqual([
       "Steps to Reproduce",
-      "Expected Behavior",
-      "Actual Behavior",
+      "Reporter Notes",
       "Console Errors",
       "Environment",
       "Failed Requests",
     ]);
-    const expected = sections.find((s) => s.name === "Expected Behavior");
-    const actual = sections.find((s) => s.name === "Actual Behavior");
-    expect(expected?.text).toContain("`@00:00` — The total should be $4.99");
-    expect(actual?.text).toContain("`@00:00` — The total shows $9.98");
+    const notes = sections.find((s) => s.name === "Reporter Notes");
+    expect(notes?.text).toContain(
+      "`@00:00` — The total should be $4.99 but it showed $9.98",
+    );
     // Priorities keep the notes ahead of console evidence in URL-budget fits.
-    expect(expected!.priority).toBeLessThan(
+    expect(notes!.priority).toBeLessThan(
       sections.find((s) => s.name === "Console Errors")!.priority,
     );
   });
@@ -237,40 +249,49 @@ describe("buildSections", () => {
     const sections = buildSections(
       report,
       [
-        event({ k: "flag", t: 1000, expected: "Cart keeps items", actual: "Cart empties" }),
-        event({ k: "flag", t: 5000, expected: "Checkout accepts the card", actual: "Card rejected" }),
+        event({ k: "flag", t: 1000, note: "Cart keeps items? No — cart empties" }),
+        event({ k: "flag", t: 5000, note: "Card rejected at checkout" }),
       ],
+      { redact: true },
+    );
+    const notes = sections.find((s) => s.name === "Reporter Notes");
+    expect(notes?.text).toBe(
+      "- `@00:00` — Cart keeps items? No — cart empties\n- `@00:04` — Card rejected at checkout",
+    );
+  });
+
+  it("keeps legacy Expected/Actual sections for old sessions", () => {
+    const sections = buildSections(
+      report,
+      [event({ k: "flag", t: 1000, expected: "Cart keeps items", actual: "Cart empties" })],
       { redact: true },
     );
     const expected = sections.find((s) => s.name === "Expected Behavior");
     const actual = sections.find((s) => s.name === "Actual Behavior");
-    expect(expected?.text).toBe(
-      "- `@00:00` — Cart keeps items\n- `@00:04` — Checkout accepts the card",
-    );
-    expect(actual?.text).toBe(
-      "- `@00:00` — Cart empties\n- `@00:04` — Card rejected",
-    );
+    expect(expected?.text).toContain("Cart keeps items");
+    expect(actual?.text).toContain("Cart empties");
   });
 
-  it("emits no Expected/Actual sections when the flag has no notes", () => {
+  it("emits no note sections when the flag has no text", () => {
     const sections = buildSections(
       report,
       [...events, event({ k: "flag", t: 650 })],
       { redact: true },
     );
+    expect(sections.some((s) => s.name === "Reporter Notes")).toBe(false);
     expect(sections.some((s) => s.name === "Expected Behavior")).toBe(false);
     expect(sections.some((s) => s.name === "Actual Behavior")).toBe(false);
   });
 
-  it("emits only the note that exists", () => {
+  it("emits only the section that exists", () => {
     const sections = buildSections(
       report,
-      [event({ k: "flag", t: 1000, expected: "Only expected" })],
+      [event({ k: "flag", t: 1000, note: "Only a note" })],
       { redact: true },
     );
     expect(sections.map((s) => s.name)).toEqual([
       "Steps to Reproduce",
-      "Expected Behavior",
+      "Reporter Notes",
       "Console Errors",
       "Environment",
     ]);
@@ -281,7 +302,7 @@ describe("buildSections", () => {
       report,
       [
         event({ k: "click", t: 500, label: "Submit", tag: "button" }),
-        event({ k: "flag", t: 600, expected: "It should work" }),
+        event({ k: "flag", t: 600, note: "It should work" }),
       ],
       { redact: true },
     );

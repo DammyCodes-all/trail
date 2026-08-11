@@ -182,12 +182,15 @@ export function buildTimeline(events: StoredEvent[], redact = true): TimelineSte
       case 'flag': {
         // 'open' and 'cancel' are the window's edges, not report steps: the
         // window is compressed in the replay and folded into the submit's
-        // marker below. Legacy flags (no phase) read as submits.
+        // marker below. Legacy flags (no phase) read as submits. The modern
+        // form is one free-form note; legacy sessions carry expected/actual.
         if (e.phase === 'open' || e.phase === 'cancel') break;
+        const note = e.note;
         const expected = e.expected;
         const actual = e.actual;
-        let text =
-          expected && actual
+        let text = note
+          ? `Flag: "${note}"`
+          : expected && actual
             ? `Flag: "${expected}" — "${actual}"`
             : expected
               ? `Flag: "${expected}"`
