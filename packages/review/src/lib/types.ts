@@ -134,8 +134,15 @@ export interface RrwebEvent extends BaseTrailEvent {
 // are the reporter's own words about what should have happened vs what did.
 // Both fields are optional: a flag without notes is still a timeline marker.
 // Captured at capture time (user-authored text — never redacted).
+//
+// `phase` distinguishes the captured moments of the flag flow: 'open' (the
+// flag form appeared — the start of the report-writing window), 'submit' (the
+// flag was submitted, carrying the notes) and 'cancel' (the form was closed
+// without submitting). Events recorded before `phase` existed have no phase
+// and are treated as submits.
 export interface FlagEvent extends BaseTrailEvent {
   k: 'flag';
+  phase?: 'open' | 'submit' | 'cancel';
   expected?: string;
   actual?: string;
 }

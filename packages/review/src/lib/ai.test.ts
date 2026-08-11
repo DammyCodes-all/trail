@@ -337,6 +337,24 @@ describe("buildSessionDigest", () => {
     ]);
   });
 
+  it("does not count flag-window opens as flagged moments", () => {
+    const flagged = [
+      ...events,
+      event({ k: "flag", t: 900, phase: "open" }),
+      event({
+        k: "flag",
+        t: 40_900,
+        phase: "submit",
+        expected: "Cart keeps items",
+        actual: "Cart empties",
+      }),
+    ];
+    const digest = buildSessionDigest(report, flagged, timeline, facts);
+    expect(digest.stats).toMatch(/1 flagged moments/);
+    expect(digest.flags).toHaveLength(1);
+    expect(digest.flags[0]).toMatchObject({ expected: "Cart keeps items" });
+  });
+
   it("includes flags without notes and caps the flag list", () => {
     const manyFlags = [
       ...Array.from({ length: 7 }, (_, i) =>
