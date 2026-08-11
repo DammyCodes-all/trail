@@ -89,12 +89,18 @@ export default defineContentScript({
       } else if (e.data?.[POST_MESSAGE_KEY] === FLAG_KEY) {
         // The overlay posts per flag flow: an 'open' when the form appears, a
         // 'cancel' when it's dismissed without submitting, and a 'submit' with
-        // the notes. Only submits (and legacy notes-only events) carry text;
-        // the window edges are marker events. Events from before phase existed
-        // carry neither and read as submits.
+        // the reporter's note. Only submits carry text; the window edges are
+        // marker events. Events from before phase existed carry neither and
+        // read as submits. The message still accepts the legacy expected/
+        // actual pair (old overlay builds), but we only write the `note`.
         if (!active) return;
         const d = e.data.d as
-          | { expected?: string; actual?: string; phase?: 'open' | 'submit' | 'cancel' }
+          | {
+              note?: string;
+              expected?: string;
+              actual?: string;
+              phase?: 'open' | 'submit' | 'cancel';
+            }
           | undefined;
         const rawPhase = d?.phase;
         const phase =
@@ -104,13 +110,15 @@ export default defineContentScript({
             ? rawPhase
             : undefined;
         const notes = phase !== 'open' && phase !== 'cancel';
+        const note = notes
+          ? cap(d?.note || d?.expected || d?.actual || '', 240) || undefined
+          : undefined;
         const flag: FlagEvent = {
           k: 'flag',
           t: Date.now(),
           url: location.href,
           phase,
-          expected: notes ? cap(d?.expected ?? '', 240) || undefined : undefined,
-          actual: notes ? cap(d?.actual ?? '', 240) || undefined : undefined,
+          note,
         };
         ctx.emit(flag);
       }

@@ -71,10 +71,12 @@ export interface SessionDigest {
   steps: string[];
   consoleErrors: Array<{ level: string; page: string; message: string; stack: string }>;
   failedRequests: Array<{ method: string; target: string; status: number; error: string; body: string }>;
-  // Reporter-flagged moments: the user's own account of expected vs actual
-  // outcome. High-signal intent — see the proxy's SYSTEM_PROMPT for how the
-  // model is told to treat them.
-  flags: Array<{ at: string; expected?: string; actual?: string }>;
+  // Reporter-flagged moments: the user's own account — the modern form is one
+  // free-form note (expected vs actual is extracted by the model); legacy
+  // sessions carry the structured expected/actual pair instead. High-signal
+  // intent — see the proxy's SYSTEM_PROMPT for how the model is told to treat
+  // them.
+  flags: Array<{ at: string; note?: string; expected?: string; actual?: string }>;
   repo?: string;
   note?: string;
 }
@@ -162,9 +164,9 @@ export function buildSessionDigest(
   const flagCount = events.filter((e) => e.k === 'flag' && e.phase !== 'open').length;
   const stats = `${flagCount} flagged moments · ${foldedErrors} console errors · ${failedRequests} failed requests in ${formatDuration(facts.durationMs)}`;
 
-  // Reporter flags: the user's own expected/actual notes, offset like the
-  // timeline so the model can anchor them to the surrounding steps. Last five
-  // kept — flags are rare, but a flag-spam session must not eat the budget.
+  // Reporter flags: the user's own words, offset like the timeline so the
+  // model can anchor them to the surrounding steps. Last five kept — flags are
+  // rare, but a flag-spam session must not eat the budget.
   const t0 = events[0]?.t ?? 0;
   const flags = events
     .filter(
@@ -174,6 +176,7 @@ export function buildSessionDigest(
     .slice(-MAX_FLAGS)
     .map((e) => ({
       at: formatElapsedTime(e.t - t0),
+      ...(e.note ? { note: truncate(e.note, MAX_STEP_CHARS) } : {}),
       ...(e.expected ? { expected: truncate(e.expected, MAX_STEP_CHARS) } : {}),
       ...(e.actual ? { actual: truncate(e.actual, MAX_STEP_CHARS) } : {}),
     }));
@@ -185,7 +188,7 @@ export function buildSessionDigest(
   let total = 0;
   for (const c of consoles) total += c.message.length + c.stack.length;
   for (const n of nets) total += n.target.length + n.body.length;
-  for (const f of flags) total += (f.expected ?? '').length + (f.actual ?? '').length;
+  for (const f of flags) total += (f.note ?? '').length + (f.expected ?? '').length + (f.actual ?? '').length;
   while (
     total > TOTAL_EVIDENCE_BUDGET &&
     (consoles.length || nets.length || flags.length)
@@ -200,7 +203,7 @@ export function buildSessionDigest(
       note = 'Some older evidence was truncated for size.';
     } else if (flags.length) {
       const f = flags.shift()!;
-      total -= (f.expected ?? '').length + (f.actual ?? '').length;
+      total -= (f.note ?? '').length + (f.expected ?? '').length + (f.actual ?? '').length;
       note = 'Some older evidence was truncated for size.';
     }
   }
@@ -244,7 +247,7 @@ export interface TitleDigest {
   steps: string[];
   consoleErrors: Array<{ level: string; page: string; message: string; stack: string }>;
   failedRequests: Array<{ method: string; target: string; status: number; error: string }>;
-  flags: Array<{ at: string; expected?: string; actual?: string }>;
+  flags: Array<{ at: string; note?: string; expected?: string; actual?: string }>;
 }
 
 export function buildTitleDigest(
@@ -292,6 +295,7 @@ export function buildTitleDigest(
     )
     .map((e) => ({
       at: formatElapsedTime(e.t - t0),
+      ...(e.note ? { note: truncate(e.note, MAX_STEP_CHARS) } : {}),
       ...(e.expected ? { expected: truncate(e.expected, MAX_STEP_CHARS) } : {}),
       ...(e.actual ? { actual: truncate(e.actual, MAX_STEP_CHARS) } : {}),
     }));
@@ -302,7 +306,7 @@ export function buildTitleDigest(
   let total = 0;
   for (const c of consoles) total += c.message.length + c.stack.length;
   for (const n of nets) total += n.target.length;
-  for (const f of flags) total += (f.expected ?? '').length + (f.actual ?? '').length;
+  for (const f of flags) total += (f.note ?? '').length + (f.expected ?? '').length + (f.actual ?? '').length;
   while (total > TITLE_BUDGET && (consoles.length || nets.length || flags.length)) {
     if (consoles.length) {
       total -= consoles[0]!.message.length + consoles[0]!.stack.length;
@@ -312,7 +316,7 @@ export function buildTitleDigest(
       total -= n.target.length;
     } else if (flags.length) {
       const f = flags.shift()!;
-      total -= (f.expected ?? '').length + (f.actual ?? '').length;
+      total -= (f.note ?? '').length + (f.expected ?? '').length + (f.actual ?? '').length;
     }
   }
 
