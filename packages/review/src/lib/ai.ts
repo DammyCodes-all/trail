@@ -158,7 +158,8 @@ export function buildSessionDigest(
   // the numbers match the evidence the model actually sees — and match the
   // title digest's numbers exactly (single source, countKeySignals).
   const { foldedErrors, failedRequests } = countKeySignals(events);
-  const flagCount = events.filter((e) => e.k === 'flag').length;
+  // 'open' events start the report-writing window, not a flagged moment.
+  const flagCount = events.filter((e) => e.k === 'flag' && e.phase !== 'open').length;
   const stats = `${flagCount} flagged moments · ${foldedErrors} console errors · ${failedRequests} failed requests in ${formatDuration(facts.durationMs)}`;
 
   // Reporter flags: the user's own expected/actual notes, offset like the
@@ -166,7 +167,10 @@ export function buildSessionDigest(
   // kept — flags are rare, but a flag-spam session must not eat the budget.
   const t0 = events[0]?.t ?? 0;
   const flags = events
-    .filter((e): e is Extract<StoredEvent, { k: 'flag' }> => e.k === 'flag')
+    .filter(
+      (e): e is Extract<StoredEvent, { k: 'flag' }> =>
+        e.k === 'flag' && e.phase !== 'open',
+    )
     .slice(-MAX_FLAGS)
     .map((e) => ({
       at: formatElapsedTime(e.t - t0),
@@ -277,11 +281,15 @@ export function buildTitleDigest(
     }));
 
   // All flags, never sliced: they are the reporter's own account and the
-  // strongest title signal. The budget trims them last.
+  // strongest title signal. The budget trims them last. Opens (window start,
+  // no notes) don't count as flagged moments but still ride along trimmed.
   const t0 = events[0]?.t ?? 0;
-  const flagCount = events.filter((e) => e.k === 'flag').length;
+  const flagCount = events.filter((e) => e.k === 'flag' && e.phase !== 'open').length;
   const flags = events
-    .filter((e): e is Extract<StoredEvent, { k: 'flag' }> => e.k === 'flag')
+    .filter(
+      (e): e is Extract<StoredEvent, { k: 'flag' }> =>
+        e.k === 'flag' && e.phase !== 'open',
+    )
     .map((e) => ({
       at: formatElapsedTime(e.t - t0),
       ...(e.expected ? { expected: truncate(e.expected, MAX_STEP_CHARS) } : {}),

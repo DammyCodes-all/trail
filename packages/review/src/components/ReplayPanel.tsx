@@ -9,6 +9,7 @@ import type { eventWithTime } from "@rrweb/types";
 import { Clapperboard } from "lucide-react";
 
 import type { ReportFacts } from "@trail/review/lib/facts";
+import type { ReplaySpan } from "@trail/review/lib/replay-windows";
 import {
   ReplayPlayer,
   type ReplayPlayerHandle,
@@ -24,6 +25,9 @@ export const ReplayPanel = forwardRef<
     events: eventWithTime[];
     facts: ReportFacts;
     currentTime: number;
+    spans?: ReplaySpan[];
+    expandedWindows?: ReadonlySet<number>;
+    onToggleExpandWindow?: (index: number) => void;
     onCurrentTimeChange: (timeOffset: number) => void;
     onPlayingChange?: (playing: boolean) => void;
   }
@@ -32,6 +36,9 @@ export const ReplayPanel = forwardRef<
     events,
     facts,
     currentTime,
+    spans = [],
+    expandedWindows = new Set(),
+    onToggleExpandWindow,
     onCurrentTimeChange,
     onPlayingChange,
   },
@@ -73,6 +80,30 @@ export const ReplayPanel = forwardRef<
     setIsPlaying(false);
     setSpeed(1);
   }, [eventDuration]);
+
+  // The events list is replaced when a report-writing window is expanded or
+  // collapsed, which remounts the player (rrweb-player can't re-time an
+  // existing instance). Restore the playback position across the remount so
+  // the toggle doesn't reset the review back to 00:00. Parent effects run
+  // after the child's, so the player exists by the time this runs.
+  const currentTimeRef = useRef(currentTime);
+  currentTimeRef.current = currentTime;
+  useEffect(() => {
+    replayRef.current?.seek(currentTimeRef.current, false);
+  }, [events]);
+
+  // The report-writing window under the current playback position, if any:
+  // show a "skipped" marker instead of silently playing through dead air.
+  const activeSpanIndex = (() => {
+    for (let i = spans.length - 1; i >= 0; i--) {
+      const span = spans[i]!;
+      if (currentTime >= span.start - 100 && currentTime <= span.end + 100) {
+        return i;
+      }
+      if (currentTime > span.end + 100) return -1;
+    }
+    return -1;
+  })();
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -152,7 +183,7 @@ export const ReplayPanel = forwardRef<
           />
         ) : null}
       </header>
-      <div className="overflow-hidden rounded-sm border border-border-strong bg-card">
+      <div className="relative overflow-hidden rounded-sm border border-border-strong bg-card">
         {events.length ? (
           <>
             <ReplayPlayer
@@ -162,6 +193,15 @@ export const ReplayPanel = forwardRef<
               onDurationChange={setDuration}
               onPlayingChange={setIsPlaying}
             />
+            {activeSpanIndex >= 0 ? (
+              <SkippedWindowChip
+                span={spans[activeSpanIndex]!}
+                expanded={expandedWindows.has(activeSpanIndex)}
+                onToggle={() =>
+                  onToggleExpandWindow?.(activeSpanIndex)
+                }
+              />
+            ) : null}
             <ReplayTransportControls
               currentTime={safeCurrentTime}
               duration={safeDuration}
@@ -196,3 +236,37 @@ export const ReplayPanel = forwardRef<
     </section>
   );
 });
+
+// Floating marker over the player while the replay is inside a report-writing
+// window: the window plays compressed (default) or at 1x (expanded), and the
+// real duration plus any background activity are always visible so the
+// compression never hides evidence.
+function SkippedWindowChip({
+  span,
+  expanded,
+  onToggle,
+}: {
+  span: ReplaySpan;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const secs = Math.max(1, Math.round(span.window.durationMs / 1000));
+  const bg = span.window.background;
+  return (
+    <div className="absolute bottom-14 left-1/2 z-10 flex -translate-x-1/2 max-w-[calc(100%-2rem)] flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-sm border border-border-strong bg-background/95 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm backdrop-blur">
+      <span>
+        Skipped {secs}s of report writing
+        {bg > 0
+          ? ` · ${bg} background event${bg === 1 ? "" : "s"} during writing`
+          : ""}
+      </span>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="cursor-pointer rounded-xs px-1.5 py-0.5 font-semibold text-info underline decoration-info/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground/40"
+      >
+        {expanded ? "Collapse" : "Watch at 1×"}
+      </button>
+    </div>
+  );
+}
