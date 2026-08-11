@@ -227,6 +227,18 @@ function RecordingOverlay() {
     if (flagOpen) flagExpectedRef.current?.focus();
   }, [flagOpen]);
 
+  // Opening the flag form starts the report-writing window; the replay
+  // collapses it (open → submit/cancel) instead of showing real-time idle.
+  // Each transition posts exactly once — the MAIN-world recorder turns the
+  // messages into captured 'flag' events with phase 'open' / 'cancel'.
+  const openFlag = () => {
+    setFlagOpen(true);
+    window.postMessage(
+      { [POST_MESSAGE_KEY]: FLAG_KEY, d: { phase: "open" } },
+      "*",
+    );
+  };
+
   const showFlagToast = (text: string) => {
     setFlagToast(text);
     window.clearTimeout(flagToastTimerRef.current);
@@ -237,7 +249,7 @@ function RecordingOverlay() {
     // Post to the page window like the relay's start/stop commands; the
     // MAIN-world recorder turns it into a captured 'flag' event.
     window.postMessage(
-      { [POST_MESSAGE_KEY]: FLAG_KEY, d: { expected, actual } },
+      { [POST_MESSAGE_KEY]: FLAG_KEY, d: { phase: "submit", expected, actual } },
       "*",
     );
     setFlagOpen(false);
@@ -251,6 +263,13 @@ function RecordingOverlay() {
   };
 
   const cancelFlag = () => {
+    // A cancelled flag is still a report-writing window (the form was open
+    // and the reporter typed in it) — close it explicitly so the replay can
+    // compress it like a submitted one.
+    window.postMessage(
+      { [POST_MESSAGE_KEY]: FLAG_KEY, d: { phase: "cancel" } },
+      "*",
+    );
     setFlagOpen(false);
     setFlagExpected("");
     setFlagActual("");
@@ -406,7 +425,8 @@ function RecordingOverlay() {
             onMouseDownCapture={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
-              setFlagOpen((open) => !open);
+              if (flagOpen) cancelFlag();
+              else openFlag();
             }}
           >
             <svg

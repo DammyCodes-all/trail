@@ -16,6 +16,12 @@ import {
   type IssueTemplate,
 } from "./lib/templates";
 import { buildTimeline } from "./lib/timeline";
+import {
+  buildFlagWindows,
+  buildReplayMap,
+  compressFlagWindows,
+  type ReplayTimeMap,
+} from "./lib/replay-windows";
 import { hashSession, stableShareJson } from "./lib/share-cache";
 import {
   buildSessionDigest,
@@ -137,6 +143,20 @@ export function ReviewApp({
   const [currentReplayTime, setCurrentReplayTime] = useState(0);
   const [replayPlaying, setReplayPlaying] = useState(false);
   const replayRef = useRef<ReplayPlayerHandle>(null);
+  // Report-writing windows the reviewer chose to watch at 1x instead of the
+  // compressed budget. Lives here (not in ReplayPanel) because the time map —
+  // and therefore seeking and the timeline highlight — depends on it.
+  const [expandedWindows, setExpandedWindows] = useState<ReadonlySet<number>>(
+    () => new Set(),
+  );
+  const toggleExpandedWindow = useCallback((index: number) => {
+    setExpandedWindows((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -192,9 +212,27 @@ export function ReviewApp({
   );
   const replayT0 = rrwebEvents[0]?.timestamp ?? t0;
 
+  // Report-writing windows (flag open → submit/cancel): the replay compresses
+  // each into a short budget so idle note-typing doesn't inflate the perceived
+  // reproduction time. The map links wall clock ↔ replay time; both it and the
+  // compressed event list rebuild when a window is expanded at 1x.
+  const flagWindows = useMemo(() => buildFlagWindows(events), [events]);
+  const replayMap = useMemo<ReplayTimeMap | null>(() => {
+    if (!rrwebEvents.length || !flagWindows.length) return null;
+    return buildReplayMap(replayT0, flagWindows, expandedWindows);
+  }, [rrwebEvents, replayT0, flagWindows, expandedWindows]);
+  const replayEvents = useMemo(
+    () =>
+      replayMap ? compressFlagWindows(rrwebEvents, replayMap) : rrwebEvents,
+    [rrwebEvents, replayMap],
+  );
+
   const counts: TrailCounts = useMemo(() => countEvents(events), [events]);
+  // Submitted flags only — 'open'/'cancel' are report-writing window edges,
+  // not flagged moments, and must not inflate the header stat.
   const flags = useMemo(
-    () => events.filter((e) => e.k === "flag").length,
+    () =>
+      events.filter((e) => e.k === "flag" && e.phase !== "open" && e.phase !== "cancel").length,
     [events],
   );
   const facts = useMemo(
@@ -401,11 +439,13 @@ export function ReviewApp({
 
   const seekReplay = useCallback(
     (timestamp: number) => {
-      const offset = Math.max(0, timestamp - replayT0);
+      const offset = replayMap
+        ? replayMap.wallToReplay(timestamp)
+        : Math.max(0, timestamp - replayT0);
       setCurrentReplayTime(offset);
       replayRef.current?.seek(offset, false);
     },
-    [replayT0],
+    [replayT0, replayMap],
   );
 
   const handleReplayTimeChange = useCallback((timeOffset: number) => {
@@ -665,9 +705,12 @@ export function ReviewApp({
           <div className="min-w-0">
             <ReplayPanel
               ref={replayRef}
-              events={rrwebEvents}
+              events={replayEvents}
               facts={facts}
               currentTime={currentReplayTime}
+              spans={replayMap?.spans ?? []}
+              expandedWindows={expandedWindows}
+              onToggleExpandWindow={toggleExpandedWindow}
               onCurrentTimeChange={handleReplayTimeChange}
               onPlayingChange={setReplayPlaying}
             />
@@ -677,6 +720,7 @@ export function ReviewApp({
               steps={timeline}
               t0={t0}
               replayT0={replayT0}
+              replayToWall={replayMap?.replayToWall}
               currentTime={currentReplayTime}
               onSeek={seekReplay}
               isPlaying={replayPlaying}

@@ -10,7 +10,6 @@ const event = (over: Partial<StoredEvent>): StoredEvent => ({
 } as StoredEvent);
 
 const nav = event({ k: "nav", t: 0, url: "https://example.com", reload: false });
-
 describe("buildTimeline console folding", () => {
   it("emits one step with a count for a repeated message", () => {
     const steps = buildTimeline([
@@ -141,5 +140,47 @@ describe("buildTimeline interaction steps", () => {
       event({ k: "click", t: 10, label: "Go", tag: "button" }),
     ]);
     expect(steps.map((s) => s.kind)).toEqual(["nav", "click"]);
+  });
+});
+
+describe("buildTimeline flag windows", () => {
+  it("folds open/cancel edges into the submit step with a duration marker", () => {
+    const steps = buildTimeline([
+      nav,
+      event({ k: "flag", t: 1000, phase: "open" }),
+      event({ k: "flag", t: 1000 + 42_000, phase: "submit", expected: "works", actual: "broken" }),
+    ]);
+    expect(steps.map((s) => s.kind)).toEqual(["nav", "flag"]);
+    expect(steps[1]).toMatchObject({
+      t: 43_000,
+      kind: "flag",
+      text: 'Flag: "works" — "broken" (42s of report writing)',
+    });
+  });
+
+  it("marks background activity that fired while the report was written", () => {
+    const steps = buildTimeline([
+      nav,
+      event({ k: "flag", t: 1000, phase: "open" }),
+      event({ t: 2000, lv: "error", msg: "boom during writing" }),
+      event({ k: "net", t: 3000, status: 500, method: "GET", target: "/api/x", via: "fetch" }),
+      event({ k: "flag", t: 1000 + 10_000, phase: "submit" }),
+    ]);
+    const flagStep = steps.find((s) => s.kind === "flag");
+    expect(flagStep?.text).toBe(
+      "Flagged this moment (10s of report writing) · 2 background events",
+    );
+  });
+
+  it("skips short windows and keeps legacy flags as plain steps", () => {
+    const steps = buildTimeline([
+      nav,
+      event({ k: "flag", t: 1000, phase: "open" }),
+      event({ k: "flag", t: 1400, phase: "submit" }),
+      event({ k: "flag", t: 5000, expected: "works", actual: "broken" }),
+    ]);
+    expect(steps.map((s) => s.kind)).toEqual(["nav", "flag", "flag"]);
+    expect(steps[1]).toMatchObject({ text: "Flagged this moment" });
+    expect(steps[2]).toMatchObject({ text: 'Flag: "works" — "broken"' });
   });
 });
