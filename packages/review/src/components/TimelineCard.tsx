@@ -40,6 +40,7 @@ export function TimelineCard({
   currentTime,
   onSeek,
   isPlaying = false,
+  replayToWall,
 }: {
   steps: TimelineStep[];
   t0: number;
@@ -47,6 +48,10 @@ export function TimelineCard({
   currentTime: number;
   onSeek: (timestamp: number) => void;
   isPlaying?: boolean;
+  // Player offset → wall-clock absolute. Identity when the replay is
+  // uncompressed; when report-writing windows are compressed, the player
+  // time must be mapped back so the active-row highlight stays correct.
+  replayToWall?: (offset: number) => number;
 }) {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -86,7 +91,9 @@ export function TimelineCard({
     userCollapsedAll.current = false;
   }, [filter]);
 
-  const absoluteTime = replayT0 + currentTime;
+  const absoluteTime = replayToWall
+    ? replayToWall(currentTime)
+    : replayT0 + currentTime;
 
   // A collapsed group opens itself once the replay reaches its range — unless
   // the user just collapsed it. Collapsing wins over auto-expand for the rest

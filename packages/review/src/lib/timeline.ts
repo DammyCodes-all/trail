@@ -1,4 +1,5 @@
 import { foldRepeatedConsoles, type FoldedConsole } from './fold.ts';
+import { buildFlagWindows } from './replay-windows.ts';
 import type { StoredEvent } from './types.ts';
 
 export type StepKind =
@@ -70,6 +71,11 @@ export function buildTimeline(events: StoredEvent[], redact = true): TimelineSte
       .filter((e) => e.k !== 'rrweb' && e.k !== 'meta')
       .sort((a, b) => a.t - b.t),
   );
+
+  // Report-writing windows (flag open → submit/cancel). The submit step
+  // carries the window's duration and background activity; the replay
+  // compresses the same windows, so timeline and replay always agree.
+  const flagWindows = buildFlagWindows(events);
 
   const steps: TimelineStep[] = [];
   let lastUrl = '';
@@ -174,9 +180,13 @@ export function buildTimeline(events: StoredEvent[], redact = true): TimelineSte
         });
         break;
       case 'flag': {
+        // 'open' and 'cancel' are the window's edges, not report steps: the
+        // window is compressed in the replay and folded into the submit's
+        // marker below. Legacy flags (no phase) read as submits.
+        if (e.phase === 'open' || e.phase === 'cancel') break;
         const expected = e.expected;
         const actual = e.actual;
-        const text =
+        let text =
           expected && actual
             ? `Flag: "${expected}" — "${actual}"`
             : expected
@@ -184,6 +194,14 @@ export function buildTimeline(events: StoredEvent[], redact = true): TimelineSte
               : actual
                 ? `Flag: "${actual}"`
                 : 'Flagged this moment';
+        const win = flagWindows.find((w) => w.submit === e.t);
+        if (win) {
+          const secs = Math.max(1, Math.round(win.durationMs / 1000));
+          text += ` (${secs}s of report writing)`;
+          if (win.background > 0) {
+            text += ` · ${win.background} background event${win.background === 1 ? '' : 's'}`;
+          }
+        }
         steps.push({ t: e.t, kind: 'flag', text });
         break;
       }
