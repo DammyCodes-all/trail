@@ -34,6 +34,27 @@ export const createRrweb = (
         maskInputOptions: maskInputs(redact()),
         blockClass: "rr-block",
         checkoutEveryNms: 30_000,
+        // Throttle the high-frequency streams: the replayer applies every due
+        // event in one burst per frame, so dense mouse/scroll traffic is what
+        // makes high-speed playback janky. Input is deliberately NOT sampled
+        // ("last" would capture only change events and drop keystrokes from
+        // fields that are never blurred) — typing fidelity is a core TRAIL
+        // feature. Clicks are kept in full.
+        sampling: {
+          mousemove: 100,
+          scroll: 200,
+          mouseInteraction: {
+            MouseUp: false,
+            MouseDown: false,
+            Click: true,
+            DblClick: true,
+            Focus: false,
+            Blur: false,
+            ContextMenu: true,
+            TouchStart: false,
+            TouchEnd: false,
+          },
+        },
         errorHandler: () => true, // never let a recording bug break the page
       });
       running = true;
