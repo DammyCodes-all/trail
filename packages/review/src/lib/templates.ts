@@ -66,17 +66,21 @@ function parseFrontmatter(raw: string): { meta: Record<string, string>; labels: 
   return { meta, labels };
 }
 
-// GitHub's generated markdown templates use `**Label**` on their own line; older
-// hand-written ones use `## Label` headings. Accept both.
+// GitHub's generated markdown templates use `**Label**` on their own line;
+// hand-written ones use `## Label` or `### Label:` headings. Accept all three.
+// H1 is excluded — repos like Rocket.Chat's use it for a title (`# Release {v}`)
+// that is not a field. HTML comments are stripped: templates often keep
+// extra sections commented out (`<!-- ## Draft section -->`), which must not
+// surface as phantom fields.
 export function parseMarkdownTemplate(raw: string, filename: string): IssueTemplate | null {
   const front = raw.match(FRONTMATTER_RE);
   const { meta, labels } = front ? parseFrontmatter(front[1] ?? '') : parseFrontmatter('');
-  const body = front ? raw.slice(front[0].length) : raw;
+  const body = (front ? raw.slice(front[0].length) : raw).replace(/<!--[\s\S]*?-->/g, '');
   const fields: IssueTemplateField[] = [];
   for (const line of body.split('\n')) {
-    const h2 = line.match(/^##\s+(.+?)\s*$/);
+    const heading = line.match(/^(#{2,6})\s+(.+?)\s*$/);
     const bold = line.match(/^\*\*(.+?)\*\*\s*$/);
-    const label = (h2?.[1] ?? bold?.[1])?.trim();
+    const label = (heading?.[2] ?? bold?.[1])?.trim();
     if (label) fields.push({ id: slugify(label), label });
   }
   if (!fields.length) return null;

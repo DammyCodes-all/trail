@@ -118,6 +118,27 @@ describe("sanitizeAIResult", () => {
     expect(out?.labels?.length).toBe(20);
   });
 
+  it("normalizes model-numbered steps", () => {
+    const out = sanitizeAIResult(
+      JSON.stringify({
+        steps: [
+          "1. Navigate to the checkout page",
+          "2) Click Pay",
+          "3. Double numbered",
+          "2FA setup",
+          "3.14 pi stays",
+        ],
+      }),
+    );
+    expect(out?.steps).toEqual([
+      "Navigate to the checkout page",
+      "Click Pay",
+      "Double numbered",
+      "2FA setup",
+      "3.14 pi stays",
+    ]);
+  });
+
   it("keeps template mapping only with a filename and string fields", () => {
     const out = sanitizeAIResult(
       JSON.stringify({
@@ -147,6 +168,16 @@ describe("applyAI", () => {
     expect(out[0]?.priority).toBe(0);
     const steps = out.find((s) => s.name === "Steps to Reproduce");
     expect(steps?.text).toBe("1. Go to checkout\n2. Hit Pay");
+  });
+
+  it("never renders double-numbered steps from model output", () => {
+    const ai = sanitizeAIResult(
+      JSON.stringify({ steps: ["1. Navigate to checkout", "2. Hit Pay"] }),
+    )!;
+    const out = applyAI(baseSections, ai, null);
+    const steps = out.find((s) => s.name === "Steps to Reproduce");
+    expect(steps?.text).toBe("1. Navigate to checkout\n2. Hit Pay");
+    expect(steps?.text).not.toContain("1. 1.");
   });
 
   it("shapes onto the template and overlays AI field content", () => {

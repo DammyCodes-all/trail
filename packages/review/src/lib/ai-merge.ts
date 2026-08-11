@@ -60,7 +60,13 @@ export function sanitizeAIResult(content: string): AIResult | null {
   const stepsRaw = (raw as Record<string, unknown>).steps;
   if (Array.isArray(stepsRaw)) {
     const steps = stepsRaw
-      .map((s) => clean(s, LIMITS.step))
+      .map((s) => {
+        const c = clean(s, LIMITS.step);
+        // Models often number the steps they return; applyAI re-numbers on
+        // output, so a kept ordinal would render "1. 1. Navigate to ...".
+        // Requires whitespace after the separator: "2FA" / "3.14" survive.
+        return c ? c.replace(/^\d+[.)]\s+/, '') : undefined;
+      })
       .filter((s): s is string => !!s)
       .slice(0, LIMITS.steps);
     if (steps.length) out.steps = steps;

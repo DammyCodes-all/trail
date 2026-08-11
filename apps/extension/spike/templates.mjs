@@ -3,9 +3,9 @@ import {
   parseMarkdownTemplate,
   parseYamlTemplate,
   shapeSections,
-} from '../lib/templates.ts';
-import { buildIssueUrl } from '../lib/github.ts';
-import { buildMarkdownFromSections } from '../lib/report.ts';
+} from '@trail/review/lib/templates';
+import { buildIssueUrl } from '@trail/review/lib/github';
+import { buildMarkdownFromSections } from '@trail/review/lib/report';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(`ASSERTION FAILED: ${msg}`);
@@ -112,6 +112,79 @@ assert(mdLabels.includes('To Reproduce'), 'bold label fields are parsed');
 assert(mdLabels.includes('Desktop (please complete the following information):'), 'bold label with parens parses');
 assert(mdLabels.includes('Additional context'), 'additional context field present');
 console.log('markdown parse PASS');
+
+// ---- markdown parsing: H3 style (Rocket.Chat's bug_report.md) ----
+// Real-world case that previously failed: `### Label:` headings parsed to zero
+// fields, so bug_report.md was dropped and the release checklist was picked.
+const RC_BUG_REPORT = `---
+name: Bug report
+about: Create a report to help us improve
+---
+
+### Description:
+
+A clear and concise description of what the bug is.
+
+### Steps to reproduce:
+
+1. Go to '...'
+2. Click on '....'
+
+### Expected behavior:
+
+What you expect to happen
+
+### Actual behavior:
+
+What actually happens
+
+<!--
+### Release Candidate {release-candidate-version} - On the {day}
+Commented-out sections must not surface as phantom fields.
+-->
+
+### Additional context
+
+Add any other context about the problem here.
+`;
+
+const RELEASE_TEMPLATE = `---
+name: Release
+about: Internal release checklist template
+---
+
+# Release {version}
+We are releasing a new version.
+
+## Before Release - Preparation - 1 business day before the day 20th
+- [ ] Create the issue to track the release progress
+
+<!--
+## Release Candidate {release-candidate-version} - On the {day}
+- [ ] Execute action \`Release Candidate\`
+-->
+
+## Final Release - On the 27th
+- [ ] Execute action \`Final Release\`
+
+## After Release - Conclusion - 1 business day after the 27th
+- [ ] Ensure all of the related issues were closed
+`;
+
+const rc = parseMarkdownTemplate(RC_BUG_REPORT, 'bug_report.md');
+assert(rc !== null, 'H3-style template parses');
+assert(rc.name === 'Bug report', 'H3-style frontmatter name is read');
+const rcLabels = rc.fields.map((f) => f.label);
+assert(rcLabels.includes('Description:'), 'H3 heading parsed as a field');
+assert(rcLabels.includes('Steps to reproduce:'), 'H3 steps heading parsed');
+assert(!rcLabels.some((l) => l.includes('Release Candidate')), 'commented-out headings are not fields');
+const rcDetected = detectTemplate([
+  { filename: 'release.md', raw: RELEASE_TEMPLATE },
+  { filename: 'bug_report.md', raw: RC_BUG_REPORT },
+]);
+assert(rcDetected?.filename === 'bug_report.md', 'H3 bug template preferred over release checklist');
+console.log('markdown H3 parse PASS');
+
 
 // ---- yaml parsing ----
 const yaml = parseYamlTemplate(YAML_TEMPLATE, 'bug_report.yaml');
