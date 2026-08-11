@@ -298,22 +298,38 @@ function main() {
           window.removeEventListener(type, fn, false);
         }
 
+        const fillFlag = async (expectedText, actualText) => {
+          const exp = root?.querySelector('#trail-flag-expected');
+          const act = root?.querySelector('#trail-flag-actual');
+          if (!exp || !act) return false;
+          const setVal = (el, v) => {
+            const setter = Object.getOwnPropertyDescriptor(
+              HTMLTextAreaElement.prototype,
+              'value',
+            ).set;
+            setter.call(el, v);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+          };
+          setVal(exp, expectedText);
+          setVal(act, actualText);
+          return true;
+        };
+
         // The real flag flow: open the form, type, submit.
         flagBtn.click();
         await new Promise((r) => setTimeout(r, 200));
-        const expected = root?.querySelector('#trail-flag-expected');
-        const actual = root?.querySelector('#trail-flag-actual');
-        if (!expected || !actual) return { ok: false, reason: 'flag form fields missing' };
-        const setVal = (el, v) => {
-          const setter = Object.getOwnPropertyDescriptor(
-            HTMLTextAreaElement.prototype,
-            'value',
-          ).set;
-          setter.call(el, v);
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-        };
-        setVal(expected, 'Checkout total should be $4.99');
-        setVal(actual, 'Total shows $9.98');
+        if (!(await fillFlag('Checkout total should be $4.99', 'Total shows $9.98'))) {
+          return { ok: false, reason: 'flag form fields missing' };
+        }
+        // Cancel-close once first: the report-writing window's close must be
+        // captured even when the form is dismissed without submitting.
+        root?.querySelector('.trail-overlay__cancel')?.click();
+        await new Promise((r) => setTimeout(r, 100));
+        flagBtn.click();
+        await new Promise((r) => setTimeout(r, 100));
+        if (!(await fillFlag('Checkout total should be $4.99', 'Total shows $9.98'))) {
+          return { ok: false, reason: 'flag form fields missing after reopen' };
+        }
         root?.querySelector('button[type="submit"]')?.click();
         await new Promise((r) => setTimeout(r, 250));
         return {
@@ -350,6 +366,29 @@ function main() {
       assert(summary(s1).net >= 3, 'expected failed network requests');
       assert(summary(s1).input >= 2, 'expected typed input events');
       assert(summary(s1).rrweb >= 1, 'expected rrweb replay events');
+      // The flag flow records the report-writing window's edges: open on form
+      // appearance, cancel on dismiss-without-submit, open again, submit with
+      // notes. The replay compresses each open→close window; the submit must
+      // carry the notes.
+      const flagPhases = s1
+        .filter((e) => e.k === 'flag')
+        .map((e) => `${e.phase ?? 'legacy'}:${e.expected ? 'note' : ''}`);
+      console.log('flag phases:', flagPhases);
+      assert(
+        flagPhases.some((p) => p === 'open:'),
+        'flag open phase recorded when the form appears',
+      );
+      assert(
+        flagPhases.some((p) => p === 'cancel:'),
+        'flag cancel phase recorded when the form is dismissed',
+      );
+      const submitted = s1.filter((e) => e.k === 'flag' && e.phase === 'submit');
+      assert(
+        submitted.length === 1 &&
+          submitted[0].expected.includes('4.99') &&
+          submitted[0].actual.includes('9.98'),
+        'flag submit phase carries the reporter notes',
+      );
       assert(
         s1.some((e) => e.url.includes('page2.html')),
         'expected events captured after navigation to page2',
@@ -394,11 +433,16 @@ function main() {
         'final click before stop survives the teardown (no tail loss)',
       );
       // The reporter flag rides the same capture pipeline as every other event.
-      assert(summary(s1).flag === 1, 'expected exactly one reporter flag event');
-      const flagEvent = s1.find((e) => e.k === 'flag');
+      // The window edges (open/cancel) are marker events; the submit carries
+      // the notes — four flag events for the open → cancel → open → submit flow.
+      const submitFlag = s1.find((e) => e.k === 'flag' && e.phase === 'submit');
       assert(
-        flagEvent?.expected === 'Checkout total should be $4.99' &&
-          flagEvent?.actual === 'Total shows $9.98',
+        s1.filter((e) => e.k === 'flag').length === 4,
+        'expected open + cancel + open + submit flag events',
+      );
+      assert(
+        submitFlag?.expected === 'Checkout total should be $4.99' &&
+          submitFlag?.actual === 'Total shows $9.98',
         'flag carries the reporter expected/actual notes verbatim',
       );
       assert(
@@ -1292,7 +1336,11 @@ function main() {
       const dupTarget = await browser.waitForTarget(
         (t) => t.type() === 'page' && t.url().includes('review.html?share='),
         { timeout: 10000 },
-      );
+      ).catch(async (err) => {
+        const urls = browser.targets().map((t) => t.url()).join('\n  ');
+        console.log(`DBG targets on dup-wait timeout:\n  ${urls}`);
+        throw err;
+      });
       const dup = await dupTarget.page();
       await dup.waitForFunction(() => location.search.startsWith('?report='), {
         timeout: 20000,
