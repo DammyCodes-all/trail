@@ -14,6 +14,10 @@ export interface AIResult {
   steps?: string[];
   template?: { filename: string; fields: Record<string, string> };
   labels?: string[];
+  // A hedged, evidence-linked likely cause. Produced by the Groq cause pass
+  // at review load; the enhance pass (full digest + template context) may
+  // refine it — when both land, the enhance result wins.
+  cause?: string;
 }
 
 const LIMITS = {
@@ -25,6 +29,7 @@ const LIMITS = {
   labels: 20,
   fieldValue: 4000,
   filename: 120,
+  cause: 500,
 } as const;
 
 // Model output is fenced or sloppy JSON more often than not; strip a single
@@ -94,6 +99,9 @@ export function sanitizeAIResult(content: string): AIResult | null {
     if (labels.length) out.labels = labels;
   }
 
+  const cause = clean((raw as Record<string, unknown>).cause, LIMITS.cause);
+  if (cause) out.cause = cause;
+
   return Object.keys(out).length ? out : null;
 }
 
@@ -113,6 +121,16 @@ export function applyAI(
 
   if (result.summary) {
     withAI.unshift({ name: 'Summary', priority: 0, text: result.summary });
+  }
+  // The likely cause leads right after the summary (priority 0.6 keeps it in
+  // the URL budget ahead of Steps): the maintainer's first question after
+  // "what happened" is "why" — and it's the AI's most speculative claim, so
+  // it degrades by omission when no cause was returned.
+  if (result.cause) {
+    const section = { name: 'Likely Cause', priority: 0.6, text: result.cause };
+    const summaryIdx = withAI.findIndex((s) => s.name === 'Summary');
+    if (summaryIdx >= 0) withAI.splice(summaryIdx + 1, 0, section);
+    else withAI.unshift(section);
   }
   if (result.steps?.length) {
     const text = result.steps.map((s, i) => `${i + 1}. ${s}`).join('\n');

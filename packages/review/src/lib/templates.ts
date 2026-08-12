@@ -204,6 +204,9 @@ function matchScore(fieldLabel: string, section: ReportSection): number {
   switch (section.name) {
     case 'Summary':
       return t(/summary|describe|what happened|problem|overview/i);
+    case 'Likely Cause':
+      // "because" must not match — the \b keeps substrings out.
+      return t(/\bcause\b|\bwhy\b|\breason\b|root cause/i);
     case 'Steps to Reproduce':
       return t(/repro|step|follow|action|go to/i);
     case 'Reporter Notes':

@@ -3,6 +3,7 @@ import { REPLAY_SERVER_URL } from "./constants";
 import {
   buildSessionDigest,
   buildTitleDigest,
+  generateCause,
   generateEnhancements,
   generateTitle,
 } from "./ai";
@@ -151,6 +152,17 @@ describe("sanitizeAIResult", () => {
     expect(out?.template?.filename).toBe("bug_report.md");
     expect(out?.template?.fields).toEqual({ "describe-the-bug": "It broke" });
   });
+
+  it("keeps a cause capped at its limit and drops it when absent", () => {
+    const short = sanitizeAIResult(
+      JSON.stringify({ cause: "likely the cart API 500s" }),
+    );
+    expect(short?.cause).toBe("likely the cart API 500s");
+    const long = sanitizeAIResult(JSON.stringify({ cause: "x".repeat(700) }));
+    expect(long?.cause?.length).toBe(500);
+    const missing = sanitizeAIResult(JSON.stringify({ title: "T" }));
+    expect(missing?.cause).toBeUndefined();
+  });
 });
 
 describe("applyAI", () => {
@@ -204,6 +216,38 @@ describe("applyAI", () => {
     );
     expect(out.some((s) => s.text === "y")).toBe(false);
     expect(out.every((s) => s.text !== "_No response_")).toBe(false);
+  });
+
+  it("inserts the Likely Cause section after the summary at priority 0.6", () => {
+    const out = applyAI(
+      baseSections,
+      { ...result, cause: "likely a 500 from the cart API" },
+      null,
+    );
+    const summaryIdx = out.findIndex((s) => s.name === "Summary");
+    expect(out[summaryIdx + 1]?.name).toBe("Likely Cause");
+    const cause = out.find((s) => s.name === "Likely Cause");
+    expect(cause?.priority).toBe(0.6);
+    expect(cause?.text).toBe("likely a 500 from the cart API");
+  });
+
+  it("leads with the cause when there is no AI summary", () => {
+    const out = applyAI(baseSections, { cause: "likely X" }, null);
+    expect(out[0]?.name).toBe("Likely Cause");
+    expect(out.find((s) => s.name === "Likely Cause")?.priority).toBe(0.6);
+  });
+
+  it("shapes the cause onto a root-cause template field", () => {
+    const template: IssueTemplate = {
+      ...MARKDOWN_TEMPLATE,
+      fields: [
+        { id: "root-cause", label: "Root Cause" },
+        { id: "describe-the-bug", label: "Describe the bug" },
+      ],
+    };
+    const out = applyAI(baseSections, { summary: "S", cause: "likely the cart API" }, template);
+    const field = out.find((s) => s.name === "Root Cause");
+    expect(field?.text).toBe("likely the cart API");
   });
 });
 
@@ -558,6 +602,64 @@ describe("generateTitle (fallback matrix)", () => {
   });
 });
 
+describe("generateCause (fallback matrix)", () => {
+  const digest = buildTitleDigest(report, events, timeline, facts);
+  const okBody = JSON.stringify({
+    ok: true,
+    content: JSON.stringify({ cause: "likely the cart API 500s" }),
+  });
+
+  const mockFetch = (status: number, body: unknown, error = false) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        if (error) throw new TypeError("network down");
+        return new Response(JSON.stringify(body), { status });
+      }),
+    );
+  };
+
+  it("returns the parsed cause on 200", async () => {
+    mockFetch(200, JSON.parse(okBody));
+    const out = await generateCause(digest);
+    expect(out.ok).toBe(true);
+    expect(out.status).toBe("ready");
+    expect(out.cause).toBe("likely the cart API 500s");
+  });
+
+  it("maps 501 to server-off", async () => {
+    mockFetch(501, { error: "ai_not_configured" });
+    const out = await generateCause(digest);
+    expect(out).toEqual({ ok: false, status: "server-off" });
+  });
+
+  it.each([429, 502, 504, 500])("maps %i to unavailable", async (status) => {
+    mockFetch(status, { error: "x" });
+    const out = await generateCause(digest);
+    expect(out).toEqual({ ok: false, status: "unavailable" });
+  });
+
+  it("maps network failure to unavailable", async () => {
+    mockFetch(0, null, true);
+    const out = await generateCause(digest);
+    expect(out).toEqual({ ok: false, status: "unavailable" });
+  });
+
+  it("maps a completion without a cause to unavailable", async () => {
+    mockFetch(200, { ok: true, content: JSON.stringify({ title: "T" }) });
+    const out = await generateCause(digest);
+    expect(out).toEqual({ ok: false, status: "unavailable" });
+  });
+
+  it("posts the digest to the replay server cause route", async () => {
+    const fetchMock = vi.fn(async () => new Response(okBody, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateCause(digest);
+    const [url] = fetchMock.mock.calls[0] as unknown as [string];
+    expect(url).toBe(`${REPLAY_SERVER_URL}/api/ai/cause`);
+  });
+});
+
 describe("generateEnhancements (fallback matrix)", () => {
   const digest = buildSessionDigest(report, events, timeline, facts);
   const okBody = JSON.stringify({ ok: true, content: JSON.stringify({ title: "T", summary: "S" }) });
@@ -648,14 +750,26 @@ describe("ai-cache", () => {
     });
   };
 
-  it("round-trips a result and keys by session hash + repo", async () => {
+  it("round-trips a result keyed by pass kind, hash, and repo", async () => {
     stubBrowser();
     const result = { title: "T", summary: "S" };
-    const key = aiCacheKey("hash1", "a/b");
+    const key = aiCacheKey("enhance", "hash1", "a/b");
     await rememberAIResult(key, result);
     expect(await getCachedAIResult(key)).toEqual(result);
-    expect(await getCachedAIResult(aiCacheKey("hash1", "c/d"))).toBeNull();
-    expect(await getCachedAIResult(aiCacheKey("hash2", "a/b"))).toBeNull();
+    expect(await getCachedAIResult(aiCacheKey("enhance", "hash1", "c/d"))).toBeNull();
+    expect(await getCachedAIResult(aiCacheKey("enhance", "hash2", "a/b"))).toBeNull();
+    expect(await getCachedAIResult(aiCacheKey("title", "hash1"))).toBeNull();
+  });
+
+  it("namespaces keys by pass kind so passes never collide", () => {
+    const enhance = aiCacheKey("enhance", "hash1", "a/b");
+    const title = aiCacheKey("title", "hash1");
+    const cause = aiCacheKey("cause", "hash1");
+    expect(enhance).not.toBe(title);
+    expect(title).not.toBe(cause);
+    expect(enhance).not.toBe(cause);
+    expect(aiCacheKey("enhance", "hash1", "c/d")).not.toBe(enhance);
+    expect(aiCacheKey("title", "hash1")).toBe("title:hash1");
   });
 
   it("returns null for a corrupted entry", async () => {

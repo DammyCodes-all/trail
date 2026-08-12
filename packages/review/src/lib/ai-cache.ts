@@ -15,10 +15,17 @@ interface CachedAIResult {
 
 const MAX_CACHED = 100;
 
-// Cache key: the session's content hash (title excluded, matching the share
-// hash) plus the repo, so a repo change re-enhances.
-export function aiCacheKey(sessionHash: string, repo: string): string {
-  return `${sessionHash}:${repo || ''}`;
+// The pass that produced the cached result. Distinct passes must never
+// collide on the same session: the title and cause passes fire at review
+// load (repo-blind), the enhance pass fires in the issue dialog. A cached
+// title-only entry would otherwise be misread as a full enhancement.
+export type AICacheKind = 'title' | 'cause' | 'enhance';
+
+// Cache key: namespaced by pass kind, keyed on the session's content hash
+// (title excluded, matching the share hash). The enhance pass appends the
+// repo so a repo change re-enhances; the repo-blind passes never carry one.
+export function aiCacheKey(kind: AICacheKind, sessionHash: string, repo = ''): string {
+  return `${kind}:${sessionHash}${repo ? `:${repo}` : ''}`;
 }
 
 export async function getCachedAIResult(key: string): Promise<AIResult | null> {
