@@ -21,6 +21,25 @@ export interface ReportSection {
 
 export const defaultSectionRender = (name: string, text: string) => `## ${name}\n\n${text}`;
 
+export interface TrailReportLinks {
+  replayUrl?: string;
+  landingUrl?: string;
+}
+
+export function buildTrailReplayPreamble(links?: TrailReportLinks): string {
+  return links?.replayUrl
+    ? `> **Interactive replay:** [Open the captured session in TRAIL](${links.replayUrl})`
+    : '';
+}
+
+export function buildTrailAttribution(links?: TrailReportLinks): string {
+  if (!links?.landingUrl) return '';
+  const replay = links.replayUrl
+    ? ` · [View interactive replay](${links.replayUrl})`
+    : '';
+  return `---\n\n<sub>Captured with [TRAIL](${links.landingUrl})${replay}</sub>`;
+}
+
 const cleanErrorMessage = (message: string): string =>
   message
     .replace(/^(?:Uncaught\s+)?(?:Error|TypeError|ReferenceError|RangeError|SyntaxError):\s*/i, '')
@@ -316,11 +335,14 @@ export function buildSections(
 export function buildMarkdownFromSections(
   title: string,
   sections: ReportSection[],
+  links?: TrailReportLinks,
 ): string {
   const body = sections
     .map((s) => (s.render ?? defaultSectionRender)(s.name, s.text))
     .join('\n\n');
-  return `# ${title || 'Bug report'}\n\n${body}\n`;
+  const preamble = buildTrailReplayPreamble(links);
+  const attribution = buildTrailAttribution(links);
+  return `# ${title || 'Bug report'}\n\n${preamble ? `${preamble}\n\n` : ''}${body}\n${attribution ? `\n${attribution}\n` : ''}`;
 }
 
 export function buildMarkdown(

@@ -55,6 +55,8 @@ export function GitHubIssueDialog({
   aiEnabled,
   onAiEnabledChange,
   aiState,
+  replayStatus,
+  replayError,
   reportTooLong,
   onOpenIssue,
 }: {
@@ -71,6 +73,14 @@ export function GitHubIssueDialog({
   aiEnabled: boolean;
   onAiEnabledChange: (value: boolean) => void;
   aiState: AIStatus;
+  replayStatus:
+    | "idle"
+    | "preparing"
+    | "uploading"
+    | "ready"
+    | "failed"
+    | "unavailable";
+  replayError: string;
   reportTooLong: boolean;
   onOpenIssue: () => void;
 }) {
@@ -195,6 +205,28 @@ export function GitHubIssueDialog({
                 {AI_INLINE[aiState]}
               </p>
             )}
+          {(replayStatus === "preparing" || replayStatus === "uploading") && (
+            <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+              Preparing the interactive replay. GitHub will wait for this attempt to finish.
+            </p>
+          )}
+          {replayStatus === "ready" && (
+            <p className="flex items-center gap-2 text-xs text-success" role="status">
+              <Check className="size-3.5 shrink-0" aria-hidden="true" />
+              Interactive replay ready.
+            </p>
+          )}
+          {replayStatus === "failed" && (
+            <p className="flex items-start gap-2 text-xs text-warn" role="status">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                The replay could not be prepared. GitHub will open without it.
+                Use “Copy Replay Link” to try again.
+                {replayError ? ` (${replayError})` : ""}
+              </span>
+            </p>
+          )}
           {templateState === "checking" && (
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
