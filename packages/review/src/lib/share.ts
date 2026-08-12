@@ -9,11 +9,16 @@ import {
 } from "./share-cache";
 import type { SharedReportPayload, StoredEvent, TrailCounts } from "./types";
 
-export interface ShareResult {
+export interface EnsureShareResult {
   link: string;
-  copied: boolean;
   reused: boolean;
 }
+
+export interface ShareResult extends EnsureShareResult {
+  copied: boolean;
+}
+
+export type SharePhase = 'preparing' | 'uploading';
 
 // The path shapes of a TRAIL replay share link. New links point at the web
 // app (/r/<id>, which renders the review for everyone and hands off to the
@@ -48,10 +53,23 @@ export function resolveSharePayloadUrl(link: string): string {
   return link;
 }
 
+// New share links are always web-app links. Older cache entries and imported
+// sessions may still carry the payload route, so normalize those at the
+// presentation boundary while keeping the legacy URL usable for reads.
+export function toWebShareLink(link: string): string {
+  try {
+    const parsed = new URL(link);
+    const match = /^\/api\/replays\/([A-Za-z0-9.-]{1,64})$/.exec(parsed.pathname);
+    return match?.[1] ? `${WEB_URL}/r/${match[1]}` : link;
+  } catch {
+    return link;
+  }
+}
+
 // Concurrent share attempts for the same session (e.g. rapid double-clicks)
 // share one upload instead of hitting blob storage twice. Module scope so it
 // survives across clicks; separate tabs are out of reach without messaging.
-const shareInFlight = new Map<string, Promise<ShareResult>>();
+const shareInFlight = new Map<string, Promise<EnsureShareResult>>();
 
 // A recipient just imported a session from a shared link. Remember it under
 // the same content hash the sharer uses, so re-sharing this session reuses
@@ -79,45 +97,49 @@ export interface ShareSessionInput {
   events: StoredEvent[];
 }
 
-// Upload the session to the replay server and hand back the share link. The
-// link points at the web app (/r/<id>), which opens the review for anyone —
-// with the extension installed it hands off into the extension instead. The
-// payload itself goes to the replay server through a presigned PUT URL: Vercel
-// caps function bodies at ~4.5MB and full sessions blow past that, so the
-// payload goes straight to storage. The payload carries the full report so a
-// reviewer can rebuild the exact same review UI (timeline, evidence, replay)
-// from the link. Clipboard failures never block the link from being generated.
-//
-// A content hash of the session is remembered alongside each generated link
-// (chrome.storage.local, see lib/share-cache.ts). Re-sharing an unchanged
-// session reuses the existing link and never uploads to blob storage again;
-// only new events (or any other payload change) hash differently and upload
-// fresh. Title edits don't count — the title is excluded from the hash.
+// Ensure a replay exists on the replay server and return the web-app link.
+// This path deliberately has no clipboard side effect so it is safe to call
+// automatically after a review loads. A content hash of the session is
+// remembered alongside each generated link (chrome.storage.local, see
+// lib/share-cache.ts). Re-sharing an unchanged session reuses the existing
+// link and never uploads to blob storage again; title edits don't count because
+// the title is excluded from the hash.
 //
 // Reused links are probed (status-only fetch, body cancelled) before being
-// trusted: a cache entry can outlive its blob, and a confirmed 4xx/5xx
-// clears the entry and uploads fresh. The probe always hits the RESOLVED
-// payload URL — a web-app link would answer 200 with HTML even when the blob
-// behind it is gone. If the probe itself fails the network the entry is kept —
-// better a possibly-stale link than destroying a valid one during an outage.
-export async function shareSession(input: ShareSessionInput): Promise<ShareResult> {
+// trusted: a cache entry can outlive its blob, and a confirmed 4xx/5xx clears
+// the entry and uploads fresh. The probe always hits the resolved payload URL —
+// a web-app link would answer 200 with HTML even when the blob behind it is
+// gone. If the probe itself fails due to a network outage, the cached link is
+// kept rather than discarded.
+export async function ensureShareLink(
+  input: ShareSessionInput,
+  onPhase?: (phase: SharePhase) => void,
+): Promise<EnsureShareResult> {
   const hash = await hashSession(input.stableJson);
   const running = shareInFlight.get(hash);
   if (running) return running;
-  const run = (async (): Promise<ShareResult> => {
+  const run = (async (): Promise<EnsureShareResult> => {
+    onPhase?.('preparing');
     const cached = await getCachedShare(hash);
     if (cached) {
       try {
         const probe = await fetch(resolveSharePayloadUrl(cached));
         await probe.body?.cancel().catch(() => {});
         if (probe.ok) {
-          return { link: cached, copied: await copyText(cached), reused: true };
+          const link = toWebShareLink(cached);
+          if (link !== cached) {
+            try {
+              await rememberShare(hash, link);
+            } catch {}
+          }
+          return { link, reused: true };
         }
         await forgetShare(hash);
       } catch {
-        return { link: cached, copied: await copyText(cached), reused: true };
+        return { link: toWebShareLink(cached), reused: true };
       }
     }
+    onPhase?.('uploading');
     let res: Response;
     try {
       res = await fetch(`${REPLAY_SERVER_URL}/api/replays/presign`, {
@@ -156,7 +178,7 @@ export async function shareSession(input: ShareSessionInput): Promise<ShareResul
     try {
       await rememberShare(hash, link);
     } catch {}
-    return { link, copied: await copyText(link), reused: false };
+    return { link, reused: false };
   })();
   shareInFlight.set(hash, run);
   void run
@@ -165,4 +187,15 @@ export async function shareSession(input: ShareSessionInput): Promise<ShareResul
       if (shareInFlight.get(hash) === run) shareInFlight.delete(hash);
     });
   return run;
+}
+
+export async function copyReplayLink(link: string): Promise<boolean> {
+  return copyText(link);
+}
+
+// Explicit sharing keeps the original clipboard-oriented behavior used by the
+// Share menu. Automatic callers should use ensureShareLink directly.
+export async function shareSession(input: ShareSessionInput): Promise<ShareResult> {
+  const result = await ensureShareLink(input);
+  return { ...result, copied: await copyReplayLink(result.link) };
 }

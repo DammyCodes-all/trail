@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isShareLink, resolveSharePayloadUrl } from "./share";
+import { isShareLink, resolveSharePayloadUrl, toWebShareLink } from "./share";
 
 describe("isShareLink", () => {
   it("accepts web-app links", () => {
@@ -23,6 +23,19 @@ describe("isShareLink", () => {
     expect(isShareLink("not a url")).toBe(false);
     expect(isShareLink("https://example.com/api/replays/")).toBe(false);
     expect(isShareLink("https://example.com/api/")).toBe(false);
+  });
+});
+
+describe("toWebShareLink", () => {
+  it("normalizes legacy payload links to the web replay route", () => {
+    expect(toWebShareLink("https://trail-roan.vercel.app/api/replays/xyz")).toBe(
+      "http://localhost:3000/r/xyz",
+    );
+  });
+
+  it("leaves web replay links unchanged", () => {
+    const link = "https://trail-web.example.com/r/xyz";
+    expect(toWebShareLink(link)).toBe(link);
   });
 });
 

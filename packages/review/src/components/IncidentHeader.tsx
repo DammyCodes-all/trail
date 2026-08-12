@@ -75,7 +75,7 @@ export function IncidentHeader({
   facts,
   counts,
   flags,
-  sharing,
+  replayStatus,
   onCreateIssue,
   onCopyMarkdown,
   onCopyReplayLink,
@@ -90,7 +90,13 @@ export function IncidentHeader({
   facts: ReportFacts;
   counts: TrailCounts;
   flags: number;
-  sharing: "idle" | "uploading";
+  replayStatus:
+    | "idle"
+    | "preparing"
+    | "uploading"
+    | "ready"
+    | "failed"
+    | "unavailable";
   onCreateIssue: () => void;
   onCopyMarkdown: () => void;
   onCopyReplayLink: () => void;
@@ -128,13 +134,20 @@ export function IncidentHeader({
                 <Copy aria-hidden="true" />
                 Copy Markdown
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onCopyReplayLink} disabled={sharing === "uploading"}>
-                {sharing === "uploading" ? (
+              <DropdownMenuItem
+                onClick={onCopyReplayLink}
+                disabled={replayStatus === "preparing" || replayStatus === "uploading"}
+              >
+                {replayStatus === "preparing" || replayStatus === "uploading" ? (
                   <Loader2 className="animate-spin" aria-hidden="true" />
                 ) : (
                   <Link2 aria-hidden="true" />
                 )}
-                {sharing === "uploading" ? "Preparing link..." : "Copy Replay Link"}
+                {replayStatus === "preparing" || replayStatus === "uploading"
+                  ? "Preparing link..."
+                  : replayStatus === "failed"
+                    ? "Try Copy Replay Link Again"
+                    : "Copy Replay Link"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -147,6 +160,25 @@ export function IncidentHeader({
           </Button>
         </div>
       </div>
+
+      {replayStatus !== "idle" && (
+        <p
+          className={cn(
+            "text-right text-[11px] text-muted-foreground",
+            replayStatus === "failed" && "text-warn",
+            replayStatus === "ready" && "text-success",
+          )}
+          role="status"
+        >
+          {replayStatus === "preparing" || replayStatus === "uploading"
+            ? "Preparing interactive replay…"
+            : replayStatus === "ready"
+              ? "Interactive replay ready"
+              : replayStatus === "failed"
+                ? "Replay unavailable · Copy Replay Link to try again"
+                : "Replay unavailable"}
+        </p>
+      )}
 
       <div className="pb-6 pt-8 sm:pb-8 sm:pt-12">
         {titleLoading ? (

@@ -4,8 +4,11 @@
 const URL_LIMIT = 7600;
 
 import {
+  buildTrailAttribution,
+  buildTrailReplayPreamble,
   defaultSectionRender,
   type ReportSection,
+  type TrailReportLinks,
 } from "./report";
 
 export interface IssueUrlResult {
@@ -22,6 +25,7 @@ export function buildIssueUrl(
   title: string,
   sections: ReportSection[],
   labels: string[] = [],
+  links?: TrailReportLinks,
 ): IssueUrlResult {
   const base = `https://github.com/${repo}/issues/new`;
   const encTitle = encodeURIComponent(cap(title, 120));
@@ -40,10 +44,16 @@ export function buildIssueUrl(
     block: `${(s.render ?? defaultSectionRender)(s.name, s.text)}\n\n`,
   }));
 
-  let body = '';
+  const preamble = buildTrailReplayPreamble(links);
+  const attribution = buildTrailAttribution(links);
+  const footer = attribution ? `\n\n${attribution}` : '';
+  const fits = (candidate: string) =>
+    encodeURIComponent(candidate + footer).length <= budget;
+
+  let body = preamble ? `${preamble}\n\n` : '';
   const dropped: string[] = [];
   for (const { name, block } of blocks) {
-    if (encodeURIComponent(body + block).length <= budget) body += block;
+    if (fits(body + block)) body += block;
     else dropped.push(name);
   }
 
@@ -51,8 +61,11 @@ export function buildIssueUrl(
     const note =
       `> Truncated for URL length: ${dropped.join(', ')}. ` +
       `Full report is on the clipboard.\n`;
-    if (encodeURIComponent(note + body).length <= budget) body = note + body;
+    if (fits(note + body)) body = note + body;
   }
+
+  const trimmedBody = body.trimEnd();
+  body = trimmedBody ? `${trimmedBody}${footer}` : attribution;
 
   return {
     url: `${base}?title=${encTitle}&body=${encodeURIComponent(body)}${labelsPart}`,
