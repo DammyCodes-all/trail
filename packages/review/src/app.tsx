@@ -26,7 +26,6 @@ import { hashSession, stableShareJson } from "./lib/share-cache";
 import {
   buildSessionDigest,
   buildTitleDigest,
-  generateCause,
   generateEnhancements,
   generateTitle,
   type AIStatus,
@@ -55,7 +54,7 @@ import { AttachmentsPanel } from "./components/AttachmentsPanel";
 import { EvidencePanel } from "./components/EvidencePanel";
 import { GitHubIssueDialog } from "./components/GitHubIssueDialog";
 import { IncidentHeader } from "./components/IncidentHeader";
-import { LikelyCauseCard } from "./components/LikelyCauseCard";
+
 import { LoadingSkeleton } from "./components/LoadingSkeleton";
 import { ReplayPanel } from "./components/ReplayPanel";
 import { TimelineCard } from "./components/TimelineCard";
@@ -133,11 +132,7 @@ export function ReviewApp({
   // the title run never abort each other.
   const [titleAIState, setTitleAIState] = useState<AIStatus>("idle");
   const titleGenToken = useRef(0);
-  // Load-time AI cause (Groq fast pass): its own state/refs so the cause run,
-  // the title run, and the enhance run never abort each other. The enhance
-  // pass may refine the cause later — its result wins when both land.
-  const [groqCause, setGroqCause] = useState("");
-  const causeGenToken = useRef(0);
+
   // Set once the issue-dialog enhance result lands with a title: that title
   // is repo-aware and wins over the page-load title, whichever resolves last.
   const enhanceTitleLandedRef = useRef(false);
@@ -324,28 +319,18 @@ export function ReviewApp({
     url: events[0]?.url ?? "",
   };
   const displayTitle = title || base.title;
-  // The cause that shows on the page and rides into the report: the fast Groq
-  // pass lands first; the enhance pass's cause (full digest + template
-  // context) wins when it lands.
-  const causeSuggestion = aiResult?.cause ?? groqCause;
+
   const labelsList = labels
     .split(",")
     .map((l) => l.trim())
     .filter(Boolean);
   const sections = useMemo(() => {
     const baseSections = buildSections(base, events, { redact }, timeline);
-    // The cause rides whichever pass produced it: the fast Groq pass at load,
-    // refined by the enhance pass when that one lands (its result wins).
-    if (aiResult || groqCause) {
-      const merged = aiResult
-        ? { ...aiResult, cause: aiResult.cause ?? groqCause }
-        : { cause: groqCause };
-      return applyAI(baseSections, merged, template);
-    }
+    if (aiResult) return applyAI(baseSections, aiResult, template);
     return template
       ? shapeSections(template, baseSections).sections
       : baseSections;
-  }, [base, events, redact, template, timeline, aiResult, groqCause]);
+  }, [base, events, redact, template, timeline, aiResult]);
   const markdown = useMemo(
     () => buildMarkdownFromSections(displayTitle, sections),
     [displayTitle, sections],
@@ -654,50 +639,6 @@ export function ReviewApp({
     };
   }, [loading, events, aiEnabled, report, stableShareInput, timeline, facts]);
 
-  // Load-time AI cause: the fast Groq pass, fired once the session is loaded
-  // alongside the title pass (same cheap digest — the cause needs no repo or
-  // template context). Cached under the session hash, so reopens reuse it.
-  // The landing is gated on aiEnabledRef so toggling AI off mid-flight drops
-  // a late result; the enhance pass may refine the cause later — its result
-  // wins when both land (see the sections memo).
-  useEffect(() => {
-    if (loading || !events.length) return;
-    if (!aiEnabled) {
-      ++causeGenToken.current;
-      setGroqCause("");
-      return;
-    }
-    const token = ++causeGenToken.current;
-    const controller = new AbortController();
-    const run = async () => {
-      const key = aiCacheKey("cause", await hashSession(stableShareInput));
-      const cached = await getCachedAIResult(key);
-      if (token !== causeGenToken.current) return;
-      if (cached?.cause) {
-        if (aiEnabledRef.current) setGroqCause(cached.cause);
-        return;
-      }
-      const summary = report ?? {
-        startedAt: events[0]?.t ?? 0,
-        endedAt: events.at(-1)?.t ?? 0,
-        url: events[0]?.url ?? "",
-      };
-      const digest = buildTitleDigest(summary, events, timeline, facts);
-      const outcome = await generateCause(digest, controller.signal);
-      if (token !== causeGenToken.current) return;
-      if (outcome.ok && outcome.cause) {
-        if (aiEnabledRef.current) {
-          setGroqCause(outcome.cause);
-          void rememberAIResult(key, { cause: outcome.cause });
-        }
-      }
-    };
-    void run();
-    return () => {
-      ++causeGenToken.current;
-      controller.abort();
-    };
-  }, [loading, events, aiEnabled, report, stableShareInput, timeline, facts]);
 
   // Upload the session to the replay server and hand back the share link. The
   // pipeline (presign → PUT → probe → cache → in-flight dedupe) lives in
@@ -773,7 +714,6 @@ export function ReviewApp({
         onCopyReplayLink={() => void copyReplayLink()}
       />
 
-      {Boolean(causeSuggestion) && <LikelyCauseCard cause={causeSuggestion} />}
 
       <main className="min-w-0">
         <div

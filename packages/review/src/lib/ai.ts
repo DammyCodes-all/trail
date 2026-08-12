@@ -409,35 +409,4 @@ export async function generateTitle(
   }
 }
 
-export interface CauseOutcome {
-  ok: boolean;
-  status: AIStatus;
-  cause?: string;
-}
 
-// POST the title digest to the replay server's cause-only proxy — the same
-// cheap Groq shape as the title call and the same digest (no templates, no
-// repo), so it can run at review load, ahead of the report pass. The enhance
-// pass may refine the cause later; its result wins when both land.
-export async function generateCause(
-  digest: TitleDigest,
-  signal?: AbortSignal,
-): Promise<CauseOutcome> {
-  try {
-    const res = await fetch(`${REPLAY_SERVER_URL}/api/ai/cause`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ digest }),
-      signal,
-    });
-    if (res.status === 501) return { ok: false, status: 'server-off' };
-    if (!res.ok) return { ok: false, status: 'unavailable' };
-    const data = (await res.json().catch(() => null)) as { content?: unknown } | null;
-    const result =
-      typeof data?.content === 'string' ? sanitizeAIResult(data.content) : null;
-    if (!result?.cause) return { ok: false, status: 'unavailable' };
-    return { ok: true, status: 'ready', cause: result.cause };
-  } catch {
-    return { ok: false, status: 'unavailable' };
-  }
-}

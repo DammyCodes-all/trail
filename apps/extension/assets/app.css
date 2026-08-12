@@ -188,6 +188,7 @@
   box-shadow: 0 0 0 2px rgb(255 106 0 / 0.18);
 }
 
+
 /*
  * MagicUI pulsating button — tokens renamed from the registry defaults
  * (`pulsating`/`pulsating-ripple`) so Tailwind's built-in `animate-pulse`
@@ -249,6 +250,7 @@
   [data-reveal] {
     animation-name: timeline-row-fade;
   }
+
 }
 
 @keyframes timeline-row-fade {

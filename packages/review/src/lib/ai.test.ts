@@ -3,7 +3,6 @@ import { REPLAY_SERVER_URL } from "./constants";
 import {
   buildSessionDigest,
   buildTitleDigest,
-  generateCause,
   generateEnhancements,
   generateTitle,
 } from "./ai";
@@ -602,63 +601,6 @@ describe("generateTitle (fallback matrix)", () => {
   });
 });
 
-describe("generateCause (fallback matrix)", () => {
-  const digest = buildTitleDigest(report, events, timeline, facts);
-  const okBody = JSON.stringify({
-    ok: true,
-    content: JSON.stringify({ cause: "likely the cart API 500s" }),
-  });
-
-  const mockFetch = (status: number, body: unknown, error = false) => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        if (error) throw new TypeError("network down");
-        return new Response(JSON.stringify(body), { status });
-      }),
-    );
-  };
-
-  it("returns the parsed cause on 200", async () => {
-    mockFetch(200, JSON.parse(okBody));
-    const out = await generateCause(digest);
-    expect(out.ok).toBe(true);
-    expect(out.status).toBe("ready");
-    expect(out.cause).toBe("likely the cart API 500s");
-  });
-
-  it("maps 501 to server-off", async () => {
-    mockFetch(501, { error: "ai_not_configured" });
-    const out = await generateCause(digest);
-    expect(out).toEqual({ ok: false, status: "server-off" });
-  });
-
-  it.each([429, 502, 504, 500])("maps %i to unavailable", async (status) => {
-    mockFetch(status, { error: "x" });
-    const out = await generateCause(digest);
-    expect(out).toEqual({ ok: false, status: "unavailable" });
-  });
-
-  it("maps network failure to unavailable", async () => {
-    mockFetch(0, null, true);
-    const out = await generateCause(digest);
-    expect(out).toEqual({ ok: false, status: "unavailable" });
-  });
-
-  it("maps a completion without a cause to unavailable", async () => {
-    mockFetch(200, { ok: true, content: JSON.stringify({ title: "T" }) });
-    const out = await generateCause(digest);
-    expect(out).toEqual({ ok: false, status: "unavailable" });
-  });
-
-  it("posts the digest to the replay server cause route", async () => {
-    const fetchMock = vi.fn(async () => new Response(okBody, { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    await generateCause(digest);
-    const [url] = fetchMock.mock.calls[0] as unknown as [string];
-    expect(url).toBe(`${REPLAY_SERVER_URL}/api/ai/cause`);
-  });
-});
 
 describe("generateEnhancements (fallback matrix)", () => {
   const digest = buildSessionDigest(report, events, timeline, facts);
@@ -764,10 +706,7 @@ describe("ai-cache", () => {
   it("namespaces keys by pass kind so passes never collide", () => {
     const enhance = aiCacheKey("enhance", "hash1", "a/b");
     const title = aiCacheKey("title", "hash1");
-    const cause = aiCacheKey("cause", "hash1");
     expect(enhance).not.toBe(title);
-    expect(title).not.toBe(cause);
-    expect(enhance).not.toBe(cause);
     expect(aiCacheKey("enhance", "hash1", "c/d")).not.toBe(enhance);
     expect(aiCacheKey("title", "hash1")).toBe("title:hash1");
   });

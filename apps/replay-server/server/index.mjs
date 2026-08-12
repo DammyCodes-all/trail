@@ -4,7 +4,6 @@
 //   GET  /api/replays/<id>          → session JSON
 //   POST /api/ai/enhance            → proxy a report-enhancement to OpenRouter
 //   POST /api/ai/title              → proxy a title-only completion to Groq
-//   POST /api/ai/cause              → proxy a cause-only completion to Groq
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { put, get, isBlobMode } from "../lib/storage.js";
@@ -14,7 +13,6 @@ import {
   isOpenRouterConfigured,
   proxyEnhance,
   proxyTitle,
-  proxyCause,
 } from "../lib/ai-proxy.js";
 import { aiEnhanceLimiter, tryConsume } from "../lib/rate-limit.js";
 
@@ -144,50 +142,6 @@ async function handleAiTitle(req, res) {
   json(res, 200, { ok: true, content: upstream.content });
 }
 
-async function handleAiCause(req, res) {
-  if (!isGroqConfigured()) {
-    json(res, 501, { error: "ai_not_configured" });
-    return;
-  }
-  const allowed = await tryConsume(aiEnhanceLimiter, clientIp(req));
-  if (!allowed.ok) {
-    json(res, 429, {
-      error: "rate_limited",
-      retryAfterSecs: allowed.retryAfterSecs,
-    });
-    return;
-  }
-
-  const chunks = [];
-  let total = 0;
-  for await (const chunk of req) {
-    total += chunk.length;
-    if (total > MAX_AI_BODY) {
-      json(res, 413, { error: "payload_too_large" });
-      return;
-    }
-    chunks.push(chunk);
-  }
-  let body;
-  try {
-    body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  } catch {
-    json(res, 400, { error: "invalid_json" });
-    return;
-  }
-  const { digest } = body ?? {};
-  if (typeof digest !== "object" || digest === null) {
-    json(res, 400, { error: "bad_payload" });
-    return;
-  }
-
-  const upstream = await proxyCause({ digest });
-  if (!upstream.ok) {
-    json(res, upstream.status, { error: upstream.error });
-    return;
-  }
-  json(res, 200, { ok: true, content: upstream.content });
-}
 
 const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") {
@@ -260,10 +214,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "POST" && path === "/api/ai/cause") {
-    await handleAiCause(req, res);
-    return;
-  }
 
   const dataMatch = path.match(/^\/api\/replays\/([A-Za-z0-9.-]+)$/);
   if (req.method === "GET" && dataMatch && ID_RE.test(dataMatch[1])) {

@@ -16,10 +16,10 @@ interface CachedAIResult {
 const MAX_CACHED = 100;
 
 // The pass that produced the cached result. Distinct passes must never
-// collide on the same session: the title and cause passes fire at review
-// load (repo-blind), the enhance pass fires in the issue dialog. A cached
-// title-only entry would otherwise be misread as a full enhancement.
-export type AICacheKind = 'title' | 'cause' | 'enhance';
+// collide on the same session: the title pass fires at review load (repo-blind),
+// while the enhance pass fires in the issue dialog. A cached title-only entry
+// would otherwise be misread as a full enhancement.
+export type AICacheKind = 'title' | 'enhance';
 
 // Cache key: namespaced by pass kind, keyed on the session's content hash
 // (title excluded, matching the share hash). The enhance pass appends the

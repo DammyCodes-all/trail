@@ -14,9 +14,8 @@ export interface AIResult {
   steps?: string[];
   template?: { filename: string; fields: Record<string, string> };
   labels?: string[];
-  // A hedged, evidence-linked likely cause. Produced by the Groq cause pass
-  // at review load; the enhance pass (full digest + template context) may
-  // refine it — when both land, the enhance result wins.
+  // A hedged, evidence-linked likely cause produced by the report enhancement
+  // pass when the available context supports one.
   cause?: string;
 }
 
