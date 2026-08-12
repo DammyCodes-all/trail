@@ -5,10 +5,15 @@
 // stay server-side: GET /api/replays/<id> still fetches the blob.
 import { randomUUID } from 'node:crypto';
 import { issueSignedToken, presignUrl } from '@vercel/blob';
+import { optionsResponse, withCors } from '../../lib/cors.js';
 
 export const config = { runtime: 'nodejs' };
 
 const MAX_SESSION = 50 * 1024 * 1024; // Blob per-blob cap
+
+export function OPTIONS(): Response {
+  return optionsResponse();
+}
 
 export async function POST(): Promise<Response> {
   const id = randomUUID();
@@ -26,8 +31,10 @@ export async function POST(): Promise<Response> {
       // make the stored pathname unreachable.
       { operation: 'put', pathname, access: 'public', addRandomSuffix: false },
     );
-    return Response.json({ id, uploadUrl: presignedUrl });
+    return withCors(Response.json({ id, uploadUrl: presignedUrl }));
   } catch (err) {
-    return new Response(`presign failed: ${(err as Error).message}`, { status: 500 });
+    return withCors(
+      new Response(`presign failed: ${(err as Error).message}`, { status: 500 }),
+    );
   }
 }

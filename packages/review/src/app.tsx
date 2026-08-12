@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { eventWithTime } from "@rrweb/types";
-import { AI_ENABLED_KEY, REPLAY_SERVER_URL, REPO_HISTORY_KEY } from "./lib/constants";
+import {
+  AI_ENABLED_KEY,
+  REPLAY_SERVER_URL,
+  REPO_HISTORY_KEY,
+  WEB_URL,
+} from "./lib/constants";
 import { buildIssueUrl } from "./lib/github";
 import { buildReportFacts } from "./lib/facts";
 import {
@@ -32,7 +37,13 @@ import {
 } from "./lib/ai";
 import { applyAI, type AIResult } from "./lib/ai-merge";
 import { aiCacheKey, getCachedAIResult, rememberAIResult } from "./lib/ai-cache";
-import { shareSession } from "./lib/share";
+import {
+  copyReplayLink as copyReplayLinkToClipboard,
+  ensureShareLink,
+  isShareLink,
+  toWebShareLink,
+  type EnsureShareResult,
+} from "./lib/share";
 import {
   buildConsoleLog,
   buildHar,
@@ -60,7 +71,13 @@ import { ReplayPanel } from "./components/ReplayPanel";
 import { TimelineCard } from "./components/TimelineCard";
 import type { ReplayPlayerHandle } from "./replay";
 
-type ShareResult = { link: string; copied: boolean; reused: boolean };
+type ReplayLinkStatus =
+  | "idle"
+  | "preparing"
+  | "uploading"
+  | "ready"
+  | "failed"
+  | "unavailable";
 
 // The platform seams the review needs that differ between the extension and
 // the web viewer. Everything else (replay, timeline, report, share, AI,
@@ -139,8 +156,12 @@ export function ReviewApp({
   // aiEnabled at seed time: toggling AI off mid-flight stops a late title
   // from landing.
   const aiEnabledRef = useRef(true);
-  const [sharing, setSharing] = useState<"idle" | "uploading">("idle");
+  const [replayStatus, setReplayStatus] = useState<ReplayLinkStatus>("idle");
+  const [replayError, setReplayError] = useState("");
   const [replayLink, setReplayLink] = useState("");
+  const replayLinkRef = useRef("");
+  const replayUploadKeyRef = useRef("");
+  const replayPromiseRef = useRef<Promise<EnsureShareResult> | null>(null);
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [currentReplayTime, setCurrentReplayTime] = useState(0);
   const [replayPlaying, setReplayPlaying] = useState(false);
@@ -331,16 +352,29 @@ export function ReviewApp({
       ? shapeSections(template, baseSections).sections
       : baseSections;
   }, [base, events, redact, template, timeline, aiResult]);
+  const reportLinks = useMemo(
+    () => ({
+      replayUrl: replayLink || undefined,
+      landingUrl: WEB_URL,
+    }),
+    [replayLink],
+  );
   const markdown = useMemo(
-    () => buildMarkdownFromSections(displayTitle, sections),
-    [displayTitle, sections],
+    () => buildMarkdownFromSections(displayTitle, sections, reportLinks),
+    [displayTitle, sections, reportLinks],
   );
   const issue = useMemo(
     () =>
       repo
-        ? buildIssueUrl(normalizeRepo(repo), displayTitle, sections, labelsList)
+        ? buildIssueUrl(
+            normalizeRepo(repo),
+            displayTitle,
+            sections,
+            labelsList,
+            reportLinks,
+          )
         : null,
-    [repo, displayTitle, sections, labelsList],
+    [repo, displayTitle, sections, labelsList, reportLinks],
   );
 
   // Test hooks for spike/verify.mjs.
@@ -358,6 +392,8 @@ export function ReviewApp({
     w.__trailAIState = aiState;
     w.__trailTitleAIState = titleAIState;
     w.__trailReplayLink = replayLink;
+    w.__trailReplayStatus = replayStatus;
+    w.__trailReplayError = replayError;
     w.__trailReplayTime = currentReplayTime;
   }, [
     timeline,
@@ -370,6 +406,8 @@ export function ReviewApp({
     aiState,
     titleAIState,
     replayLink,
+    replayStatus,
+    replayError,
     currentReplayTime,
     repo,
     loading,
@@ -423,13 +461,41 @@ export function ReviewApp({
       "application/json",
     );
 
-  const openIssue = () => {
-    if (!issue) return;
+  const openIssue = async () => {
+    // If automatic sharing is still in flight, wait for that existing attempt.
+    // A failure is caught and intentionally produces an issue without replay
+    // links; opening GitHub must never trigger a hidden retry.
+    const pendingReplay = replayPromiseRef.current;
+    if (pendingReplay) {
+      await Promise.race([
+        pendingReplay.catch(() => {}),
+        new Promise<void>((resolve) => window.setTimeout(resolve, 10_000)),
+      ]);
+    }
+    const links = {
+      replayUrl: replayLinkRef.current || undefined,
+      landingUrl: WEB_URL,
+    };
+    const finalIssue = repo
+      ? buildIssueUrl(
+          normalizeRepo(repo),
+          displayTitle,
+          sections,
+          labelsList,
+          links,
+        )
+      : null;
+    if (!finalIssue) return;
+    const finalMarkdown = buildMarkdownFromSections(
+      displayTitle,
+      sections,
+      links,
+    );
     setIssueDialogOpen(false);
-    if (issue.dropped.length > 0) {
+    if (finalIssue.dropped.length > 0) {
       // The report can't fit in the prefilled link: copy the full report so
       // the user can paste it into the issue body after GitHub opens.
-      void copyText(markdown).then(() => {
+      void copyText(finalMarkdown).then(() => {
         sileo.success({
           title: "Report copied to clipboard",
           description:
@@ -437,7 +503,7 @@ export function ReviewApp({
         });
       });
     }
-    void platform.openTab(issue.url);
+    platform.openTab(finalIssue.url);
     const used = pushRepoHistory(repoHistory, repo);
     if (used !== repoHistory) {
       setRepoHistory(used);
@@ -477,6 +543,7 @@ export function ReviewApp({
       eventCount: events.length,
       counts,
       url: events[0]?.url ?? "",
+      repo: "",
     }),
     [report, events, counts],
   );
@@ -488,6 +555,69 @@ export function ReviewApp({
     () => stableShareJson({ v: 2, report: shareReportBase, events }),
     [shareReportBase, events],
   );
+  const shareInput = useMemo(
+    () => ({
+      stableJson: stableShareInput,
+      title: displayTitle,
+      base: shareReportBase,
+      events,
+    }),
+    [stableShareInput, displayTitle, shareReportBase, events],
+  );
+
+  // Automatically ensure a web replay link after the session loads. Imported
+  // sessions already have a source link and must not be uploaded again. A
+  // failed background attempt is intentionally terminal for this session: the
+  // explicit Copy Replay Link action is the only retry path.
+  useEffect(() => {
+    if (loading) return;
+    if (!events.length) {
+      replayLinkRef.current = "";
+      replayPromiseRef.current = null;
+      setReplayLink("");
+      setReplayStatus("unavailable");
+      return;
+    }
+    if (!stableShareInput) return;
+    if (replayUploadKeyRef.current === stableShareInput) return;
+    replayUploadKeyRef.current = stableShareInput;
+    replayLinkRef.current = "";
+    replayPromiseRef.current = null;
+    setReplayLink("");
+    setReplayError("");
+
+    const source = report?.source;
+    if (source && isShareLink(source)) {
+      const link = toWebShareLink(source);
+      replayLinkRef.current = link;
+      setReplayLink(link);
+      setReplayStatus("ready");
+      return;
+    }
+
+    let cancelled = false;
+    const onPhase = (phase: "preparing" | "uploading") => {
+      if (!cancelled) setReplayStatus(phase);
+    };
+    setReplayStatus("preparing");
+    const promise = ensureShareLink(shareInput, onPhase);
+    replayPromiseRef.current = promise;
+    void promise
+      .then((result) => {
+        if (cancelled) return;
+        replayLinkRef.current = result.link;
+        setReplayLink(result.link);
+        setReplayStatus("ready");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setReplayError(err instanceof Error ? err.message : String(err));
+        setReplayStatus("failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, events.length, report?.source, shareInput, stableShareInput]);
 
   // AI enhancements: build a redaction-safe digest of the session and ask the
   // replay server's Groq proxy for title/summary/steps/template mapping
@@ -640,39 +770,42 @@ export function ReviewApp({
   }, [loading, events, aiEnabled, report, stableShareInput, timeline, facts]);
 
 
-  // Upload the session to the replay server and hand back the share link. The
-  // pipeline (presign → PUT → probe → cache → in-flight dedupe) lives in
-  // lib/share.ts; this component only wires it to state and toasts.
+  // Explicitly copying the replay link is also the only retry path after an
+  // automatic load-time upload fails.
   const copyReplayLink = () => {
-    if (sharing === "uploading") return;
-    setSharing("uploading");
-    const upload = async (): Promise<ShareResult> => {
-      const result = await shareSession({
-        stableJson: stableShareInput,
-        title: displayTitle,
-        base: shareReportBase,
-        events,
+    if (replayStatus === "preparing" || replayStatus === "uploading") return;
+    setReplayStatus("preparing");
+    setReplayError("");
+    const upload = async () => {
+      const result = await ensureShareLink(shareInput, (phase) => {
+        setReplayStatus(phase);
       });
+      replayLinkRef.current = result.link;
       setReplayLink(result.link);
-      return result;
+      setReplayStatus("ready");
+      const copied = await copyReplayLinkToClipboard(result.link);
+      return { ...result, copied };
     };
+    const promise = upload();
+    replayPromiseRef.current = promise;
     sileo
-      .promise(upload(), {
-        loading: { title: "Uploading replay…" },
+      .promise(promise, {
+        loading: { title: "Preparing replay link…" },
         success: ({ link, copied }) => ({
-          title: copied
-            ? "Replay link copied to clipboard"
-            : "Replay link ready",
+          title: copied ? "Replay link copied to clipboard" : "Replay link ready",
           description: link,
         }),
-        error: (err) => ({
-          title: "Replay link failed",
-          description: `${REPLAY_SERVER_URL} — ${err instanceof Error ? err.message : String(err)}`,
-          duration: 8000,
-        }),
+        error: (err) => {
+          setReplayError(err instanceof Error ? err.message : String(err));
+          setReplayStatus("failed");
+          return {
+            title: "Replay link failed",
+            description: `${REPLAY_SERVER_URL} — ${err instanceof Error ? err.message : String(err)}`,
+            duration: 8000,
+          };
+        },
       })
-      .catch(() => {})
-      .finally(() => setSharing("idle"));
+      .catch(() => {});
   };
 
   if (loadError) {
@@ -708,7 +841,7 @@ export function ReviewApp({
         facts={facts}
         counts={counts}
         flags={flags}
-        sharing={sharing}
+        replayStatus={replayStatus}
         onCreateIssue={handleCreateIssue}
         onCopyMarkdown={() => void copyMarkdown()}
         onCopyReplayLink={() => void copyReplayLink()}
@@ -809,6 +942,8 @@ export function ReviewApp({
           void getStorageArea().set({ [AI_ENABLED_KEY]: value });
         }}
         aiState={aiState}
+        replayStatus={replayStatus}
+        replayError={replayError}
         onOpenIssue={openIssue}
       />
 

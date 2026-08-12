@@ -324,4 +324,18 @@ describe("buildMarkdown", () => {
     const md = buildMarkdownFromSections("", []);
     expect(md).toBe("# Bug report\n\n\n");
   });
+
+  it("adds the replay callout and TRAIL attribution when links are available", () => {
+    const md = buildMarkdownFromSections("My report", [], {
+      replayUrl: "https://trail.example/r/replay-123",
+      landingUrl: "https://trail.example/",
+    });
+
+    expect(md).toContain(
+      "> **Interactive replay:** [Open the captured session in TRAIL](https://trail.example/r/replay-123)",
+    );
+    expect(md).toContain(
+      "<sub>Captured with [TRAIL](https://trail.example/) · [View interactive replay](https://trail.example/r/replay-123)</sub>",
+    );
+  });
 });
