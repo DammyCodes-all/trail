@@ -208,13 +208,15 @@ export function GitHubIssueDialog({
           {(replayStatus === "preparing" || replayStatus === "uploading") && (
             <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
               <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-              Preparing the interactive replay. GitHub will wait for this attempt to finish.
+              {replayStatus === "preparing"
+                ? "Preparing the replay."
+                : "Uploading the replay."} GitHub will wait for this attempt to finish.
             </p>
           )}
           {replayStatus === "ready" && (
             <p className="flex items-center gap-2 text-xs text-success" role="status">
               <Check className="size-3.5 shrink-0" aria-hidden="true" />
-              Interactive replay ready.
+              Replay ready.
             </p>
           )}
           {replayStatus === "failed" && (

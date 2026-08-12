@@ -564,6 +564,17 @@ export function ReviewApp({
     }),
     [stableShareInput, displayTitle, shareReportBase, events],
   );
+  // Automatic sharing must not depend on the editable/AI title: a title change
+  // while an upload is in flight must not cancel the promise's ready transition.
+  const autoShareInput = useMemo(
+    () => ({
+      stableJson: stableShareInput,
+      title: base.title,
+      base: shareReportBase,
+      events,
+    }),
+    [stableShareInput, base.title, shareReportBase, events],
+  );
 
   // Automatically ensure a web replay link after the session loads. Imported
   // sessions already have a source link and must not be uploaded again. A
@@ -595,29 +606,27 @@ export function ReviewApp({
       return;
     }
 
-    let cancelled = false;
+    const uploadKey = stableShareInput;
+    const isCurrentSession = () => replayUploadKeyRef.current === uploadKey;
     const onPhase = (phase: "preparing" | "uploading") => {
-      if (!cancelled) setReplayStatus(phase);
+      if (isCurrentSession()) setReplayStatus(phase);
     };
     setReplayStatus("preparing");
-    const promise = ensureShareLink(shareInput, onPhase);
+    const promise = ensureShareLink(autoShareInput, onPhase);
     replayPromiseRef.current = promise;
     void promise
       .then((result) => {
-        if (cancelled) return;
+        if (!isCurrentSession()) return;
         replayLinkRef.current = result.link;
         setReplayLink(result.link);
         setReplayStatus("ready");
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (!isCurrentSession()) return;
         setReplayError(err instanceof Error ? err.message : String(err));
         setReplayStatus("failed");
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [loading, events.length, report?.source, shareInput, stableShareInput]);
+  }, [loading, events.length, report?.source, autoShareInput, stableShareInput]);
 
   // AI enhancements: build a redaction-safe digest of the session and ask the
   // replay server's Groq proxy for title/summary/steps/template mapping

@@ -20,7 +20,7 @@ describe("buildIssueUrl", () => {
   it("places the replay callout first and the TRAIL attribution last", () => {
     const body = bodyOf(buildIssueUrl("acme/widget", "Broken submit", sections, [], links).url);
 
-    expect(body.indexOf("Interactive replay")).toBeLessThan(
+    expect(body.indexOf("> **Replay:**")).toBeLessThan(
       body.indexOf("Steps to Reproduce"),
     );
     expect(body).toContain(links.replayUrl);
@@ -53,7 +53,7 @@ describe("buildIssueUrl", () => {
     );
 
     expect(body).toContain(`[TRAIL](${links.landingUrl})`);
-    expect(body).not.toContain("Interactive replay");
-    expect(body).not.toContain("View interactive replay");
+    expect(body).not.toContain("> **Replay:**");
+    expect(body).not.toContain("View replay");
   });
 });

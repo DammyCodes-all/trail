@@ -332,10 +332,10 @@ describe("buildMarkdown", () => {
     });
 
     expect(md).toContain(
-      "> **Interactive replay:** [Open the captured session in TRAIL](https://trail.example/r/replay-123)",
+      "> **Replay:** [Open the captured session in TRAIL](https://trail.example/r/replay-123)",
     );
     expect(md).toContain(
-      "<sub>Captured with [TRAIL](https://trail.example/) · [View interactive replay](https://trail.example/r/replay-123)</sub>",
+      "<sub>Captured with [TRAIL](https://trail.example/) · [View replay](https://trail.example/r/replay-123)</sub>",
     );
   });
 });

@@ -161,24 +161,6 @@ export function IncidentHeader({
         </div>
       </div>
 
-      {replayStatus !== "idle" && (
-        <p
-          className={cn(
-            "text-right text-[11px] text-muted-foreground",
-            replayStatus === "failed" && "text-warn",
-            replayStatus === "ready" && "text-success",
-          )}
-          role="status"
-        >
-          {replayStatus === "preparing" || replayStatus === "uploading"
-            ? "Preparing interactive replay…"
-            : replayStatus === "ready"
-              ? "Interactive replay ready"
-              : replayStatus === "failed"
-                ? "Replay unavailable · Copy Replay Link to try again"
-                : "Replay unavailable"}
-        </p>
-      )}
 
       <div className="pb-6 pt-8 sm:pb-8 sm:pt-12">
         {titleLoading ? (

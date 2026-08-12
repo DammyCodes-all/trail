@@ -28,14 +28,14 @@ export interface TrailReportLinks {
 
 export function buildTrailReplayPreamble(links?: TrailReportLinks): string {
   return links?.replayUrl
-    ? `> **Interactive replay:** [Open the captured session in TRAIL](${links.replayUrl})`
+    ? `> **Replay:** [Open the captured session in TRAIL for more context](${links.replayUrl})`
     : '';
 }
 
 export function buildTrailAttribution(links?: TrailReportLinks): string {
   if (!links?.landingUrl) return '';
   const replay = links.replayUrl
-    ? ` · [View interactive replay](${links.replayUrl})`
+    ? ` · [View replay](${links.replayUrl})`
     : '';
   return `---\n\n<sub>Captured with [TRAIL](${links.landingUrl})${replay}</sub>`;
 }

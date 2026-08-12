@@ -72,7 +72,7 @@ const openRouterConfig = () => ({
   base: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
   apiKey: process.env.OPENROUTER_API_KEY,
   model:
-    process.env.OPENROUTER_MODEL ?? "nvidia/nemotron-3-ultra-550b-a55b:free",
+    process.env.OPENROUTER_MODEL ?? "openrouter/free",
 });
 
 const groqConfig = () => ({
