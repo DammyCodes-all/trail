@@ -12,6 +12,7 @@ Keep one animation owner per DOM element. A module should not animate the same e
 
 ## Motion rules
 
+- The initial states for components should stay in the CSS and also always use only tailwind for styling
 - Use transform and opacity for motion so layout stays stable.
 - Use short `ease-out` entrances, `ease-in-out` morphs, and springs only where interaction needs physical response.
 - Gate nonessential motion with `prefers-reduced-motion`. Reduced motion must leave the content visible and usable.
