@@ -12,7 +12,6 @@ import {
   GithubStars,
   GithubStarsIcon,
   GithubStarsLogo,
-  GithubStarsNumber,
   GithubStarsParticles,
   type GithubStarsProps,
 } from '@/components/animate-ui/primitives/animate/github-stars';
@@ -33,6 +32,8 @@ const buttonVariants = cva(
           'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
         ghost:
           'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
+        light:
+          'border-0 bg-white text-neutral-900 shadow-xs hover:bg-neutral-100 hover:text-neutral-900',
       },
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',
@@ -58,6 +59,7 @@ const buttonStarVariants = cva('', {
         'fill-neutral-300 stroke-neutral-300 dark:fill-neutral-700 dark:stroke-neutral-700',
       ghost:
         'fill-neutral-300 stroke-neutral-300 dark:fill-neutral-700 dark:stroke-neutral-700',
+      light: 'fill-amber-400 stroke-amber-400',
     },
   },
   defaultVariants: {
@@ -91,15 +93,15 @@ function GitHubStarsButton({
 }: GitHubStarsButtonProps) {
   const defaultContent = (
     <>
-      <GithubStarsLogo />
-      <GithubStarsNumber />
-      <GithubStarsParticles className="text-yellow-500">
+      <GithubStarsLogo className="size-4 shrink-0" />
+      <span className="px-0.5 font-medium leading-none">Star on GitHub</span>
+      <GithubStarsParticles className="text-amber-400">
         <GithubStarsIcon
           icon={StarIcon}
           data-variant={variant}
           className={cn(buttonStarVariants({ variant }))}
-          activeClassName="text-yellow-500"
-          size={18}
+          activeClassName="text-amber-400"
+          size={16}
         />
       </GithubStarsParticles>
     </>

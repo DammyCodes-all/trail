@@ -43,7 +43,7 @@ export default function Home() {
             <GitHubStarsButton
               asChild
               size="sm"
-              variant="outline"
+              variant="light"
               username="DammyCodes-all"
               repo="trail"
             >
