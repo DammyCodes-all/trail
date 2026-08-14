@@ -58,27 +58,50 @@ function mergeProps<T extends HTMLElement>(
   return merged;
 }
 
+function isLazyReference(node: unknown): node is {
+  $$typeof: symbol;
+  _payload: PromiseLike<unknown> & { status?: string; value?: unknown };
+} {
+  return (
+    node !== null &&
+    typeof node === 'object' &&
+    (node as { $$typeof?: unknown }).$$typeof === Symbol.for('react.lazy') &&
+    typeof (node as { _payload?: unknown })._payload === 'object' &&
+    (node as { _payload?: unknown })._payload !== null
+  );
+}
+
+function resolveLazyElement(node: React.ReactNode): React.ReactElement | null {
+  let current = node;
+  if (isLazyReference(current)) {
+    current = React.use(current._payload as never);
+  }
+  return React.isValidElement(current) ? current : null;
+}
+
 function Slot<T extends HTMLElement = HTMLElement>({
   children,
   ref,
   ...props
 }: SlotProps<T>) {
+  const resolved = resolveLazyElement(children);
+  if (!resolved) {
+    return null;
+  }
   const isAlreadyMotion =
-    typeof children.type === 'object' &&
-    children.type !== null &&
-    isMotionComponent(children.type);
+    typeof resolved.type === 'object' &&
+    resolved.type !== null &&
+    isMotionComponent(resolved.type);
 
   const Base = React.useMemo(
     () =>
       isAlreadyMotion
-        ? (children.type as React.ElementType)
-        : motion.create(children.type as React.ElementType),
-    [isAlreadyMotion, children.type],
+        ? (resolved.type as React.ElementType)
+        : motion.create(resolved.type as React.ElementType),
+    [isAlreadyMotion, resolved.type],
   );
 
-  if (!React.isValidElement(children)) return null;
-
-  const { ref: childRef, ...childProps } = children.props as AnyProps;
+  const { ref: childRef, ...childProps } = resolved.props as AnyProps;
 
   const mergedProps = mergeProps(childProps, props);
 
@@ -89,6 +112,7 @@ function Slot<T extends HTMLElement = HTMLElement>({
 
 export {
   Slot,
+  resolveLazyElement,
   type SlotProps,
   type WithAsChild,
   type DOMMotionProps,

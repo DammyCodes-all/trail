@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { StarIcon } from 'lucide-react';
@@ -14,6 +16,9 @@ import {
   GithubStarsParticles,
   type GithubStarsProps,
 } from '@/components/animate-ui/primitives/animate/github-stars';
+import {
+  resolveLazyElement,
+} from '@/components/animate-ui/primitives/animate/slot';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
@@ -84,6 +89,34 @@ function GitHubStarsButton({
   children,
   ...props
 }: GitHubStarsButtonProps) {
+  const defaultContent = (
+    <>
+      <GithubStarsLogo />
+      <GithubStarsNumber />
+      <GithubStarsParticles className="text-yellow-500">
+        <GithubStarsIcon
+          icon={StarIcon}
+          data-variant={variant}
+          className={cn(buttonStarVariants({ variant }))}
+          activeClassName="text-yellow-500"
+          size={18}
+        />
+      </GithubStarsParticles>
+    </>
+  );
+
+  let content: React.ReactNode = children ?? defaultContent;
+
+  if (asChild) {
+    const resolved = resolveLazyElement(content);
+    if (
+      resolved &&
+      !React.Children.count((resolved.props as { children?: React.ReactNode }).children)
+    ) {
+      content = React.cloneElement(resolved, undefined, defaultContent);
+    }
+  }
+
   return (
     <GithubStars
       asChild
@@ -100,21 +133,7 @@ function GitHubStarsButton({
         className={cn(buttonVariants({ variant, size, className }))}
         {...(props as object)}
       >
-        {children ?? (
-          <>
-            <GithubStarsLogo />
-            <GithubStarsNumber />
-            <GithubStarsParticles className="text-yellow-500">
-              <GithubStarsIcon
-                icon={StarIcon}
-                data-variant={variant}
-                className={cn(buttonStarVariants({ variant }))}
-                activeClassName="text-yellow-500"
-                size={18}
-              />
-            </GithubStarsParticles>
-          </>
-        )}
+        {content}
       </ButtonPrimitive>
     </GithubStars>
   );

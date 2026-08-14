@@ -12,7 +12,7 @@ Keep one animation owner per DOM element. A module should not animate the same e
 
 ## Motion rules
 
-- The initial states for components should stay in the CSS and also always use only tailwind for styling
+- The initial states for components should stay in the CSS and also always use only tailwind for styling. Exception: Tailwind v4 applies transforms via the individual `rotate`/`translate`/`scale` properties, which GSAP cannot read from `getComputedStyle()` — for GSAP-owned transforms, declare the start values inline via `fromTo()`/`gsap.set()` and skip the Tailwind transform utility classes. The no-JS / reduced-motion state must remain CSS-only and fully visible (e.g. the intro logo renders assembled, not scattered).
 - Use transform and opacity for motion so layout stays stable.
 - Use short `ease-out` entrances, `ease-in-out` morphs, and springs only where interaction needs physical response.
 - Gate nonessential motion with `prefers-reduced-motion`. Reduced motion must leave the content visible and usable.
