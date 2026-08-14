@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
 import { gsap } from "gsap";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 import { LiquidButton } from "@/components/animate-ui/components/buttons/liquid";

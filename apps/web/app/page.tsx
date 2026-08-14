@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { TrailLogo } from "@/components/trail-logo";
 import { HeroExperience } from "@/components/landing/hero/hero-experience";
-import { GitHubStarsButton } from "@/components/animate-ui/components/buttons/github-stars";
+import { NavGithubLink } from "@/components/landing/nav-github-link";
 
 export const metadata: Metadata = {
   title: "TRAIL — Every bug has a trail",
@@ -40,21 +40,7 @@ export default function Home() {
             >
               Product
             </a>
-            <GitHubStarsButton
-              asChild
-              size="sm"
-              variant="light"
-              username="DammyCodes-all"
-              repo="trail"
-            >
-              <a
-                href="https://github.com/DammyCodes-all/trail"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Star TRAIL on GitHub"
-              >
-              </a>
-            </GitHubStarsButton>
+            <NavGithubLink />
           </nav>
         </header>
 
