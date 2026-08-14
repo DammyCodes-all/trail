@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { gsap } from "gsap";
-import { ArrowDown } from "lucide-react";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 import { LiquidButton } from "@/components/animate-ui/components/buttons/liquid";
 import { BrowserScene } from "./browser-scene";
@@ -107,9 +106,9 @@ export function HeroExperience() {
         data-hero-copy
         className="mt-7 max-w-xl text-base leading-7 text-[#8b929c] motion-safe:opacity-0 sm:text-lg sm:leading-8"
       >
-        <span className="font-medium text-[#f2f4f6]">Record what happened. Replay it. Report it.</span>
+        <span className="font-medium text-[#f2f4f6]">From the first click to the final error.</span>
         <br />
-        Without asking users to explain everything.
+        Capture the complete trail behind every bug.
       </p>
       <div
         data-hero-actions
@@ -129,7 +128,6 @@ export function HeroExperience() {
         <LiquidButton asChild size="lg" className="h-11 w-36 justify-center rounded-lg">
           <a href="#how-it-works" aria-label="Watch how TRAIL works">
             Watch it work
-            <ArrowDown className="size-4" strokeWidth={2} aria-hidden="true" />
           </a>
         </LiquidButton>
       </div>
