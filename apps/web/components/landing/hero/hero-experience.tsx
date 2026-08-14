@@ -3,7 +3,9 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { gsap } from "gsap";
-import { ArrowDown, ArrowUpRight } from "lucide-react";
+import { ArrowDown } from "lucide-react";
+import { AntiMetalButton } from "@/components/ui/anti-metal-button";
+import { LiquidButton } from "@/components/animate-ui/components/buttons/liquid";
 import { BrowserScene } from "./browser-scene";
 import { IntroOverlay } from "./intro-overlay";
 import { buildIntroTimeline } from "./intro-timeline";
@@ -86,7 +88,7 @@ export function HeroExperience() {
     <div
       ref={scope}
       id="top"
-      className="flex flex-1 flex-col items-center justify-center pb-8 pt-20 text-center sm:pt-24 lg:pt-28"
+      className="flex flex-1 flex-col items-center justify-center pb-8 pt-12 text-center sm:pt-14 lg:pt-16"
     >
       <IntroOverlay />
       <p
@@ -113,28 +115,23 @@ export function HeroExperience() {
         data-hero-actions
         className="mt-9 flex w-full flex-col justify-center gap-3 motion-safe:opacity-0 sm:w-auto sm:flex-row"
       >
-        <motion.a
+        <a
           href="https://github.com/DammyCodes-all/trail"
           target="_blank"
           rel="noreferrer"
-          whileHover={{ y: -2 }}
-          whileTap={{ scale: 0.98 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#ff6a00] px-5 text-sm font-semibold text-[#08090a] outline-none transition-colors hover:bg-[#ff8a1f] focus-visible:ring-2 focus-visible:ring-[#ff6a00] focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090a]"
         >
-          Get TRAIL
-          <ArrowUpRight className="size-4" strokeWidth={1.5} aria-hidden="true" />
-        </motion.a>
-        <motion.a
-          href="#how-it-works"
-          whileHover={{ y: -2 }}
-          whileTap={{ scale: 0.98 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.03] px-5 text-sm font-medium text-[#f2f4f6] outline-none transition-colors hover:border-white/25 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#ff6a00] focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090a]"
-        >
-          See how it works
-          <ArrowDown className="size-4" strokeWidth={1.5} aria-hidden="true" />
-        </motion.a>
+          <AntiMetalButton
+            label="Install TRAIL"
+            accentFrom="#ff6a00"
+            accentTo="#ff8a1f"
+          />
+        </a>
+        <LiquidButton asChild size="lg" className="h-11 w-36 justify-center rounded-lg">
+          <a href="#how-it-works" aria-label="Watch how TRAIL works">
+            Watch it work
+            <ArrowDown className="size-4" strokeWidth={2} aria-hidden="true" />
+          </a>
+        </LiquidButton>
       </div>
 
       <div className="mt-14 w-full sm:mt-16">
