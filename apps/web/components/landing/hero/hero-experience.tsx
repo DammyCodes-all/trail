@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
-import { BrowserScene } from "./browser-scene";
 import { IntroOverlay } from "./intro-overlay";
 import { buildIntroTimeline } from "./intro-timeline";
 
@@ -100,19 +99,15 @@ export function HeroExperience() {
       </p>
       <h1
         data-hero-title
-        className="max-w-4xl font-heading text-5xl font-bold leading-[0.98] tracking-[-0.045em] text-[#f2f4f6] motion-safe:opacity-0 sm:text-7xl lg:text-[5.9rem]"
+        className="max-w-4xl font-heading text-[clamp(1.75rem,7vw,4.5rem)] font-bold leading-[0.98] tracking-[-0.045em] text-[#f2f4f6] motion-safe:opacity-0"
       >
-        Every bug has a <span className="text-[#ff6a00]">trail.</span>
+        Every bug leaves a <span className="text-[#ff6a00]">trail.</span>
       </h1>
       <p
         data-hero-copy
-        className="mt-10 max-w-xl text-base leading-7 text-[#8b929c] motion-safe:opacity-0 sm:text-lg sm:leading-8"
+        className="mt-6 max-w-xl text-base leading-7 text-[#8b929c] motion-safe:opacity-0 sm:text-lg sm:leading-8"
       >
-        No more chasing reporters for steps you&apos;ll never get.
-        <br />
-        Trail records the real thing, click by click, error by error,
-        <br />
-        and files it as a ready GitHub issue.
+        Stop chasing it. Trail follows it for you, click by click, error by error, straight into a GitHub issue.
       </p>
       <div
         data-hero-actions
@@ -129,10 +124,6 @@ export function HeroExperience() {
             accentTo="#ff8a1f"
           />
         </a>
-      </div>
-
-      <div className="mt-14 w-full sm:mt-16">
-        <BrowserScene />
       </div>
     </div>
   );

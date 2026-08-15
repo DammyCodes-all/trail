@@ -96,14 +96,13 @@ export function BrowserScene() {
       <div className="grid min-h-[360px] grid-rows-[1fr_auto] sm:min-h-[430px]">
         <div
           data-browser-content
-          className="relative flex min-h-[260px] items-center justify-center overflow-hidden px-5 py-10 sm:min-h-[320px]"
+          className="relative flex min-h-[260px] flex-col items-center justify-center gap-4 overflow-hidden px-5 py-10 sm:min-h-[320px]"
         >
           <div
             aria-hidden="true"
             className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:28px_28px]"
           />
           <div
-            data-browser-card
             className="relative w-full max-w-md rounded-xl border border-white/10 bg-[#141618] p-5 sm:p-7"
           >
             <div className="mb-7 flex items-center justify-between">
@@ -129,7 +128,7 @@ export function BrowserScene() {
               <span className="text-[#30d158]">&quot;Hello TRAIL&quot;</span>
               <span>);</span>
             </div>
-            <div className="relative mt-5 flex items-center justify-between gap-4">
+            <div className="relative mt-5 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <p
                 data-hero-error
                 className="font-mono text-[10px] text-[#ff4d4f] motion-safe:opacity-0"
@@ -206,7 +205,7 @@ export function BrowserScene() {
 
           <div
             data-trail-panel
-            className="absolute inset-x-0 bottom-0 z-10 rounded-t-xl border-x border-t border-white/10 bg-[#0d0e10]/95 p-4 backdrop-blur sm:p-5"
+            className="relative z-10 w-full max-w-md rounded-xl border border-white/10 bg-[#0d0e10]/95 p-4 backdrop-blur sm:p-5"
           >
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">

@@ -30,12 +30,6 @@ export default function Home() {
             </span>
           </a>
           <nav className="flex items-center gap-1 sm:gap-3" aria-label="Primary navigation">
-            <a
-              className="rounded-md px-3 py-2 text-sm text-[#8b929c] outline-none transition-colors hover:text-[#f2f4f6] focus-visible:ring-2 focus-visible:ring-[#ff6a00]"
-              href="#how-it-works"
-            >
-              Product
-            </a>
             <NavGithubLink />
           </nav>
         </header>
