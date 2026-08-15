@@ -72,6 +72,31 @@
   }
 }
 
+/*
+ * Landing hero grid — small, faint cell lines fading toward the edges so the
+ * trail illustration stays the focal point. Static decoration owned by CSS;
+ * no animation owner touches it.
+ */
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 80% 60% at 50% 25%,
+    black 25%,
+    transparent 72%
+  );
+  mask-image: radial-gradient(
+    ellipse 80% 60% at 50% 25%,
+    black 25%,
+    transparent 72%
+  );
+}
+
 /* rrweb renders only the replay frame. TRAIL owns the playback controls. */
 .replay .rr-player {
   float: none;

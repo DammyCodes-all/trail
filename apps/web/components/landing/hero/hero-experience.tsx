@@ -5,6 +5,7 @@ import { gsap } from "gsap";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 import { IntroOverlay } from "./intro-overlay";
 import { buildIntroTimeline } from "./intro-timeline";
+import { Trail } from "./trail";
 
 export function HeroExperience() {
   const scope = useRef<HTMLDivElement>(null);
@@ -125,6 +126,7 @@ export function HeroExperience() {
           />
         </a>
       </div>
+      <Trail />
     </div>
   );
 }
