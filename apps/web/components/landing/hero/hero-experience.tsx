@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
-import { LiquidButton } from "@/components/animate-ui/components/buttons/liquid";
 import { BrowserScene } from "./browser-scene";
 import { IntroOverlay } from "./intro-overlay";
 import { buildIntroTimeline } from "./intro-timeline";
@@ -30,7 +29,7 @@ export function HeroExperience() {
 
     const revealContent = () => {
       const targets = rootEl.querySelectorAll<HTMLElement>(
-        "[data-hero-kicker],[data-hero-title],[data-hero-copy],[data-hero-actions],[data-hero-browser],[data-hero-error],[data-hero-event],[data-hero-captured]",
+        "[data-hero-kicker],[data-hero-title],[data-hero-copy],[data-hero-actions],[data-hero-browser]",
       );
       targets.forEach((el) => {
         el.style.opacity = "1";
@@ -41,6 +40,7 @@ export function HeroExperience() {
     if (sessionStorage.getItem("trail-intro-played")) {
       hideOverlay();
       revealContent();
+      window.dispatchEvent(new Event("trail:browser-revealed"));
       return;
     }
     sessionStorage.setItem("trail-intro-played", "1");
@@ -65,6 +65,9 @@ export function HeroExperience() {
           onOverlayFadeOut: () => {
             window.clearTimeout(watchdog);
             document.body.style.overflow = previousOverflow;
+          },
+          onBrowserRevealed: () => {
+            window.dispatchEvent(new Event("trail:browser-revealed"));
           },
         });
       }, scope);
@@ -93,7 +96,7 @@ export function HeroExperience() {
         data-hero-kicker
         className="mb-5 font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-[#ff8a1f] motion-safe:opacity-0"
       >
-        Browser evidence, captured
+        NO SDK · NO INSTRUMENTATION
       </p>
       <h1
         data-hero-title
@@ -105,30 +108,27 @@ export function HeroExperience() {
         data-hero-copy
         className="mt-7 max-w-xl text-base leading-7 text-[#8b929c] motion-safe:opacity-0 sm:text-lg sm:leading-8"
       >
-        <span className="font-medium text-[#f2f4f6]">From the first click to the final error.</span>
+        No more chasing reporters for steps you&apos;ll never get.
         <br />
-        Capture the complete trail behind every bug.
+        Trail records the real thing, click by click, error by error,
+        <br />
+        and files it as a ready GitHub issue.
       </p>
       <div
         data-hero-actions
         className="mt-9 flex w-full flex-col justify-center gap-3 motion-safe:opacity-0 sm:w-auto sm:flex-row"
       >
-        <a
+<a
           href="https://github.com/DammyCodes-all/trail"
           target="_blank"
           rel="noreferrer"
         >
           <AntiMetalButton
-            label="Install TRAIL"
+            label="Record your first bug"
             accentFrom="#ff6a00"
             accentTo="#ff8a1f"
           />
         </a>
-        <LiquidButton asChild size="lg" className="h-11 w-36 justify-center rounded-lg">
-          <a href="#how-it-works" aria-label="Watch how TRAIL works">
-            Watch it work
-          </a>
-        </LiquidButton>
       </div>
 
       <div className="mt-14 w-full sm:mt-16">

@@ -14,10 +14,6 @@ export default function Home() {
     <main className="relative isolate overflow-hidden bg-[#08090a] text-[#f2f4f6]">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[680px] bg-[radial-gradient(circle_at_50%_28%,rgba(255,106,0,0.12),transparent_44%)]"
-      />
-      <div
-        aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[680px] opacity-40 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:36px_36px] [mask-image:linear-gradient(to_bottom,black,transparent)]"
       />
 
