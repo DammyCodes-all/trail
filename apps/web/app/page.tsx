@@ -11,13 +11,9 @@ export const metadata: Metadata = {
 
 export default function Home() {
   return (
-    <main className="relative isolate overflow-hidden bg-[#08090a] text-[#f2f4f6]">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[680px] opacity-40 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:36px_36px] [mask-image:linear-gradient(to_bottom,black,transparent)]"
-      />
-
-      <section className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col px-5 pb-14 sm:px-8 lg:px-10">
+    <main className="relative isolate overflow-hidden bg-[#0d0f0e] text-[#f2f4f6]">
+      <section className="relative mx-auto flex min-h-dvh w-full max-w-7xl flex-col px-5 pb-14 sm:px-8 lg:px-10">
+        <div aria-hidden="true" className="hero-grid -z-10" />
         <header className="flex h-20 items-center justify-between sm:h-24">
           <a
             href="#top"
@@ -25,7 +21,7 @@ export default function Home() {
             aria-label="TRAIL home"
           >
             <TrailLogo size={28} data-nav-logo aria-hidden="true" />
-            <span className="font-heading text-base font-semibold tracking-[0.16em] text-[#f2f4f6]">
+            <span className="font-mono text-sm font-medium tracking-[0.2em] text-[#f2f4f6]">
               TRAIL
             </span>
           </a>
