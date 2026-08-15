@@ -59,16 +59,12 @@ export function IntroOverlay() {
       aria-hidden="true"
       className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-[#08090a] motion-reduce:hidden"
     >
-      <div
-        data-intro-logo
-        className="relative size-64 sm:size-72"
-        style={{ perspective: 1000 }}
-      >
-        <div
-          data-intro-glow
-          className="absolute -inset-12 rounded-full bg-[#ff6a00]/15 blur-3xl motion-safe:opacity-0"
-        />
-        {introFragments.map((fragment) => (
+<div
+          data-intro-logo
+          className="relative size-64 sm:size-72"
+          style={{ perspective: 1000 }}
+        >
+          {introFragments.map((fragment) => (
           <div
             key={fragment.id}
             data-intro-piece

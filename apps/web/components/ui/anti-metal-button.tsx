@@ -67,7 +67,7 @@ export const AntiMetalButton = React.forwardRef<
     <button
       ref={ref}
       className={cn(
-        "group/btn relative inline-flex h-11 w-36 cursor-pointer overflow-hidden rounded-lg transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "group/btn relative inline-flex h-11 cursor-pointer items-center overflow-hidden whitespace-nowrap rounded-lg pl-12 pr-4 transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "bg-[linear-gradient(180deg,#1a1a1a_0%,#0a0a0a_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_4px_12px_rgba(0,0,0,0.18)]",
         "dark:bg-[linear-gradient(180deg,#ffffff_0%,#ededed_100%)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_12px_rgba(0,0,0,0.35)]",
         className,
@@ -89,7 +89,7 @@ export const AntiMetalButton = React.forwardRef<
           }
         `}</style>
 
-      <span className="absolute inset-y-0 right-4 flex items-center text-[14px] font-medium tracking-tight text-white dark:text-[#0a0a0a]">
+      <span className="text-[14px] font-medium tracking-tight text-white dark:text-[#0a0a0a]">
         {content}
       </span>
 

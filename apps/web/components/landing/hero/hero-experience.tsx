@@ -106,7 +106,7 @@ export function HeroExperience() {
       </h1>
       <p
         data-hero-copy
-        className="mt-7 max-w-xl text-base leading-7 text-[#8b929c] motion-safe:opacity-0 sm:text-lg sm:leading-8"
+        className="mt-10 max-w-xl text-base leading-7 text-[#8b929c] motion-safe:opacity-0 sm:text-lg sm:leading-8"
       >
         No more chasing reporters for steps you&apos;ll never get.
         <br />
@@ -116,7 +116,7 @@ export function HeroExperience() {
       </p>
       <div
         data-hero-actions
-        className="mt-9 flex w-full flex-col justify-center gap-3 motion-safe:opacity-0 sm:w-auto sm:flex-row"
+        className="mt-11 flex w-full flex-col justify-center gap-3 motion-safe:opacity-0 sm:w-auto sm:flex-row"
       >
 <a
           href="https://github.com/DammyCodes-all/trail"

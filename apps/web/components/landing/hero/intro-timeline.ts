@@ -3,11 +3,12 @@ import { introFragments } from "./intro-overlay";
 
 type IntroTimelineCallbacks = {
   onOverlayFadeOut: () => void;
+  onBrowserRevealed: () => void;
 };
 
 export function buildIntroTimeline(
   rootEl: HTMLElement,
-  { onOverlayFadeOut }: IntroTimelineCallbacks,
+  { onOverlayFadeOut, onBrowserRevealed }: IntroTimelineCallbacks,
 ) {
   const navMark = document.querySelector("[data-nav-logo]");
   const introLogo = rootEl.querySelector("[data-intro-logo]");
@@ -91,19 +92,7 @@ export function buildIntroTimeline(
       3.05,
     );
 
-  timeline
-    .addLabel("assembled")
-    .fromTo(
-      "[data-intro-glow]",
-      { scale: 0.9 },
-      { opacity: 0.6, scale: 1.25, duration: 0.6, ease: "power2.out" },
-      "assembled-=0.35",
-    )
-    .to(
-      "[data-intro-glow]",
-      { opacity: 0, duration: 0.25, ease: "power2.out" },
-      "assembled+=0.6",
-    );
+  timeline.addLabel("assembled");
 
   if (flight) {
     timeline
@@ -163,22 +152,7 @@ export function buildIntroTimeline(
       { y: 0, opacity: 1, duration: 0.7 },
       "landed+=1.0",
     )
-    .to("[data-hero-submit]", { duration: 0.13, scale: 0.94, ease: "power2.in" }, "+=0.55")
-    .to("[data-hero-submit]", { duration: 0.2, scale: 1, ease: "back.out(2)" })
-    .fromTo(
-      "[data-hero-error]",
-      { y: 4 },
-      { y: 0, opacity: 1, duration: 0.32 },
-      "+=0.22",
-    )
-    .fromTo(
-      "[data-hero-event]",
-      { y: 8 },
-      { y: 0, opacity: 1, duration: 0.35, stagger: 0.28 },
-      "<0.04",
-    )
-    .to("[data-hero-recording]", { duration: 0.18, opacity: 0 }, "<0.3")
-    .to("[data-hero-captured]", { duration: 0.3, opacity: 1 }, "<0.04");
+    .call(onBrowserRevealed, undefined, "landed+=1.0");
 
   return timeline;
 }
