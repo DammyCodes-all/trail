@@ -41,47 +41,59 @@ export function HeroExperience() {
             text: { x: number; y: number; scale: number };
           }
         | undefined;
-      if (!reducedMotion) {
+
+      const measureFlight = () => {
         const navMark = document.querySelector<HTMLElement>("[data-nav-logo]");
         const navText =
           navMark?.parentElement?.querySelector<HTMLElement>("span");
-        if (navMark && navText) {
-          const navRect = navMark.getBoundingClientRect();
-          const navTextRect = navText.getBoundingClientRect();
-          const markRect = introMark.getBoundingClientRect();
-          const wordmarkRect = wordmark.getBoundingClientRect();
-          flight = {
-            mark: {
-              x:
-                navRect.left +
-                navRect.width / 2 -
-                (markRect.left + markRect.width / 2),
-              y:
-                navRect.top +
-                navRect.height / 2 -
-                (markRect.top + markRect.height / 2),
-              scale: navRect.width / markRect.width,
-            },
-            text: {
-              x:
-                navTextRect.left +
-                navTextRect.width / 2 -
-                (wordmarkRect.left + wordmarkRect.width / 2),
-              y:
-                navTextRect.top +
-                navTextRect.height / 2 -
-                (wordmarkRect.top + wordmarkRect.height / 2),
-              scale: navTextRect.height / wordmarkRect.height,
-            },
-          };
+        if (!navMark || !navText) {
+          flight = undefined;
+          return;
         }
-      }
+        const navRect = navMark.getBoundingClientRect();
+        const navTextRect = navText.getBoundingClientRect();
+        const markRect = introMark.getBoundingClientRect();
+        const wordmarkRect = wordmark.getBoundingClientRect();
+
+        const fontSize =
+          parseFloat(getComputedStyle(navText).fontSize) || 14;
+        const scale = (fontSize * 778) / (1000 * wordmarkRect.height);
+        const landingHeight = wordmarkRect.height * scale;
+
+        const spanBaseline =
+          navTextRect.top +
+          (navTextRect.height - fontSize) / 2 +
+          fontSize * 0.935;
+        const landingTop = spanBaseline - landingHeight * (738 / 778);
+
+        flight = {
+          mark: {
+            x:
+              navRect.left +
+              navRect.width / 2 -
+              (markRect.left + markRect.width / 2),
+            y:
+              navRect.top +
+              navRect.height / 2 -
+              (markRect.top + markRect.height / 2),
+            scale: navRect.width / markRect.width,
+          },
+          text: {
+            x:
+              navTextRect.left +
+              navTextRect.width / 2 -
+              (wordmarkRect.left + wordmarkRect.width / 2),
+            y: landingTop + landingHeight / 2 - (wordmarkRect.top + wordmarkRect.height / 2),
+            scale,
+          },
+        };
+      };
 
       const heroLines = gsap.utils.toArray<HTMLElement>(
         rootEl.querySelectorAll("[data-hero-anim]"),
       );
-      const letters = gsap.utils.toArray<SVGPathElement>(
-        rootEl.querySelectorAll("[data-intro-letter]"),
+      const introText = rootEl.querySelector<SVGPathElement>(
+        "[data-intro-text]",
       );
 
       const timeline = gsap.timeline({
@@ -89,7 +101,7 @@ export function HeroExperience() {
         defaults: { ease: "power3.out" },
       });
 
-      if (reducedMotion) {
+      if (reducedMotion || !introText) {
         timeline
           .to(overlay, { duration: 0.45, opacity: 0, ease: "power2.out" }, 0)
           .to(
@@ -100,66 +112,53 @@ export function HeroExperience() {
           .set(overlay, { display: "none" }, 0.55)
           .call(reportReady, undefined, 0.6);
       } else {
+        const draw = {
+          duration: 2.1,
+          ease: "easeInOut",
+        } as const;
+        const drawTargets = [introPath, introText];
+        const strokeTargets: gsap.TweenVars = { strokeDasharray: "1 1" };
+        const fillTargets: gsap.TweenVars = { fillOpacity: 1 };
+
         timeline
+          .to(drawTargets, { ...strokeTargets, ...draw }, 0)
+          .to(drawTargets, { ...fillTargets, ...draw }, 0)
           .to(
-            introPath,
-            { strokeDasharray: "1 1", duration: 1.5, ease: "easeInOut" },
-            0,
-          )
-          .to(
-            introPath,
-            { fillOpacity: 1, duration: 1.5, ease: "easeInOut" },
-            0,
-          )
-          .to(
-            introPath,
-            { strokeWidth: 0.25, duration: 0.35, ease: "power1.inOut" },
-            1.5,
-          )
-          .to(
-            letters,
-            { strokeDasharray: "1 1", duration: 0.7, stagger: 0.12, ease: "easeInOut" },
-            0.35,
-          )
-          .to(
-            letters,
-            { fillOpacity: 1, duration: 0.7, stagger: 0.12, ease: "easeInOut" },
-            0.35,
-          )
-          .to(
-            letters,
-            { strokeWidth: 0.25, duration: 0.3, stagger: 0.05, ease: "power1.inOut" },
-            1.55,
-          )
-          .to(
-            introLogo,
-            { scale: 1.04, duration: 0.18, ease: "power2.out" },
-            2.05,
-          )
-          .to(
-            introLogo,
-            { scale: 1, duration: 0.32, ease: "back.out(1.4)" },
-            2.23,
+            drawTargets,
+            {
+              strokeWidth: 0.25,
+              duration: 0.35,
+              ease: "power1.inOut",
+            },
+            "assembled",
           );
 
-        timeline.addLabel("assembled");
+        timeline.addLabel("assembled", 1.5);
+        timeline.call(measureFlight, undefined, "assembled-=0.3");
 
-        if (flight) {
-          timeline
-            .to(
-              introMark,
-              { ...flight.mark, duration: 1.05, ease: "power3.inOut" },
-              "assembled+=0.85",
-            )
-            .to(
-              wordmark,
-              { ...flight.text, duration: 1.05, ease: "power3.inOut" },
-              "assembled+=0.85",
-            )
-            .addLabel("landed");
-        } else {
-          timeline.addLabel("landed", "assembled+=0.85");
-        }
+        const markFlight = {
+          x: () => flight?.mark.x ?? 0,
+          y: () => flight?.mark.y ?? 0,
+          scale: () => flight?.mark.scale ?? 1,
+        };
+        const textFlight = {
+          x: () => flight?.text.x ?? 0,
+          y: () => flight?.text.y ?? 0,
+          scale: () => flight?.text.scale ?? 1,
+        };
+
+        timeline
+          .to(
+            introMark,
+            { ...markFlight, duration: 1.05, ease: "power3.inOut" },
+            "assembled-=0.25",
+          )
+          .to(
+            wordmark,
+            { ...textFlight, duration: 1.05, ease: "power3.inOut" },
+            "assembled-=0.25",
+          )
+          .addLabel("landed", "assembled+=0.8");
 
         timeline
           .to(
@@ -202,9 +201,9 @@ export function HeroExperience() {
             strokeWidth: 14,
             fillOpacity: 0,
           });
-          gsap.set(letters, {
+          gsap.set(introText, {
             strokeDasharray: "0 1",
-            strokeWidth: 14,
+            strokeWidth: 28,
             fillOpacity: 0,
           });
         }

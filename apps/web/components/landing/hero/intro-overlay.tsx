@@ -1,14 +1,7 @@
 import { TrailLogo } from "@/components/trail-logo";
 
-const LETTER_SVG = {
-  T: "M362 113 L362 738 L278 738 L278 113 L45 113 L45 40 L595 40 L595 113 L362 113 Z",
-  R: "M794 738 L710 738 L710 40 L964 40 Q1061 40 1112 93 L1163 241 Q1163 326 1119 377 L991 436 L1169 738 L1075 738 L905 440 L794 440 L794 738 Z M962 369 Q1015 369 1044.5 342.5 L1074 267 L1074 215 Q1074 166 1044.5 139.5 L962 113 L794 113 L794 369 L962 369 Z",
-  A: "M1701 738 L1642 539 L1397 539 L1338 738 L1251 738 L1465 40 L1576 40 L1790 738 L1701 738 Z M1524 129 L1515 129 L1417 466 L1622 466 L1524 129 Z",
-  I: "M1904 738 L1904 671 L2078 671 L2078 107 L1904 107 L1904 40 L2336 40 L2336 107 L2162 107 L2162 671 L2336 671 L2336 738 L1904 738 Z",
-  L: "M2540 738 L2540 40 L2624 40 L2624 665 L2955 665 L2955 738 L2540 738 Z",
-} as const;
-
-const WORDMARK = ["T", "R", "A", "I", "L"] as const;
+const TRAIL_WORDMARK_PATH =
+  "M362 113 L362 738 L278 738 L278 113 L45 113 L45 40 L595 40 L595 113 L362 113 Z M994 738 L910 738 L910 40 L1164 40 Q1261 40 1312 93 L1363 241 Q1363 326 1319 377 L1191 436 L1369 738 L1275 738 L1105 440 L994 440 L994 738 Z M1162 369 Q1215 369 1244.5 342.5 L1274 267 L1274 215 Q1274 166 1244.5 139.5 L1162 113 L994 113 L994 369 L1162 369 Z M2101 738 L2042 539 L1797 539 L1738 738 L1651 738 L1865 40 L1976 40 L2190 738 L2101 738 Z M1924 129 L1915 129 L1817 466 L2022 466 L1924 129 Z M2504 738 L2504 671 L2678 671 L2678 107 L2504 107 L2504 40 L2936 40 L2936 107 L2762 107 L2762 671 L2936 671 L2936 738 L2504 738 Z M3340 738 L3340 40 L3424 40 L3424 665 L3755 665 L3755 738 L3340 738 Z";
 
 export function IntroOverlay() {
   return (
@@ -21,7 +14,7 @@ export function IntroOverlay() {
         data-intro-logo
         className="relative flex items-center gap-4 sm:gap-5"
       >
-        <div data-intro-mark className="relative size-24 sm:size-28">
+        <div data-intro-mark className="relative size-16 sm:size-20">
           <TrailLogo
             className="size-full"
             pathProps={{ "data-intro-path": true, pathLength: 1 }}
@@ -29,24 +22,21 @@ export function IntroOverlay() {
         </div>
         <svg
           data-intro-wordmark
-          viewBox="0 0 3040 778"
-          className="h-8 w-auto text-[#f2f4f6] sm:h-10"
+          viewBox="0 0 4040 778"
+          className="h-9 w-auto text-[#f2f4f6] sm:h-14"
           aria-hidden="true"
           focusable="false"
         >
-          {WORDMARK.map((letter) => (
-            <path
-              key={letter}
-              data-intro-letter
-              d={LETTER_SVG[letter]}
-              pathLength={1}
-              fill="currentColor"
-              fillRule="evenodd"
-              stroke="currentColor"
-              strokeWidth="0.25"
-              strokeLinejoin="round"
-            />
-          ))}
+          <path
+            data-intro-text
+            d={TRAIL_WORDMARK_PATH}
+            pathLength={1}
+            fill="currentColor"
+            fillRule="evenodd"
+            stroke="currentColor"
+            strokeWidth="10"
+            strokeLinejoin="round"
+          />
         </svg>
       </div>
     </div>
