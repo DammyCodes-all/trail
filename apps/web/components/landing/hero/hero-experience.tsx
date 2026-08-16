@@ -19,7 +19,7 @@ export function HeroExperience() {
     const introLogo = rootEl.querySelector<HTMLElement>("[data-intro-logo]");
     const introMark = rootEl.querySelector<HTMLElement>("[data-intro-mark]");
     const introPath = rootEl.querySelector<SVGPathElement>("[data-intro-path]");
-    const wordmark = rootEl.querySelector<HTMLElement>("[data-intro-wordmark]");
+    const wordmark = rootEl.querySelector<SVGSVGElement>("[data-intro-wordmark]");
     if (!overlay || !introLogo || !introMark || !introPath || !wordmark) {
       return;
     }
@@ -41,6 +41,9 @@ export function HeroExperience() {
             text: { x: number; y: number; scale: number };
           }
         | undefined;
+      let navAnchor: HTMLElement | undefined;
+      let landMark = { left: 0, top: 0, width: 0, height: 0 };
+      let landText = { centerX: 0, top: 0, height: 1 };
 
       const measureFlight = () => {
         const navMark = document.querySelector<HTMLElement>("[data-nav-logo]");
@@ -54,17 +57,30 @@ export function HeroExperience() {
         const navTextRect = navText.getBoundingClientRect();
         const markRect = introMark.getBoundingClientRect();
         const wordmarkRect = wordmark.getBoundingClientRect();
+        navAnchor = navMark.parentElement ?? undefined;
+        landMark = {
+          left: navRect.left,
+          top: navRect.top,
+          width: navRect.width,
+          height: navRect.height,
+        };
 
+        const vb = wordmark.viewBox.baseVal;
         const fontSize =
           parseFloat(getComputedStyle(navText).fontSize) || 14;
-        const scale = (fontSize * 778) / (1000 * wordmarkRect.height);
+        const scale = (fontSize * vb.height) / (1000 * wordmarkRect.height);
         const landingHeight = wordmarkRect.height * scale;
 
         const spanBaseline =
           navTextRect.top +
           (navTextRect.height - fontSize) / 2 +
-          fontSize * 0.935;
-        const landingTop = spanBaseline - landingHeight * (738 / 778);
+          fontSize * 1;
+        const landingTop = spanBaseline - landingHeight * ((vb.height - 40) / vb.height);
+        landText = {
+          centerX: navTextRect.left + navTextRect.width / 2,
+          top: landingTop,
+          height: landingHeight,
+        };
 
         flight = {
           mark: {
@@ -89,21 +105,48 @@ export function HeroExperience() {
         };
       };
 
+      const stick = () => {
+        if (!navAnchor) {
+          return;
+        }
+        const oldMark = navAnchor.querySelector<HTMLElement>("[data-nav-logo]");
+        const oldText = navAnchor.querySelector<HTMLElement>("span");
+        if (!oldMark || !oldText) {
+          return;
+        }
+        introMark.querySelector("svg")?.setAttribute("aria-hidden", "true");
+        introMark.style.width = `${landMark.width}px`;
+        introMark.style.height = `${landMark.height}px`;
+        wordmark.style.width = "auto";
+        wordmark.style.height = `${landText.height}px`;
+        oldMark.remove();
+        oldText.remove();
+        navAnchor.prepend(introMark, wordmark);
+        gsap.set(introMark, { clearProps: "transform" });
+        const cur = wordmark.getBoundingClientRect();
+        gsap.set(wordmark, {
+          x: landText.centerX - (cur.left + cur.width / 2),
+          y: landText.top + landText.height / 2 - (cur.top + cur.height / 2),
+          scale: 1,
+        });
+      };
+
       const heroLines = gsap.utils.toArray<HTMLElement>(
         rootEl.querySelectorAll("[data-hero-anim]"),
       );
       const introText = rootEl.querySelector<SVGPathElement>(
         "[data-intro-text]",
       );
+      const introBg = rootEl.querySelector<HTMLElement>("[data-intro-bg]");
 
       const timeline = gsap.timeline({
         paused: true,
         defaults: { ease: "power3.out" },
       });
 
-      if (reducedMotion || !introText) {
+      if (reducedMotion || !introText || !introBg) {
         timeline
-          .to(overlay, { duration: 0.45, opacity: 0, ease: "power2.out" }, 0)
+          .to(introBg, { duration: 0.45, opacity: 0, ease: "power2.out" }, 0)
           .to(
             introLogo,
             { duration: 0.4, opacity: 0, ease: "power2.out" },
@@ -162,15 +205,11 @@ export function HeroExperience() {
 
         timeline
           .to(
-            overlay,
+            introBg,
             { duration: 0.5, opacity: 0, ease: "power2.out" },
             "landed-=0.05",
           )
-          .to(
-            introLogo,
-            { duration: 0.4, opacity: 0, ease: "power2.out" },
-            "landed+=0.05",
-          )
+          .call(stick, undefined, "landed")
           .fromTo(
             heroLines,
             { opacity: 0, y: 24 },
@@ -183,7 +222,7 @@ export function HeroExperience() {
             },
             "landed-=0.05",
           )
-          .set(overlay, { display: "none" })
+          .set(overlay, { display: "none" }, "landed+=0.45")
           .call(reportReady, undefined, "landed+=0.15");
       }
 

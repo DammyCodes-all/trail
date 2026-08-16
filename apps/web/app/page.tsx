@@ -23,7 +23,7 @@ export default function Home() {
             aria-label="TRAIL home"
           >
             <TrailLogo size={28} data-nav-logo aria-hidden="true" />
-            <span className="font-mono text-sm font-medium tracking-[0.2em] text-[#f2f4f6]">
+            <span className="font-heading text-sm font-medium tracking-[0.2em] text-[#f2f4f6]">
               TRAIL
             </span>
           </a>
