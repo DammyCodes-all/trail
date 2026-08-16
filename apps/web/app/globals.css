@@ -86,12 +86,12 @@
     linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
   background-size: 24px 24px;
   -webkit-mask-image: radial-gradient(
-    ellipse 80% 60% at 50% 50%,
+    ellipse 80% 60% at 50% 44%,
     black 25%,
     transparent 72%
   );
   mask-image: radial-gradient(
-    ellipse 80% 60% at 50% 50%,
+    ellipse 80% 60% at 50% 44%,
     black 25%,
     transparent 72%
   );
@@ -284,5 +284,20 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+/*
+ * Intro overlay: hide the hero lockup before the first paint while JS is
+ * enabled, so the draw-in never flashes an assembled logo. When scripting is
+ * off (or motion is reduced) the lockup stays fully visible — GSAP is the only
+ * thing that hides it, never CSS alone.
+ */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-intro-path],
+  [data-intro-letter] {
+    stroke-dasharray: 0 1;
+    fill-opacity: 0;
+    stroke-width: 14;
   }
 }

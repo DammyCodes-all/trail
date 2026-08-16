@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { TrailLogo } from "@/components/trail-logo";
 import { HeroExperience } from "@/components/landing/hero/hero-experience";
+import { GridGlow } from "@/components/landing/hero/grid-glow";
 import { NavGithubLink } from "@/components/landing/nav-github-link";
 
 export const metadata: Metadata = {
@@ -14,6 +15,7 @@ export default function Home() {
     <main className="relative isolate overflow-hidden bg-[#0d0f0e] text-[#f2f4f6]">
       <section className="relative mx-auto flex min-h-dvh w-full max-w-7xl flex-col px-5 pb-14 sm:px-8 lg:px-10">
         <div aria-hidden="true" className="hero-grid -z-10" />
+        <GridGlow />
         <header className="flex h-20 items-center justify-between sm:h-24">
           <a
             href="#top"
