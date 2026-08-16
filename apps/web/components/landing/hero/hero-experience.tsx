@@ -122,12 +122,11 @@ export function HeroExperience() {
         oldMark.remove();
         oldText.remove();
         navAnchor.prepend(introMark, wordmark);
-        gsap.set(introMark, { clearProps: "transform" });
+        gsap.set([introMark, wordmark], { clearProps: "transform" });
         const cur = wordmark.getBoundingClientRect();
         gsap.set(wordmark, {
           x: landText.centerX - (cur.left + cur.width / 2),
           y: landText.top + landText.height / 2 - (cur.top + cur.height / 2),
-          scale: 1,
         });
       };
 
@@ -177,7 +176,19 @@ export function HeroExperience() {
           );
 
         timeline.addLabel("assembled", 1.5);
-        timeline.call(measureFlight, undefined, "assembled-=0.3");
+        timeline.call(
+          () => {
+            if (document.fonts && document.fonts.status === "loading") {
+              document.fonts.ready
+                .then(() => measureFlight())
+                .catch(() => {});
+            } else {
+              measureFlight();
+            }
+          },
+          undefined,
+          "assembled-=0.3",
+        );
 
         const markFlight = {
           x: () => flight?.mark.x ?? 0,

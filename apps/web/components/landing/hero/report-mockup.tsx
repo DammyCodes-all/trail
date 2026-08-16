@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { gsap } from "gsap";
 import {
@@ -13,7 +13,6 @@ import {
   Globe2,
   Keyboard,
   ListChecks,
-  Lock,
   Monitor,
   MousePointer2,
   Network,
@@ -223,17 +222,15 @@ const FACT_TONE = { warn: "text-[#ffb020]", error: "text-[#ff4d4f]" } as const s
 
 function BrowserChrome() {
   return (
-    <div className="flex h-10 items-center gap-3 px-4">
-      <div className="flex items-center gap-1.5" aria-hidden="true">
-        <span className="size-2.5 rounded-full bg-[#ff5f57]" />
-        <span className="size-2.5 rounded-full bg-[#febc2e]" />
-        <span className="size-2.5 rounded-full bg-[#28c840]" />
-      </div>
-      <div className="mx-auto flex h-6 min-w-0 max-w-[240px] items-center gap-1.5 rounded-md border border-white/5 bg-white/5 px-3 font-mono text-[10px] text-[#8b929c]">
-        <Lock className="size-2.5 shrink-0 text-[#626973]" />
-        <span className="truncate">trail.app/r/Jq9xZv</span>
-      </div>
-      <span className="hidden w-14 sm:block" aria-hidden="true" />
+    <div className="flex h-8 items-end gap-0.5 bg-[#0d0e10] px-3 pt-1">
+      <span className="flex h-6 items-center gap-1.5 rounded-t-lg bg-[#141618] px-2.5 font-mono text-[9px] text-[#8b929c]">
+        <Globe2 className="size-2.5 shrink-0" />
+        acme.com
+      </span>
+      <span className="flex h-6 items-center gap-1.5 rounded-t-lg bg-[#08090a] px-2.5 font-mono text-[9.5px] text-[#f2f4f6] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+        <TrailLogo size={10} color="#ff6a00" aria-hidden="true" />
+        Trail report
+      </span>
     </div>
   );
 }
@@ -246,7 +243,7 @@ export function ReportMockup() {
   const [playing, setPlaying] = useState(true);
   const [panels, setPanels] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = root.current;
     if (!el) {
       return;
@@ -258,6 +255,15 @@ export function ReportMockup() {
       return;
     }
 
+    // Hide the report shell before first paint: the entrance rise (fired on
+    // `trail:report-revealed`) is what reveals it, never a flash of the static
+    // state. Reduced-motion users returned above and keep the CSS-visible
+    // static report.
+    const shellEl = el.querySelector<HTMLElement>("[data-mock-shell]");
+    if (shellEl) {
+      gsap.set(shellEl, { autoAlpha: 0, y: 28 });
+    }
+
     let context: gsap.Context | undefined;
 
     const start = () => {
@@ -265,6 +271,7 @@ export function ReportMockup() {
         return;
       }
       context = gsap.context(() => {
+        const shell = el.querySelector<HTMLElement>("[data-mock-shell]");
         const player = el.querySelector<HTMLElement>("[data-mock-player]");
         const cursor = el.querySelector<HTMLElement>("[data-mock-cursor]");
         const emailField = el.querySelector<HTMLElement>("[data-mock-field='email']");
@@ -290,6 +297,7 @@ export function ReportMockup() {
         );
 
         if (
+          !shell ||
           !player ||
           !cursor ||
           !emailField ||
@@ -313,6 +321,15 @@ export function ReportMockup() {
         el.querySelectorAll<HTMLElement>("[data-evidence-chevron]").forEach((node) => {
           chevrons.current.set(node.getAttribute("data-evidence-chevron") ?? "", node);
         });
+
+        // One-shot entrance: the report window rises in as the intro overlay
+        // lifts. Kept off the looping timeline (which rewinds each cycle) so
+        // the shell enters once; no-JS and reduced-motion users never reach
+        // `start`, so the CSS static state stays fully visible.
+        const reveal = gsap.timeline({ defaults: { ease: "power2.out" } });
+        reveal
+          .set(shell, { autoAlpha: 0, y: 28 })
+          .to(shell, { autoAlpha: 1, y: 0, duration: 0.6 });
 
         const measure = (node: HTMLElement) => {
           const box = player.getBoundingClientRect();
@@ -496,11 +513,12 @@ export function ReportMockup() {
             scrubP,
             { p: 0 },
             { p: 1, duration: 9.4, ease: "none", onUpdate: placeScrub },
-            0.4,
+            1.0,
           )
           .fromTo(captured, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, 9.2);
 
         loop.play();
+        reveal.play();
       }, el);
     };
 
@@ -543,7 +561,10 @@ export function ReportMockup() {
       className="relative mx-auto mt-12 w-full max-w-5xl text-left sm:mt-14"
     >
       <div className="hidden lg:block">
-        <div className="overflow-hidden rounded-lg border border-white/10 bg-[#0d0e10] shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+        <div
+          data-mock-shell
+          className="overflow-hidden rounded-lg border border-white/10 bg-[#0d0e10] shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+        >
           <BrowserChrome />
 
         <div className="bg-[#08090a]">
