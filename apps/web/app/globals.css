@@ -295,9 +295,14 @@
  */
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
   [data-intro-path],
-  [data-intro-letter] {
+  [data-intro-text] {
     stroke-dasharray: 0 1;
     fill-opacity: 0;
+  }
+  [data-intro-path] {
     stroke-width: 14;
+  }
+  [data-intro-text] {
+    stroke-width: 28;
   }
 }
