@@ -98,15 +98,12 @@ export function ProblemSection() {
     >
       <div className="mx-auto max-w-5xl">
         <div data-copy className="text-center">
-          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-[#ff8a1f]">
-            Beyond the error
-          </p>
-          <h2 className="mx-auto mt-5 max-w-3xl font-heading text-[clamp(1.75rem,4.5vw,3.25rem)] font-bold leading-[1.05] tracking-[-0.035em] text-[#f2f4f6]">
-            The error is only half <span className="text-[#ff6a00]">the story</span>.
+          <h2 className="mx-auto max-w-3xl font-heading text-[clamp(1.75rem,4.5vw,3.25rem)] font-bold leading-[1.05] tracking-[-0.035em] text-[#f2f4f6]">
+            Guesswork in. Evidence out.
           </h2>
           <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-[#8b929c] sm:text-lg sm:leading-8">
-            Trail captures the clicks, requests, console errors, replay, and
-            context around the moment things went wrong.
+            One of these is what most bug reports look like. The other is what
+            Trail sends instead.
           </p>
         </div>
 
