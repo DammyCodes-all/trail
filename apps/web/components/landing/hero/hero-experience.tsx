@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
+import { lockScroll, unlockScroll } from "@/lib/scroll-lock";
 import { IntroOverlay } from "./intro-overlay";
 import { ReportMockup } from "./report-mockup";
 
@@ -158,7 +159,8 @@ export function HeroExperience() {
             0.15,
           )
           .set(overlay, { display: "none" }, 0.55)
-          .call(reportReady, undefined, 0.6);
+          .call(reportReady, undefined, 0.6)
+          .call(unlockScroll, undefined, 0.7);
       } else {
         const draw = {
           duration: 2.1,
@@ -227,7 +229,8 @@ export function HeroExperience() {
           .call(stick, undefined, "landed")
           .fromTo(heroLines, { opacity: 0, y: 24 }, linesIn, "landed-=0.05")
           .set(overlay, { display: "none" }, "landed+=0.45")
-          .call(reportReady, undefined, "landed+=0.15");
+          .call(reportReady, undefined, "landed+=0.15")
+          .call(unlockScroll, undefined, "landed+=0.5");
       }
 
       let introPlayed = false;
@@ -237,6 +240,7 @@ export function HeroExperience() {
           return;
         }
         introPlayed = true;
+        requestAnimationFrame(lockScroll);
         gsap.set(overlay, { display: "flex", opacity: 1 });
         if (!reducedMotion) {
           gsap.set(introPath, {
@@ -267,6 +271,7 @@ export function HeroExperience() {
     }, rootEl);
 
     return () => {
+      unlockScroll();
       context.revert();
     };
   }, []);

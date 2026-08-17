@@ -3,6 +3,7 @@ import { TrailLogo } from "@/components/trail-logo";
 import { HeroExperience } from "@/components/landing/hero/hero-experience";
 import { GridGlow } from "@/components/landing/hero/grid-glow";
 import { NavGithubLink } from "@/components/landing/nav-github-link";
+import { ProblemSection } from "@/components/landing/problem/problem-section";
 
 export const metadata: Metadata = {
   title: "TRAIL — Every bug has a trail",
@@ -35,21 +36,7 @@ export default function Home() {
         <HeroExperience />
       </section>
 
-      <section id="how-it-works" className="border-t border-white/10 bg-[#0d0e10] px-5 py-24 sm:px-8 sm:py-32 lg:px-10">
-        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
-          <div>
-            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-[#ff8a1f]">
-              The missing context
-            </p>
-            <h2 className="mt-5 max-w-xl font-heading text-4xl font-semibold leading-tight tracking-[-0.035em] text-[#f2f4f6] sm:text-5xl">
-              A screenshot doesn&apos;t tell you what happened.
-            </h2>
-          </div>
-          <p className="max-w-2xl text-lg leading-8 text-[#8b929c]">
-            TRAIL connects the user&apos;s action to the browser&apos;s response: clicks, input, console errors, failed requests, and a replayable session in one maintainer-ready report.
-          </p>
-        </div>
-      </section>
+      <ProblemSection />
     </main>
   );
 }
