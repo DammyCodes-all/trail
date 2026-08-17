@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
+  Check,
   Clock3,
   ListChecks,
   MousePointer2,
@@ -11,6 +12,7 @@ import {
   Play,
   Terminal,
   WifiOff,
+  X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -51,144 +53,8 @@ export function ProblemSection() {
     }
 
     const ctx = gsap.context(() => {
-      const stage = el.querySelector<HTMLElement>("[data-stage]");
-      const leftCol = el.querySelector<HTMLElement>("[data-fragments]");
-      const fragments = gsap.utils.toArray<HTMLElement>(
-        el.querySelectorAll("[data-fragment]"),
-      );
-      const card = el.querySelector<HTMLElement>("[data-card]");
-      const cardHead = el.querySelector<HTMLElement>("[data-card-head]");
-      const rows = gsap.utils.toArray<HTMLElement>(
-        el.querySelectorAll("[data-card-row]"),
-      );
-      const facts = Array.from(el.querySelectorAll<HTMLElement>("[data-fact]"));
-      const beam = el.querySelector<HTMLElement>("[data-beam]");
       const payoff = el.querySelector<HTMLElement>("[data-payoff]");
-      if (
-        !stage ||
-        !leftCol ||
-        fragments.length === 0 ||
-        !card ||
-        !cardHead ||
-        rows.length === 0 ||
-        facts.length === 0 ||
-        !beam
-      ) {
-        return;
-      }
-
-      // On stacked layouts the beam sweeps top→bottom between the columns;
-      // on desktop it sweeps left→right into the card's edge.
-      const vertical = window.matchMedia("(max-width: 1023px)").matches;
-      const beamW = vertical ? 3 : 128;
-      const beamH = vertical ? 128 : 3;
-
-      const beamStart = () => {
-        const s = stage.getBoundingClientRect();
-        const l = leftCol.getBoundingClientRect();
-        if (vertical) {
-          return {
-            x: l.left + l.width / 2 - s.left - beamW / 2,
-            y: l.bottom - s.top + 8,
-          };
-        }
-        return {
-          x: l.left + l.width / 2 - s.left - beamW / 2,
-          y: l.top + l.height / 2 - s.top - beamH / 2,
-        };
-      };
-      const beamEnd = () => {
-        const s = stage.getBoundingClientRect();
-        const c = card.getBoundingClientRect();
-        if (vertical) {
-          return {
-            x: c.left + c.width / 2 - s.left - beamW / 2,
-            y: c.top - s.top - 12,
-          };
-        }
-        return {
-          x: c.left - s.left - beamW - 8,
-          y: c.top + c.height / 2 - s.top - beamH / 2,
-        };
-      };
-
-      // 10s scrubbed timeline, pinned for the whole run. Pre-pin the stage is
-      // empty (from-states render at build) and every phase answers to scroll
-      // position, so the choreography is fully interruptible.
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: stage,
-          start: "top 70%",
-          end: "+=120%",
-          scrub: 1,
-          pin: true,
-          anticipatePin: 1,
-        },
-        defaults: { ease: "power2.out" },
-      });
-
-      tl.fromTo(
-        fragments,
-        { y: 26, autoAlpha: 0 },
-        { y: 0, autoAlpha: 1, duration: 0.85, stagger: 0.05 },
-        0,
-      );
-
-      fragments.forEach((f) => {
-        tl.to(
-          f,
-          {
-            x: Number(f.dataset.driftX ?? 0),
-            rotation: Number(f.dataset.driftRot ?? 0),
-            duration: 0.9,
-            ease: "power1.inOut",
-          },
-          1.2,
-        );
-      });
-      tl.to(fragments, { opacity: 0.55, duration: 0.9, ease: "power1.inOut" }, 1.2);
-
-      tl.set(beam, { width: beamW, height: beamH, x: () => beamStart().x, y: () => beamStart().y }, 2.9);
-      tl.fromTo(beam, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, 3.0);
-      tl.to(fragments, { autoAlpha: 0, duration: 0.7, stagger: 0.08, ease: "power1.in" }, 3.2);
-      tl.to(beam, { x: () => beamEnd().x, y: () => beamEnd().y, duration: 1.15, ease: "power1.inOut" }, 3.3);
-      tl.to(beam, { autoAlpha: 0, duration: 0.3 }, 4.5);
-
-      tl.fromTo(
-        card,
-        { y: 24, scale: 0.97, autoAlpha: 0 },
-        { y: 0, scale: 1, autoAlpha: 1, duration: 0.85 },
-        4.8,
-      );
-      tl.fromTo(cardHead, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 5.6);
-
-      facts.forEach((node, i) => {
-        const to = Number(node.dataset.to ?? 0);
-        const suffix = node.dataset.suffix ?? "";
-        const state = { v: 0 };
-        tl.fromTo(
-          state,
-          { v: 0 },
-          {
-            v: to,
-            duration: 0.9,
-            ease: "power1.inOut",
-            onUpdate: () => {
-              node.textContent = `${Math.round(state.v)}${suffix}`;
-            },
-          },
-          5.9 + i * 0.12,
-        );
-      });
-
-      rows.forEach((r, i) => {
-        tl.fromTo(
-          r,
-          { y: 10, autoAlpha: 0 },
-          { y: 0, autoAlpha: 1, duration: 0.5 },
-          6.3 + i * 0.12,
-        );
-      });
+      const copy = el.querySelector<HTMLElement>("[data-copy]");
 
       if (payoff) {
         gsap.fromTo(
@@ -200,6 +66,20 @@ export function ProblemSection() {
             duration: 0.7,
             ease: "power2.out",
             scrollTrigger: { trigger: payoff, start: "top 88%" },
+          },
+        );
+      }
+
+      if (copy) {
+        gsap.fromTo(
+          copy,
+          { autoAlpha: 0, y: 18 },
+          {
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.7,
+            ease: "power2.out",
+            scrollTrigger: { trigger: copy, start: "top 88%" },
           },
         );
       }
@@ -217,26 +97,31 @@ export function ProblemSection() {
       className="border-t border-white/10 bg-[#0d0e10] px-5 py-32 sm:px-8 sm:py-40 lg:px-10"
     >
       <div className="mx-auto max-w-5xl">
-        <div className="text-center">
+        <div data-copy className="text-center">
           <p className="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-[#ff8a1f]">
-            The problem
+            Beyond the error
           </p>
           <h2 className="mx-auto mt-5 max-w-3xl font-heading text-[clamp(1.75rem,4.5vw,3.25rem)] font-bold leading-[1.05] tracking-[-0.035em] text-[#f2f4f6]">
-            The bug report shouldn&apos;t be a guessing game.
+            The error is only half <span className="text-[#ff6a00]">the story</span>.
           </h2>
           <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-[#8b929c] sm:text-lg sm:leading-8">
-            The person who experienced the bug knows what happened. The person
-            fixing it usually gets fragments.
+            Trail captures the clicks, requests, console errors, replay, and
+            context around the moment things went wrong.
           </p>
         </div>
 
         <div data-stage className="relative mt-16 lg:mt-24">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-24">
-            <div
-              data-fragments
-              aria-hidden="true"
-              className="pointer-events-none mx-auto flex w-full max-w-sm flex-col items-start gap-4"
-            >
+            <div className="w-full">
+              <p className="mb-4 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#626973]">
+                <X className="size-3" aria-hidden="true" />
+                Without trail
+              </p>
+              <div
+                data-fragments
+                aria-hidden="true"
+                className="pointer-events-none flex w-full max-w-sm flex-col items-start gap-4"
+              >
               <div
                 data-fragment
                 data-drift-x="-10"
@@ -280,11 +165,16 @@ export function ProblemSection() {
                 Can you reproduce it?
               </div>
             </div>
+            </div>
 
-            <div className="mx-auto w-full max-w-[420px]">
+            <div className="relative mx-auto w-full max-w-[420px]">
+              <p className="mb-4 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#ff6a00]">
+                <Check className="size-3" aria-hidden="true" />
+                With trail
+              </p>
               <div
                 data-card
-                className="overflow-hidden rounded-lg border border-white/10 bg-[#0a0b0d] shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+                className="relative overflow-hidden rounded-lg border border-white/10 bg-[#0a0b0d] shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
               >
                 <div
                   data-card-head
@@ -337,12 +227,6 @@ export function ProblemSection() {
               </div>
             </div>
           </div>
-
-          <div
-            data-beam
-            aria-hidden="true"
-            className="pointer-events-none absolute left-0 top-0 z-10 h-[3px] w-28 rounded-full bg-[#ff6a00] opacity-0 shadow-[0_0_18px_rgba(255,106,0,0.5)]"
-          />
         </div>
 
         <p
