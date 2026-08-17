@@ -28,8 +28,6 @@ export function HeroExperience() {
       "(prefers-reduced-motion: reduce)",
     ).matches;
 
-    let removeScroll: (() => void) | undefined;
-
     const reportReady = () => {
       window.dispatchEvent(new Event("trail:report-revealed"));
     };
@@ -121,6 +119,7 @@ export function HeroExperience() {
         wordmark.style.height = `${landText.height}px`;
         oldMark.remove();
         oldText.remove();
+        navAnchor.style.zIndex = "60";
         navAnchor.prepend(introMark, wordmark);
         gsap.set([introMark, wordmark], { clearProps: "transform" });
         const cur = wordmark.getBoundingClientRect();
@@ -133,6 +132,13 @@ export function HeroExperience() {
       const heroLines = gsap.utils.toArray<HTMLElement>(
         rootEl.querySelectorAll("[data-hero-anim]"),
       );
+      const linesIn: gsap.TweenVars = {
+        opacity: 1,
+        y: 0,
+        duration: 0.65,
+        ease: "power2.out",
+        stagger: 0.08,
+      };
       const introText = rootEl.querySelector<SVGPathElement>(
         "[data-intro-text]",
       );
@@ -178,10 +184,8 @@ export function HeroExperience() {
         timeline.addLabel("assembled", 1.5);
         timeline.call(
           () => {
-            if (document.fonts && document.fonts.status === "loading") {
-              document.fonts.ready
-                .then(() => measureFlight())
-                .catch(() => {});
+            if (document.fonts?.status === "loading") {
+              document.fonts.ready.then(measureFlight, measureFlight);
             } else {
               measureFlight();
             }
@@ -221,18 +225,7 @@ export function HeroExperience() {
             "landed-=0.05",
           )
           .call(stick, undefined, "landed")
-          .fromTo(
-            heroLines,
-            { opacity: 0, y: 24 },
-            {
-              opacity: 1,
-              y: 0,
-              duration: 0.65,
-              ease: "power2.out",
-              stagger: 0.08,
-            },
-            "landed-=0.05",
-          )
+          .fromTo(heroLines, { opacity: 0, y: 24 }, linesIn, "landed-=0.05")
           .set(overlay, { display: "none" }, "landed+=0.45")
           .call(reportReady, undefined, "landed+=0.15");
       }
@@ -260,27 +253,20 @@ export function HeroExperience() {
         timeline.play();
       };
 
-      const onScroll = () => {
-        if (introPlayed) {
-          return;
-        }
-        if (window.scrollY <= 8) {
-          startIntro();
-        }
-      };
-
       if (window.scrollY <= 8) {
         startIntro();
       } else {
+        // Loaded past the hero: the intro never plays (scrolling back up does
+        // not re-trigger it). Bring the hero content in and reveal the report.
         gsap.set(overlay, { display: "none" });
+        if (!reducedMotion) {
+          gsap.fromTo(heroLines, { opacity: 0, y: 24 }, linesIn);
+        }
         reportReady();
-        window.addEventListener("scroll", onScroll, { passive: true });
-        removeScroll = () => window.removeEventListener("scroll", onScroll);
       }
     }, rootEl);
 
     return () => {
-      removeScroll?.();
       context.revert();
     };
   }, []);

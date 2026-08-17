@@ -19,7 +19,7 @@ export default function Home() {
         <header className="flex h-20 items-center justify-between sm:h-24">
           <a
             href="#top"
-            className="flex min-h-11 items-center gap-2 rounded-md px-1 outline-none focus-visible:ring-2 focus-visible:ring-[#ff6a00]"
+            className="relative flex min-h-11 items-center gap-2 rounded-md px-1 outline-none focus-visible:ring-2 focus-visible:ring-[#ff6a00]"
             aria-label="TRAIL home"
           >
             <TrailLogo size={28} data-nav-logo aria-hidden="true" />
