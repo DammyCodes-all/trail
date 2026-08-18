@@ -88,8 +88,8 @@ export function ProblemSection() {
         </div>
 
         <div data-stage className="relative isolate mt-10 lg:mt-12">
-          <TrailConnector />
-          <div className="relative z-10 grid items-center gap-12 lg:grid-cols-2 lg:gap-32">
+          <TrailConnector orientation="horizontal" />
+          <div className="relative z-10 grid items-center gap-0 lg:grid-cols-2 lg:gap-32">
             <div data-comparison-side="without" className="w-full">
               <p
                 data-without-label
@@ -188,6 +188,13 @@ export function ProblemSection() {
             </div>
 
             <div
+              data-mobile-connector-slot
+              className="relative z-0 my-7 h-[180px] lg:hidden"
+            >
+              <TrailConnector orientation="vertical" />
+            </div>
+
+            <div
               data-comparison-side="with"
               className="relative mx-auto w-full max-w-[420px]"
             >
@@ -204,7 +211,7 @@ export function ProblemSection() {
               >
                 <div
                   data-card-head
-                  className="flex items-center gap-2 border-b border-white/10 px-4 py-3"
+                  className="flex items-center gap-2 border-b border-white/10 px-4 py-4"
                 >
                   <span
                     data-status-dot
@@ -215,25 +222,25 @@ export function ProblemSection() {
                     Session captured
                   </span>
                 </div>
-                <div className="grid grid-cols-2 divide-x divide-white/10 sm:grid-cols-4">
+                <div className="grid grid-cols-2">
                   {FACTS.map((fact) => (
                     <div
                       key={fact.key}
                       data-fact-cell
-                      className="min-w-0 px-3 py-3"
+                      className="min-w-0 border-white/10 px-4 py-4 odd:border-r [&:nth-child(n+3)]:border-t"
                     >
-                      <span className="flex items-center gap-2 text-[#626973]">
+                      <span className="flex items-center gap-2 text-[#8b929c]">
                         <fact.icon
                           className="size-3 shrink-0"
                           aria-hidden="true"
                         />
-                        <span className="text-[9.5px]">{fact.label}</span>
+                        <span className="text-[10px] leading-4">{fact.label}</span>
                       </span>
                       <span
                         data-fact
                         data-to={fact.to}
                         data-suffix={fact.suffix}
-                        className={`mt-1 block truncate pl-5 font-heading text-sm font-semibold tabular-nums ${fact.cls}`}
+                        className={`mt-2 block truncate pl-5 font-heading text-lg font-semibold leading-none tabular-nums ${fact.cls}`}
                       >
                         {fact.to}
                         {fact.suffix}
@@ -244,16 +251,26 @@ export function ProblemSection() {
                 <div
                   data-replay-strip
                   aria-hidden="true"
-                  className="border-t border-white/10 px-4 pb-3 pt-3.5"
+                  className="border-t border-white/10 px-4 py-4"
                 >
-                  <div className="relative">
-                    <div className="h-px bg-white/10" />
-                    <span className="absolute left-0 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-white/25" />
-                    <span className="absolute left-[32%] top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-white/25" />
-                    <span className="absolute left-[62%] top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-white/25" />
-                    <span className="absolute right-0 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-[#ff6a00] shadow-[0_0_8px_rgba(255,106,0,0.6)]" />
+                  <p className="mb-3 font-mono text-[9px] uppercase tracking-[0.16em] text-[#8b929c]">
+                    Replay timeline
+                  </p>
+                  <div data-replay-track className="relative h-2">
+                    <div className="absolute inset-x-0 top-[3.5px] h-px bg-white/10" />
+                    <div
+                      data-replay-progress
+                      className="absolute inset-x-0 top-[3.5px] h-px origin-left bg-[#ff6a00]/60"
+                    />
+                    <span className="absolute left-0 top-1/2 size-2 -translate-y-1/2 rounded-full bg-[#8b929c] ring-2 ring-[#0a0b0d]" />
+                    <span className="absolute left-[32%] top-1/2 size-2 -translate-y-1/2 rounded-full bg-[#8b929c] ring-2 ring-[#0a0b0d]" />
+                    <span className="absolute left-[62%] top-1/2 size-2 -translate-y-1/2 rounded-full bg-[#8b929c] ring-2 ring-[#0a0b0d]" />
+                    <span
+                      data-replay-playhead
+                      className="absolute right-0 top-0 size-2 rounded-full bg-[#ff6a00] shadow-[0_0_8px_rgba(255,106,0,0.6)]"
+                    />
                   </div>
-                  <div className="mt-1.5 flex items-baseline justify-between font-mono text-[9px] text-[#626973]">
+                  <div className="mt-1 flex items-baseline justify-between font-mono text-[9px] text-[#626973]">
                     <span>00:00</span>
                     <span>00:55</span>
                   </div>
@@ -263,7 +280,7 @@ export function ProblemSection() {
                     <div
                       key={row.label}
                       data-card-row
-                      className="flex items-center gap-3 px-4 py-3"
+                      className="flex items-center gap-3 px-4 py-3.5"
                     >
                       <row.icon
                         className="size-4 shrink-0 text-[#626973]"

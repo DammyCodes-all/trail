@@ -4,6 +4,7 @@ import { HeroExperience } from "@/components/landing/hero/hero-experience";
 import { GridGlow } from "@/components/landing/hero/grid-glow";
 import { NavGithubLink } from "@/components/landing/nav-github-link";
 import { ProblemSection } from "@/components/landing/problem/problem-section";
+import { TrailSection } from "@/components/landing/evidence/trail-section";
 
 export const metadata: Metadata = {
   title: "TRAIL — Every bug has a trail",
@@ -37,6 +38,7 @@ export default function Home() {
       </section>
 
       <ProblemSection />
+      <TrailSection />
     </main>
   );
 }
