@@ -89,7 +89,7 @@ export function ProblemSection() {
 
         <div data-stage className="relative isolate mt-10 lg:mt-12">
           <TrailConnector orientation="horizontal" />
-          <div className="relative z-10 grid items-center gap-0 lg:grid-cols-2 lg:gap-28">
+          <div className="relative z-10 grid items-start gap-0 lg:grid-cols-2 lg:gap-28">
             <div data-comparison-side="without" className="w-full">
               <p
                 data-without-label
