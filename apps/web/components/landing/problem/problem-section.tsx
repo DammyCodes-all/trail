@@ -103,72 +103,86 @@ export function ProblemSection() {
                 aria-hidden="true"
                 className="pointer-events-none flex w-full max-w-sm flex-col items-start gap-4"
               >
-                <div
-                  data-ticket-meta
-                  className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#8b929c]"
-                >
-                  <span
-                    className="size-1.5 rounded-full bg-[#ff4d4f]"
-                    aria-hidden="true"
-                  />
-                  Ticket #4821
-                  <span className="text-[#8b929c]/70">&middot; open</span>
-                </div>
-                <div
-                  data-fragment
-                  className="-rotate-[1.5deg] max-w-[250px] rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.07] px-3.5 py-2.5 text-[13px] leading-5 text-[#8b929c]"
-                >
-                  &ldquo;The login button doesn&apos;t work.&rdquo;
-                </div>
-                <p
-                  data-fragment
-                  className="ml-2 rotate-[1deg] font-mono text-[11px] leading-5 text-[#ff4d4f]"
-                >
-                  <span className="text-[#8b929c]">[14:03:22]</span> TypeError:
-                  cannot read &apos;value&apos; of null
-                </p>
-                <div
-                  data-fragment
-                  className="-rotate-[2deg] ml-4 w-44 overflow-hidden rounded-md border border-dotted border-white/20 bg-white/[0.02]"
-                >
-                  <div className="flex items-center gap-1.5 border-b border-dotted border-white/20 px-2.5 py-1.5">
-                    <ImageIcon
-                      className="size-2.5 text-[#8b929c]"
+                <div data-rough-item data-enter-from="left" className="self-start">
+                  <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#8b929c]">
+                    <span
+                      className="size-1.5 rounded-full bg-[#ff4d4f]"
                       aria-hidden="true"
                     />
-                    <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#8b929c]">
-                      Product screenshot
-                    </span>
-                    <span className="ml-auto font-mono text-[8px] text-[#626973]/60">
-                      acme-143022.png
-                    </span>
-                  </div>
-                  <div className="space-y-1.5 px-2.5 pb-3 pt-2.5">
-                    <div className="h-1 w-8 rounded-sm bg-white/20" />
-                    <div className="h-1.5 rounded-sm bg-white/10" />
-                    <div className="h-1.5 rounded-sm bg-white/10" />
-                    <div className="h-3 rounded-sm bg-white/20" />
+                    Ticket #4821
+                    <span className="text-[#8b929c]/70">&middot; open</span>
                   </div>
                 </div>
                 <div
-                  data-fragment
-                  className="ml-auto flex rotate-[1.5deg] items-end gap-2"
+                  data-rough-item
+                  data-enter-from="left"
+                  className="self-start"
                 >
-                  <div className="max-w-[230px] rounded-2xl rounded-br-md border border-white/10 bg-white/[0.07] px-3.5 py-2.5 text-[13px] leading-5 text-[#8b929c]">
-                    Can you reproduce it?
-                  </div>
-                  <div className="grid size-5 shrink-0 place-items-center rounded-full bg-[#1c1e22] ring-1 ring-white/10">
-                    <Headset
-                      className="size-3 text-[#626973]"
-                      aria-hidden="true"
-                    />
+                  <div className="-rotate-[1.5deg] max-w-[250px] rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.07] px-3.5 py-2.5 text-[13px] leading-5 text-[#8b929c]">
+                    &ldquo;The login button doesn&apos;t work.&rdquo;
                   </div>
                 </div>
                 <div
-                  data-fragment
-                  className="-rotate-[1deg] max-w-[230px] rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.07] px-3.5 py-2.5 text-[13px] leading-5 text-[#8b929c]"
+                  data-rough-item
+                  data-enter-from="left"
+                  className="ml-2 self-start"
                 >
-                  I don&apos;t know what I clicked.
+                  <p className="rotate-[1deg] font-mono text-[11px] leading-5 text-[#ff4d4f]">
+                    <span className="text-[#8b929c]">[14:03:22]</span>{" "}
+                    TypeError: cannot read &apos;value&apos; of null
+                  </p>
+                </div>
+                <div
+                  data-rough-item
+                  data-enter-from="left"
+                  className="ml-4 self-start"
+                >
+                  <div className="-rotate-[2deg] w-44 overflow-hidden rounded-md border border-dotted border-white/20 bg-white/[0.02]">
+                    <div className="flex items-center gap-1.5 border-b border-dotted border-white/20 px-2.5 py-1.5">
+                      <ImageIcon
+                        className="size-2.5 text-[#8b929c]"
+                        aria-hidden="true"
+                      />
+                      <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#8b929c]">
+                        Product screenshot
+                      </span>
+                      <span className="ml-auto font-mono text-[8px] text-[#626973]/60">
+                        acme-143022.png
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 px-2.5 pb-3 pt-2.5">
+                      <div className="h-1 w-8 rounded-sm bg-white/20" />
+                      <div className="h-1.5 rounded-sm bg-white/10" />
+                      <div className="h-1.5 rounded-sm bg-white/10" />
+                      <div className="h-3 rounded-sm bg-white/20" />
+                    </div>
+                  </div>
+                </div>
+                <div
+                  data-rough-item
+                  data-enter-from="right"
+                  className="self-end"
+                >
+                  <div className="flex rotate-[1.5deg] items-end gap-2">
+                    <div className="max-w-[230px] rounded-2xl rounded-br-md border border-white/10 bg-white/[0.07] px-3.5 py-2.5 text-[13px] leading-5 text-[#8b929c]">
+                      Can you reproduce it?
+                    </div>
+                    <div className="grid size-5 shrink-0 place-items-center rounded-full bg-[#1c1e22] ring-1 ring-white/10">
+                      <Headset
+                        className="size-3 text-[#626973]"
+                        aria-hidden="true"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div
+                  data-rough-item
+                  data-enter-from="left"
+                  className="self-start"
+                >
+                  <div className="-rotate-[1deg] max-w-[230px] rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.07] px-3.5 py-2.5 text-[13px] leading-5 text-[#8b929c]">
+                    I don&apos;t know what I clicked.
+                  </div>
                 </div>
               </div>
             </div>
