@@ -67,6 +67,7 @@ export function useProblemSectionMotion() {
           );
           const withLabel = section.querySelector<HTMLElement>("[data-with-label]");
           const card = section.querySelector<HTMLElement>("[data-card]");
+          const cardHead = section.querySelector<HTMLElement>("[data-card-head]");
           const factCells = Array.from(
             section.querySelectorAll<HTMLElement>("[data-fact-cell]"),
           );
@@ -87,6 +88,11 @@ export function useProblemSectionMotion() {
           const connectorNode = section.querySelector<SVGGElement>(
             "[data-connector-node]",
           );
+          const outputMarkers = Array.from(
+            section.querySelectorAll<SVGRectElement>(
+              "[data-connector-output-marker]",
+            ),
+          );
           const flowLayers = Array.from(
             section.querySelectorAll<SVGElement>("[data-connector-flow-layer]"),
           );
@@ -103,6 +109,7 @@ export function useProblemSectionMotion() {
             roughItems.length === 0 ||
             !withLabel ||
             !card ||
+            !cardHead ||
             factCells.length === 0 ||
             !replayStrip ||
             cardRows.length === 0 ||
@@ -111,6 +118,7 @@ export function useProblemSectionMotion() {
             feederPaths.length === 0 ||
             !outputPath ||
             !connectorNode ||
+            outputMarkers.length === 0 ||
             flowLayers.length === 0 ||
             flowPaths.length === 0 ||
             !connectorLogo
@@ -160,6 +168,13 @@ export function useProblemSectionMotion() {
           });
           connectorVisible = visibility.isActive;
 
+          const evidenceItems = [
+            cardHead,
+            ...factCells,
+            replayStrip,
+            ...cardRows,
+          ];
+
           gsap.set(withoutLabel, { opacity: 0 });
           gsap.set(roughItems, {
             autoAlpha: 0,
@@ -175,19 +190,39 @@ export function useProblemSectionMotion() {
             strokeDashoffset: 1,
           });
           gsap.set(connectorNode, {
-            opacity: 0.55,
-            scale: 0.96,
+            opacity: 0,
+            scale: 0.86,
             svgOrigin: "126 70",
           });
           gsap.set(outputPath, {
             strokeDasharray: "1 1",
             strokeDashoffset: 1,
           });
+          gsap.set(outputMarkers, {
+            opacity: 0,
+            scale: 0.72,
+            transformOrigin: "50% 50%",
+          });
           gsap.set(flowLayers, { opacity: 0 });
-          gsap.set([withLabel, card], { autoAlpha: 0, y: 14 });
-          gsap.set(factCells, { opacity: 0 });
-          gsap.set(replayStrip, { opacity: 0 });
-          gsap.set(cardRows, { opacity: 0 });
+          gsap.set(withLabel, {
+            autoAlpha: 0,
+            x: 24,
+            scale: 0.96,
+            transformOrigin: "100% 50%",
+          });
+          gsap.set(card, {
+            autoAlpha: 0,
+            x: 36,
+            y: 8,
+            scale: 0.96,
+            transformOrigin: "100% 50%",
+          });
+          gsap.set(evidenceItems, {
+            autoAlpha: 0,
+            x: 20,
+            scale: 0.96,
+            transformOrigin: "100% 50%",
+          });
 
           const timeline = gsap.timeline({ paused: true });
 
@@ -238,15 +273,23 @@ export function useProblemSectionMotion() {
             .fromTo(
               connectorNode,
               {
-                opacity: 0.55,
-                scale: 0.96,
+                opacity: 0,
+                scale: 0.86,
                 svgOrigin: "126 70",
               },
               {
                 opacity: 1,
-                scale: 1,
-                duration: 0.3,
+                duration: 0.22,
                 ease: "power2.out",
+              },
+              1.68,
+            )
+            .to(
+              connectorNode,
+              {
+                scale: 1,
+                duration: 0.5,
+                ease: "back.out(1.15)",
               },
               1.68,
             )
@@ -261,13 +304,33 @@ export function useProblemSectionMotion() {
               1.92,
             )
             .to(
+              outputMarkers,
+              {
+                opacity: 1,
+                duration: 0.18,
+                stagger: 0.07,
+                ease: "power2.out",
+              },
+              2.14,
+            )
+            .to(
+              outputMarkers,
+              {
+                scale: 1,
+                duration: 0.4,
+                stagger: 0.07,
+                ease: "back.out(1.15)",
+              },
+              2.14,
+            )
+            .to(
               flowLayers,
               {
                 opacity: 0.85,
                 duration: 0.25,
                 ease: "power2.out",
               },
-              2.34,
+              2.38,
             )
             .call(
               () => {
@@ -275,57 +338,78 @@ export function useProblemSectionMotion() {
                 syncAmbientLoop();
               },
               undefined,
-              2.42,
+              2.48,
             )
-            .fromTo(
-              [withLabel, card],
-              { autoAlpha: 0, y: 14 },
+            .to(
+              withLabel,
               {
                 autoAlpha: 1,
-                y: 0,
-                duration: 0.4,
+                duration: 0.2,
                 ease: "power2.out",
               },
-              2.42,
+              2.38,
+            )
+            .to(
+              withLabel,
+              {
+                x: 0,
+                scale: 1,
+                duration: 0.48,
+                ease: "back.out(1.1)",
+              },
+              2.38,
+            )
+            .to(
+              card,
+              {
+                autoAlpha: 1,
+                duration: 0.22,
+                ease: "power2.out",
+              },
+              2.48,
+            )
+            .to(
+              card,
+              {
+                x: 0,
+                y: 0,
+                scale: 1,
+                duration: 0.55,
+                ease: "back.out(1.1)",
+              },
+              2.48,
+            )
+            .to(
+              evidenceItems,
+              {
+                autoAlpha: 1,
+                duration: 0.2,
+                stagger: 0.065,
+                ease: "power2.out",
+              },
+              2.62,
+            )
+            .to(
+              evidenceItems,
+              {
+                x: 0,
+                scale: 1,
+                duration: 0.46,
+                stagger: 0.065,
+                ease: "back.out(1.05)",
+              },
+              2.62,
             )
             .fromTo(
               statusDot,
               { scale: 1 },
               { scale: 1.65, duration: 0.16, ease: "power2.out" },
-              2.64,
+              2.78,
             )
             .to(
               statusDot,
               { scale: 1, duration: 0.24, ease: "power1.inOut" },
-              2.8,
-            )
-            .fromTo(
-              factCells,
-              { opacity: 0 },
-              {
-                opacity: 1,
-                duration: 0.28,
-                stagger: 0.06,
-                ease: "power2.out",
-              },
-              2.75,
-            )
-            .fromTo(
-              replayStrip,
-              { opacity: 0 },
-              { opacity: 1, duration: 0.25, ease: "power2.out" },
-              3.09,
-            )
-            .fromTo(
-              cardRows,
-              { opacity: 0 },
-              {
-                opacity: 1,
-                duration: 0.25,
-                stagger: 0.08,
-                ease: "power2.out",
-              },
-              3.23,
+              2.94,
             );
 
           let hasPlayed = false;

@@ -127,6 +127,7 @@ export function TrailConnector() {
       {OUTPUT_MARKERS.map((x, index) => (
         <rect
           key={x}
+          data-connector-output-marker
           x={x - 1.6}
           y="68.4"
           width="3.2"
