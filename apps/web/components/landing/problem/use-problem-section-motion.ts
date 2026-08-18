@@ -32,6 +32,51 @@ type EvidenceElements = {
   statusDot: HTMLElement;
 };
 
+type ConnectorEntranceTiming = {
+  feederDuration: number;
+  feederStagger: number;
+  nodeDelay: number;
+  nodeFadeDuration: number;
+  nodeSettleDuration: number;
+  outputDelay: number;
+  outputDuration: number;
+  markerDelay: number;
+  markerDuration: number;
+  markerStagger: number;
+  flowDelay: number;
+  flowDuration: number;
+};
+
+const DESKTOP_CONNECTOR_TIMING: ConnectorEntranceTiming = {
+  feederDuration: 0.42,
+  feederStagger: 0.035,
+  nodeDelay: 0.34,
+  nodeFadeDuration: 0.12,
+  nodeSettleDuration: 0.3,
+  outputDelay: 0.5,
+  outputDuration: 0.34,
+  markerDelay: 0.66,
+  markerDuration: 0.22,
+  markerStagger: 0.035,
+  flowDelay: 0.9,
+  flowDuration: 0.14,
+};
+
+const MOBILE_CONNECTOR_TIMING: ConnectorEntranceTiming = {
+  feederDuration: 0.42,
+  feederStagger: 0.035,
+  nodeDelay: 0.34,
+  nodeFadeDuration: 0.14,
+  nodeSettleDuration: 0.3,
+  outputDelay: 0.52,
+  outputDuration: 0.36,
+  markerDelay: 0.68,
+  markerDuration: 0.24,
+  markerStagger: 0.035,
+  flowDelay: 0.96,
+  flowDuration: 0.14,
+};
+
 function getConnector(
   section: HTMLElement,
   orientation: ConnectorOrientation,
@@ -165,6 +210,7 @@ function createOnceTrigger(
 function createAmbientController(
   connector: ConnectorElements,
   duration: number,
+  logoDuration = 0.6,
 ) {
   const loop = gsap.timeline({ paused: true, repeat: -1 });
   loop
@@ -180,10 +226,10 @@ function createAmbientController(
       {
         rotation: 360,
         svgOrigin: connector.origin,
-        duration: 0.8,
+        duration: logoDuration,
         ease: "power1.inOut",
       },
-      duration - 1.05,
+      Math.max(0, duration - logoDuration - 0.2),
     );
 
   let isVisible = false;
@@ -240,6 +286,7 @@ function setConnectorStart(connector: ConnectorElements) {
 function addConnectorEntrance(
   timeline: gsap.core.Timeline,
   connector: ConnectorElements,
+  timing: ConnectorEntranceTiming,
   at = 0,
 ) {
   timeline
@@ -247,42 +294,42 @@ function addConnectorEntrance(
       connector.feederPaths,
       {
         strokeDashoffset: 0,
-        duration: 0.72,
-        stagger: 0.065,
+        duration: timing.feederDuration,
+        stagger: timing.feederStagger,
         ease: "power1.inOut",
       },
       at,
     )
     .to(
       connector.node,
-      { opacity: 1, duration: 0.2, ease: "power2.out" },
-      at + 0.62,
+      { opacity: 1, duration: timing.nodeFadeDuration, ease: "power2.out" },
+      at + timing.nodeDelay,
     )
     .to(
       connector.node,
-      { scale: 1, duration: 0.5, ease: "back.out(1.15)" },
-      at + 0.62,
+      { scale: 1, duration: timing.nodeSettleDuration, ease: "back.out(1.15)" },
+      at + timing.nodeDelay,
     )
     .to(
       connector.outputPath,
-      { strokeDashoffset: 0, duration: 0.62, ease: "power1.inOut" },
-      at + 0.86,
+      { strokeDashoffset: 0, duration: timing.outputDuration, ease: "power1.inOut" },
+      at + timing.outputDelay,
     )
     .to(
       connector.outputMarkers,
       {
         opacity: 1,
         scale: 1,
-        duration: 0.4,
-        stagger: 0.07,
+        duration: timing.markerDuration,
+        stagger: timing.markerStagger,
         ease: "back.out(1.15)",
       },
-      at + 1.06,
+      at + timing.markerDelay,
     )
     .to(
       connector.flowLayers,
-      { opacity: 0.85, duration: 0.24, ease: "power2.out" },
-      at + 1.3,
+      { opacity: 0.85, duration: timing.flowDuration, ease: "power2.out" },
+      at + timing.flowDelay,
     );
 }
 
@@ -304,16 +351,17 @@ function addReplay(
   timeline: gsap.core.Timeline,
   evidence: EvidenceElements,
   at: number,
+  duration: number,
 ) {
   timeline
     .to(
       evidence.replayProgress,
-      { scaleX: 1, duration: 0.75, ease: "power1.inOut" },
+      { scaleX: 1, duration, ease: "power1.inOut" },
       at,
     )
     .to(
       evidence.replayPlayhead,
-      { x: 0, duration: 0.75, ease: "power1.inOut" },
+      { x: 0, duration, ease: "power1.inOut" },
       at,
     );
 }
@@ -390,7 +438,7 @@ export function useProblemSectionMotion() {
             return;
           }
 
-          const ambient = createAmbientController(connector, 3.6);
+          const ambient = createAmbientController(connector, 2.4, 0.5);
           setConnectorStart(connector);
           setReplayStart(evidence);
 
@@ -438,8 +486,8 @@ export function useProblemSectionMotion() {
               roughItems,
               {
                 autoAlpha: 1,
-                duration: 0.22,
-                stagger: 0.09,
+                duration: 0.16,
+                stagger: 0.06,
                 ease: "power2.out",
               },
               0.08,
@@ -450,35 +498,35 @@ export function useProblemSectionMotion() {
                 x: 0,
                 y: 0,
                 scale: 1,
-                duration: 0.55,
-                stagger: 0.09,
+                duration: 0.42,
+                stagger: 0.06,
                 ease: "back.out(1.1)",
               },
               0.08,
             );
 
-          addConnectorEntrance(timeline, connector, 0.98);
+          addConnectorEntrance(timeline, connector, DESKTOP_CONNECTOR_TIMING, 0.58);
 
           timeline
             .to(
               evidence.label,
-              { autoAlpha: 1, duration: 0.2, ease: "power2.out" },
-              2.38,
+              { autoAlpha: 1, duration: 0.16, ease: "power2.out" },
+              1.38,
             )
             .to(
               evidence.label,
               {
                 x: 0,
                 scale: 1,
-                duration: 0.48,
+                duration: 0.3,
                 ease: "back.out(1.1)",
               },
-              2.38,
+              1.38,
             )
             .to(
               evidence.card,
-              { autoAlpha: 1, duration: 0.22, ease: "power2.out" },
-              2.48,
+              { autoAlpha: 1, duration: 0.16, ease: "power2.out" },
+              1.46,
             )
             .to(
               evidence.card,
@@ -486,45 +534,45 @@ export function useProblemSectionMotion() {
                 x: 0,
                 y: 0,
                 scale: 1,
-                duration: 0.52,
+                duration: 0.34,
                 ease: "back.out(1.05)",
               },
-              2.48,
+              1.46,
             )
             .to(
               evidence.head,
-              { autoAlpha: 1, y: 0, duration: 0.28, ease: "power2.out" },
-              2.72,
+              { autoAlpha: 1, y: 0, duration: 0.2, ease: "power2.out" },
+              1.62,
             )
             .to(
               evidence.factCells,
               {
                 autoAlpha: 1,
                 y: 0,
-                duration: 0.28,
-                stagger: 0.07,
+                duration: 0.2,
+                stagger: 0.05,
                 ease: "power2.out",
               },
-              2.88,
+              1.72,
             )
             .fromTo(
               evidence.statusDot,
               { scale: 1 },
-              { scale: 1.65, duration: 0.16, ease: "power2.out" },
-              2.9,
+              { scale: 1.65, duration: 0.13, ease: "power2.out" },
+              1.76,
             )
             .to(
               evidence.statusDot,
-              { scale: 1, duration: 0.24, ease: "power1.inOut" },
-              3.06,
+              { scale: 1, duration: 0.18, ease: "power1.inOut" },
+              1.89,
             )
             .to(
               evidence.replayStrip,
-              { autoAlpha: 1, y: 0, duration: 0.28, ease: "power2.out" },
-              3.24,
+              { autoAlpha: 1, y: 0, duration: 0.2, ease: "power2.out" },
+              2.02,
             );
 
-          addReplay(timeline, evidence, 3.38);
+          addReplay(timeline, evidence, 2.12, 0.42);
 
           timeline
             .to(
@@ -532,13 +580,13 @@ export function useProblemSectionMotion() {
               {
                 autoAlpha: 1,
                 y: 0,
-                duration: 0.28,
-                stagger: 0.08,
+                duration: 0.2,
+                stagger: 0.05,
                 ease: "power2.out",
               },
-              4.04,
+              2.48,
             )
-            .call(() => ambient.ready(), undefined, 4.45);
+            .call(() => ambient.ready(), undefined, 2.82);
 
           createOnceTrigger(stage, "top 82%", timeline);
         }, section);
@@ -581,7 +629,7 @@ export function useProblemSectionMotion() {
             return;
           }
 
-          const ambient = createAmbientController(connector, 4.2);
+          const ambient = createAmbientController(connector, 2.8, 0.5);
           setConnectorStart(connector);
           setReplayStart(evidence);
 
@@ -628,8 +676,8 @@ export function useProblemSectionMotion() {
               roughItems,
               {
                 autoAlpha: 1,
-                duration: 0.2,
-                stagger: 0.08,
+                duration: 0.16,
+                stagger: 0.055,
                 ease: "power2.out",
               },
               0.06,
@@ -640,22 +688,26 @@ export function useProblemSectionMotion() {
                 x: 0,
                 y: 0,
                 scale: 1,
-                duration: 0.5,
-                stagger: 0.08,
+                duration: 0.4,
+                stagger: 0.055,
                 ease: "back.out(1.1)",
               },
               0.06,
             );
 
           const connectorTimeline = gsap.timeline({ paused: true });
-          addConnectorEntrance(connectorTimeline, connector);
-          connectorTimeline.call(() => ambient.ready(), undefined, 1.58);
+          addConnectorEntrance(
+            connectorTimeline,
+            connector,
+            MOBILE_CONNECTOR_TIMING,
+          );
+          connectorTimeline.call(() => ambient.ready(), undefined, 1.12);
 
           const evidenceTimeline = gsap.timeline({ paused: true });
           evidenceTimeline
             .to(
               evidence.label,
-              { autoAlpha: 1, duration: 0.2, ease: "power2.out" },
+              { autoAlpha: 1, duration: 0.16, ease: "power2.out" },
               0,
             )
             .to(
@@ -663,14 +715,14 @@ export function useProblemSectionMotion() {
               {
                 y: 0,
                 scale: 1,
-                duration: 0.46,
+                duration: 0.34,
                 ease: "back.out(1.1)",
               },
               0,
             )
             .to(
               evidence.card,
-              { autoAlpha: 1, duration: 0.22, ease: "power2.out" },
+              { autoAlpha: 1, duration: 0.16, ease: "power2.out" },
               0.12,
             )
             .to(
@@ -678,45 +730,45 @@ export function useProblemSectionMotion() {
               {
                 y: 0,
                 scale: 1,
-                duration: 0.52,
+                duration: 0.4,
                 ease: "back.out(1.05)",
               },
               0.12,
             )
             .to(
               evidence.head,
-              { autoAlpha: 1, y: 0, duration: 0.26, ease: "power2.out" },
-              0.34,
+              { autoAlpha: 1, y: 0, duration: 0.2, ease: "power2.out" },
+              0.28,
             )
             .to(
               evidence.factCells,
               {
                 autoAlpha: 1,
                 y: 0,
-                duration: 0.26,
-                stagger: 0.065,
+                duration: 0.2,
+                stagger: 0.05,
                 ease: "power2.out",
               },
-              0.48,
+              0.4,
             )
             .fromTo(
               evidence.statusDot,
               { scale: 1 },
-              { scale: 1.65, duration: 0.16, ease: "power2.out" },
-              0.52,
+              { scale: 1.65, duration: 0.13, ease: "power2.out" },
+              0.44,
             )
             .to(
               evidence.statusDot,
-              { scale: 1, duration: 0.24, ease: "power1.inOut" },
-              0.68,
+              { scale: 1, duration: 0.18, ease: "power1.inOut" },
+              0.57,
             )
             .to(
               evidence.replayStrip,
-              { autoAlpha: 1, y: 0, duration: 0.26, ease: "power2.out" },
-              0.82,
+              { autoAlpha: 1, y: 0, duration: 0.2, ease: "power2.out" },
+              0.68,
             );
 
-          addReplay(evidenceTimeline, evidence, 0.96);
+          addReplay(evidenceTimeline, evidence, 0.8, 0.42);
 
           evidenceTimeline
             .to(
@@ -724,11 +776,11 @@ export function useProblemSectionMotion() {
               {
                 autoAlpha: 1,
                 y: 0,
-                duration: 0.26,
-                stagger: 0.08,
+                duration: 0.2,
+                stagger: 0.055,
                 ease: "power2.out",
               },
-              1.62,
+              1.38,
             );
 
           createOnceTrigger(withoutSide, "top 86%", reportTimeline);
