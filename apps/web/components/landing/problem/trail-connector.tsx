@@ -1,20 +1,72 @@
 import { TRAIL_LOGO_PATH } from "@/components/trail-logo";
 
-const FEEDER_PATHS = [
-  "M 1 21 C 52 21, 75 51, 111 60",
-  "M 1 51 C 54 51, 79 61, 111 66",
-  "M 1 88 C 54 88, 80 79, 111 74",
-  "M 1 116 C 56 116, 78 88, 111 80",
-] as const;
+export type ConnectorOrientation = "horizontal" | "vertical";
 
-const OUTPUT_MARKERS = [158, 174, 190] as const;
+type Point = {
+  x: number;
+  y: number;
+};
 
-function TrailNode() {
+type ConnectorGeometry = {
+  viewBox: string;
+  className: string;
+  node: Point;
+  feederPaths: readonly string[];
+  outputPath: string;
+  outputMarkers: readonly Point[];
+  feederGradient: Point & { x2: number; y2: number };
+  outputGradient: Point & { x2: number; y2: number };
+};
+
+const GEOMETRY: Record<ConnectorOrientation, ConnectorGeometry> = {
+  horizontal: {
+    viewBox: "0 0 260 140",
+    className:
+      "pointer-events-none absolute left-1/2 top-[58%] z-0 hidden h-auto w-[290px] -translate-x-1/2 -translate-y-1/2 lg:block",
+    node: { x: 126, y: 70 },
+    feederPaths: [
+      "M 1 21 C 52 21, 75 51, 111 60",
+      "M 1 51 C 54 51, 79 61, 111 66",
+      "M 1 88 C 54 88, 80 79, 111 74",
+      "M 1 116 C 56 116, 78 88, 111 80",
+    ],
+    outputPath: "M 141 70 C 176 70, 216 70, 259 70",
+    outputMarkers: [
+      { x: 158, y: 70 },
+      { x: 174, y: 70 },
+      { x: 190, y: 70 },
+    ],
+    feederGradient: { x: 20, y: 0, x2: 112, y2: 0 },
+    outputGradient: { x: 140, y: 70, x2: 260, y2: 70 },
+  },
+  vertical: {
+    viewBox: "0 0 140 180",
+    className:
+      "pointer-events-none absolute left-1/2 top-1/2 z-0 block h-[180px] w-[140px] -translate-x-1/2 -translate-y-1/2 lg:hidden",
+    node: { x: 70, y: 80 },
+    feederPaths: [
+      "M 18 1 C 18 31, 49 43, 62 65",
+      "M 47 1 C 47 34, 58 49, 66 64",
+      "M 93 1 C 93 34, 82 49, 74 64",
+      "M 122 1 C 122 31, 91 43, 78 65",
+    ],
+    outputPath: "M 70 100 C 70 124, 70 151, 70 179",
+    outputMarkers: [
+      { x: 70, y: 121 },
+      { x: 70, y: 138 },
+      { x: 70, y: 155 },
+    ],
+    feederGradient: { x: 70, y: 0, x2: 70, y2: 66 },
+    outputGradient: { x: 70, y: 100, x2: 70, y2: 180 },
+  },
+};
+
+function TrailNode({ x, y }: Point) {
   return (
     <g data-connector-node>
       <rect
-        x="106"
-        y="50"
+        x={x - 20}
+        y={y - 20}
         width="40"
         height="40"
         rx="12"
@@ -24,8 +76,8 @@ function TrailNode() {
       />
       <g data-connector-logo>
         <svg
-          x="113"
-          y="58.35"
+          x={x - 13}
+          y={y - 11.65}
           width="26"
           height="23.3"
           viewBox="50.5 42.8 1044.4 936.4"
@@ -38,22 +90,31 @@ function TrailNode() {
   );
 }
 
-export function TrailConnector() {
+type TrailConnectorProps = {
+  orientation: ConnectorOrientation;
+};
+
+export function TrailConnector({ orientation }: TrailConnectorProps) {
+  const geometry = GEOMETRY[orientation];
+  const feederGradientId = `trail-feeder-gradient-${orientation}`;
+  const outputGradientId = `trail-output-gradient-${orientation}`;
+
   return (
     <svg
-      data-connector
+      data-connector={orientation}
+      data-node-origin={`${geometry.node.x} ${geometry.node.y}`}
       aria-hidden="true"
       focusable="false"
-      viewBox="0 0 260 140"
-      className="pointer-events-none absolute left-1/2 top-[58%] z-0 hidden h-auto w-[290px] -translate-x-1/2 -translate-y-1/2 lg:block"
+      viewBox={geometry.viewBox}
+      className={geometry.className}
     >
       <defs>
         <linearGradient
-          id="trail-feeder-gradient"
-          x1="20"
-          y1="0"
-          x2="112"
-          y2="0"
+          id={feederGradientId}
+          x1={geometry.feederGradient.x}
+          y1={geometry.feederGradient.y}
+          x2={geometry.feederGradient.x2}
+          y2={geometry.feederGradient.y2}
           gradientUnits="userSpaceOnUse"
         >
           <stop offset="0" stopColor="#626973" stopOpacity="0.42" />
@@ -61,11 +122,11 @@ export function TrailConnector() {
           <stop offset="1" stopColor="#ff6a00" stopOpacity="0.72" />
         </linearGradient>
         <linearGradient
-          id="trail-output-gradient"
-          x1="140"
-          y1="70"
-          x2="260"
-          y2="70"
+          id={outputGradientId}
+          x1={geometry.outputGradient.x}
+          y1={geometry.outputGradient.y}
+          x2={geometry.outputGradient.x2}
+          y2={geometry.outputGradient.y2}
           gradientUnits="userSpaceOnUse"
         >
           <stop offset="0" stopColor="#ff6a00" stopOpacity="0.72" />
@@ -75,11 +136,11 @@ export function TrailConnector() {
 
       <g
         fill="none"
-        stroke="url(#trail-feeder-gradient)"
+        stroke={`url(#${feederGradientId})`}
         strokeLinecap="round"
         strokeWidth="1.2"
       >
-        {FEEDER_PATHS.map((path) => (
+        {geometry.feederPaths.map((path) => (
           <path
             key={path}
             data-connector-feeder
@@ -92,54 +153,57 @@ export function TrailConnector() {
       <g
         data-connector-flow-layer
         fill="none"
-        stroke="url(#trail-feeder-gradient)"
+        stroke={`url(#${feederGradientId})`}
         strokeDasharray="6 16"
         strokeLinecap="round"
         strokeWidth="1.6"
         className="opacity-80 motion-reduce:opacity-0"
       >
-        {FEEDER_PATHS.map((path) => (
+        {geometry.feederPaths.map((path) => (
           <path key={`flow-${path}`} data-connector-flow d={path} />
         ))}
       </g>
 
       <path
         data-connector-output
-        d="M 141 70 C 176 70, 216 70, 259 70"
+        d={geometry.outputPath}
         fill="none"
         pathLength="1"
-        stroke="url(#trail-output-gradient)"
+        stroke={`url(#${outputGradientId})`}
         strokeLinecap="round"
         strokeWidth="1.2"
       />
       <path
         data-connector-flow-layer
         data-connector-flow
-        d="M 141 70 C 176 70, 216 70, 259 70"
+        d={geometry.outputPath}
         fill="none"
-        stroke="url(#trail-output-gradient)"
+        stroke={`url(#${outputGradientId})`}
         strokeDasharray="6 16"
         strokeLinecap="round"
         strokeWidth="1.6"
         className="opacity-90 motion-reduce:opacity-0"
       />
 
-      {OUTPUT_MARKERS.map((x, index) => (
-        <rect
-          key={x}
+      {geometry.outputMarkers.map((marker, index) => (
+        <g
+          key={`${marker.x}-${marker.y}`}
           data-connector-output-marker
-          x={x - 1.6}
-          y="68.4"
-          width="3.2"
-          height="3.2"
-          rx="0.35"
-          fill="#ff6a00"
-          opacity={0.38 + index * 0.14}
-          transform={`rotate(45 ${x} 70)`}
-        />
+        >
+          <rect
+            x={marker.x - 1.6}
+            y={marker.y - 1.6}
+            width="3.2"
+            height="3.2"
+            rx="0.35"
+            fill="#ff6a00"
+            opacity={0.38 + index * 0.14}
+            transform={`rotate(45 ${marker.x} ${marker.y})`}
+          />
+        </g>
       ))}
 
-      <TrailNode />
+      <TrailNode {...geometry.node} />
     </svg>
   );
 }
