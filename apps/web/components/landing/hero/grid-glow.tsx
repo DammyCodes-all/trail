@@ -16,7 +16,7 @@ const FADE_SPEED = 0.006;
 const MAX_CELLS = 30;
 
 /**
- * Cursor-reactive hero background: grid cells light up faintly as the cursor
+ * Cursor-reactive page background: grid cells light up faintly as the cursor
  * passes over them, then fade out. Snapped to a 12px lattice (a subdivision of
  * the 24px hero grid) so the lit boxes stay tight under the cursor. Pure rAF +
  * React state — no GSAP, Lenis, or Framer Motion involvement; it never touches

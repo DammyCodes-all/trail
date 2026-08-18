@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { StarIcon } from "lucide-react";
 import {
   GithubStars,
@@ -11,7 +12,7 @@ import {
 export function NavGithubLink() {
   return (
     <GithubStars asChild username="DammyCodes-all" repo="trail">
-      <a
+      <Link
         href="https://github.com/DammyCodes-all/trail"
         target="_blank"
         rel="noreferrer"
@@ -27,7 +28,7 @@ export function NavGithubLink() {
             activeClassName="text-amber-400"
           />
         </GithubStarsParticles>
-      </a>
+      </Link>
     </GithubStars>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
+import Link from "next/link";
 import { gsap } from "gsap";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 import { lockScroll, unlockScroll } from "@/lib/scroll-lock";
@@ -306,8 +307,8 @@ export function HeroExperience() {
         data-hero-anim
         className="mt-11 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row"
       >
-        <a
-          href="https://github.com/DammyCodes-all/trail"
+        <Link
+          href="https://drive.google.com/file/d/1MUGkkKjyWQZ37HbLISMpURe2MUDuCMT2/view?usp=drive_link"
           target="_blank"
           rel="noreferrer"
         >
@@ -316,7 +317,7 @@ export function HeroExperience() {
             accentFrom="#ff6a00"
             accentTo="#ff8a1f"
           />
-        </a>
+        </Link>
       </div>
       <ReportMockup />
     </div>
