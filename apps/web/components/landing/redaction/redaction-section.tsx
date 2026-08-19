@@ -20,7 +20,7 @@ export function RedactionSection() {
         className="glow-breathe pointer-events-none absolute inset-0"
         style={{
           backgroundImage:
-            "radial-gradient(ellipse 55% 45% at 82% 18%, rgba(255,120,20,0.055), transparent 70%), radial-gradient(ellipse 55% 45% at 14% 84%, rgba(80,160,255,0.045), transparent 70%)",
+            "radial-gradient(ellipse 55% 45% at 14% 84%, rgba(80,160,255,0.045), transparent 70%)",
         }}
       />
       <div className="mx-auto max-w-5xl">
