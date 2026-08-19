@@ -312,7 +312,11 @@ function addConnectorEntrance(
     )
     .to(
       connector.outputPath,
-      { strokeDashoffset: 0, duration: timing.outputDuration, ease: "power1.inOut" },
+      {
+        strokeDashoffset: 0,
+        duration: timing.outputDuration,
+        ease: "power1.inOut",
+      },
       at + timing.outputDelay,
     )
     .to(
@@ -359,11 +363,7 @@ function addReplay(
       { scaleX: 1, duration, ease: "power1.inOut" },
       at,
     )
-    .to(
-      evidence.replayPlayhead,
-      { x: 0, duration, ease: "power1.inOut" },
-      at,
-    );
+    .to(evidence.replayPlayhead, { x: 0, duration, ease: "power1.inOut" }, at);
 }
 
 export function useProblemSectionMotion() {
@@ -505,7 +505,12 @@ export function useProblemSectionMotion() {
               0.08,
             );
 
-          addConnectorEntrance(timeline, connector, DESKTOP_CONNECTOR_TIMING, 0.58);
+          addConnectorEntrance(
+            timeline,
+            connector,
+            DESKTOP_CONNECTOR_TIMING,
+            0.58,
+          );
 
           timeline
             .to(
@@ -770,18 +775,17 @@ export function useProblemSectionMotion() {
 
           addReplay(evidenceTimeline, evidence, 0.8, 0.42);
 
-          evidenceTimeline
-            .to(
-              evidence.rows,
-              {
-                autoAlpha: 1,
-                y: 0,
-                duration: 0.2,
-                stagger: 0.055,
-                ease: "power2.out",
-              },
-              1.38,
-            );
+          evidenceTimeline.to(
+            evidence.rows,
+            {
+              autoAlpha: 1,
+              y: 0,
+              duration: 0.2,
+              stagger: 0.055,
+              ease: "power2.out",
+            },
+            1.38,
+          );
 
           createOnceTrigger(withoutSide, "top 86%", reportTimeline);
           createOnceTrigger(connectorSlot, "top 84%", connectorTimeline);

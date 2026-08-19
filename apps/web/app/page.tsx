@@ -5,6 +5,8 @@ import { HeroExperience } from "@/components/landing/hero/hero-experience";
 import { GridGlow } from "@/components/landing/hero/grid-glow";
 import { NavGithubLink } from "@/components/landing/nav-github-link";
 import { ProblemSection } from "@/components/landing/problem/problem-section";
+import { SetupSection } from "@/components/landing/setup/setup-section";
+import { RedactionSection } from "@/components/landing/redaction/redaction-section";
 
 export const metadata: Metadata = {
   title: "TRAIL — Every bug has a trail",
@@ -38,6 +40,8 @@ export default function Home() {
       </section>
 
       <ProblemSection />
+      <SetupSection />
+      <RedactionSection />
     </main>
   );
 }
