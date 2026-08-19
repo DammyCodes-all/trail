@@ -57,7 +57,7 @@ Everything runs against local storage: reports in the extension's IndexedDB, sha
 - `WXT_PUBLIC_WEB_URL` / `NEXT_PUBLIC_WEB_URL` override the web viewer's base URL (default `http://localhost:3000`) — share links point here, and the extension's handoff bridge only answers pages on this origin, so the two must agree.
 - The AI proxy keys on the replay server — `OPENROUTER_API_KEY` (report enhancements) and `GROQ_API_KEY` (title pass), each optional and independent — turn on the corresponding AI passes; without a key that pass degrades to the local deterministic digest, so the report still works either way.
 
-To check a change: `pnpm verify:extension` runs the typecheck, a production build, and a Puppeteer spike that drives a real page through the whole capture path (including sharing a session and importing it over the extension bridge from the web origin). For a manual install: `pnpm build:extension`, then load `.output/chrome-mv3` from `chrome://extensions`. Want all three at once? `pnpm dev:all`.
+To check a change: `pnpm verify:extension` runs the typecheck, a production build, and a Puppeteer spike that drives a real page through the whole capture path (including sharing a session and importing it over the extension bridge from the web origin). For a manual install: `pnpm build:extension`, then load `.output/chrome-mv3` from `chrome://extensions`. Prefer a prebuilt zip? Download [trail-extension-0.0.0-chrome.zip](https://drive.google.com/file/d/1MUGkkKjyWQZ37HbLISMpURe2MUDuCMT2/view?usp=drive_link), unzip it, and load the folder as an unpacked extension. Want all three at once? `pnpm dev:all`.
 
 ## How it works
 
