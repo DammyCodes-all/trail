@@ -180,7 +180,7 @@ export function RedactionMockup() {
         <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#8b929c]">
           Live view
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#8b929c]">
+        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#ff8a1f]">
           What Trail sees
         </span>
       </div>
