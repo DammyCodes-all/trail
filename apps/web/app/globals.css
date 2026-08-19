@@ -291,32 +291,6 @@
 }
 
 /*
- * Redaction section ambient glow. The drift (translate) is scrubbed by GSAP;
- * the breathing runs as a CSS animation so it stays off the main thread
- * while the replay/scroll work happens. Reduced motion drops the breathing
- * and leaves the faint static tint.
- */
-@keyframes glow-breathe {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-.glow-breathe {
-  animation: glow-breathe 7s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .glow-breathe {
-    animation: none;
-  }
-}
-
-/*
  * Intro overlay: hide the hero lockup before the first paint while JS is
  * enabled, so the draw-in never flashes an assembled logo. When scripting is
  * off (or motion is reduced) the lockup stays fully visible — GSAP is the only
