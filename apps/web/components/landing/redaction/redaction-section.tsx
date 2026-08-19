@@ -14,15 +14,6 @@ export function RedactionSection() {
       ref={root}
       className="relative border-t border-white/10 bg-[#0d0e10] px-5 pb-14 pt-16 sm:px-8 sm:pb-16 sm:pt-20 lg:flex lg:min-h-dvh lg:flex-col lg:justify-center lg:px-10 lg:pb-16 lg:pt-16"
     >
-      <div
-        aria-hidden="true"
-        data-glow
-        className="glow-breathe pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage:
-            "radial-gradient(ellipse 55% 45% at 14% 84%, rgba(80,160,255,0.045), transparent 70%)",
-        }}
-      />
       <div className="mx-auto max-w-5xl">
         <div data-copy className="text-center">
           <p
