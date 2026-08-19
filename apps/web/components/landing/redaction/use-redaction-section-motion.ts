@@ -58,7 +58,6 @@ export function useRedactionSectionMotion() {
         const bars = Array.from(
           section.querySelectorAll<HTMLElement>("[data-redact-bar]"),
         );
-        const glow = section.querySelector<HTMLElement>("[data-glow]");
 
         if (
           copyLines.length === 0 ||
@@ -68,23 +67,6 @@ export function useRedactionSectionMotion() {
           !payoff
         ) {
           return;
-        }
-
-        if (glow) {
-          gsap.fromTo(
-            glow,
-            { y: -60 },
-            {
-              y: 60,
-              ease: "none",
-              scrollTrigger: {
-                trigger: section,
-                start: "top bottom",
-                end: "bottom top",
-                scrub: 1.2,
-              },
-            },
-          );
         }
 
         gsap.set(copyLines, { autoAlpha: 0, y: 16 });
