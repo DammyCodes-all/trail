@@ -35,7 +35,7 @@ export function SetupSection() {
     >
       <div className="mx-auto max-w-5xl">
         <div data-copy className="max-w-4xl">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#ff6a00]">
+          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#ff6a00]">
             Zero setup
           </p>
           <h2 className="mt-3 max-w-4xl font-heading text-3xl font-bold leading-[1.05] tracking-normal text-[#f2f4f6] sm:text-[2.75rem]">

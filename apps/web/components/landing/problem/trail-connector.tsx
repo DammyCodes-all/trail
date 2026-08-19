@@ -1,6 +1,7 @@
 import { TRAIL_LOGO_PATH } from "@/components/trail-logo";
 
 export type ConnectorOrientation = "horizontal" | "vertical";
+export type ConnectorVariant = "problem" | "report";
 
 type Point = {
   x: number;
@@ -18,7 +19,7 @@ type ConnectorGeometry = {
   outputGradient: Point & { x2: number; y2: number };
 };
 
-const GEOMETRY: Record<ConnectorOrientation, ConnectorGeometry> = {
+const PROBLEM_GEOMETRY: Record<ConnectorOrientation, ConnectorGeometry> = {
   horizontal: {
     viewBox: "0 0 260 140",
     className:
@@ -61,6 +62,53 @@ const GEOMETRY: Record<ConnectorOrientation, ConnectorGeometry> = {
   },
 };
 
+const REPORT_GEOMETRY: Record<ConnectorOrientation, ConnectorGeometry> = {
+  horizontal: {
+    viewBox: "0 0 1000 400",
+    className:
+      "pointer-events-none absolute inset-0 z-0 hidden size-full lg:block",
+    node: { x: 430, y: 200 },
+    feederPaths: [
+      "M 310 48 C 356 48, 378 144, 410 184",
+      "M 310 109 C 354 109, 382 162, 410 190",
+      "M 310 170 C 356 170, 384 184, 410 196",
+      "M 310 230 C 356 230, 384 216, 410 204",
+      "M 310 291 C 354 291, 382 238, 410 210",
+      "M 310 352 C 356 352, 378 256, 410 216",
+    ],
+    outputPath: "M 450 200 C 476 200, 504 200, 530 200",
+    outputMarkers: [
+      { x: 468, y: 200 },
+      { x: 486, y: 200 },
+      { x: 504, y: 200 },
+    ],
+    feederGradient: { x: 310, y: 200, x2: 410, y2: 200 },
+    outputGradient: { x: 450, y: 200, x2: 530, y2: 200 },
+  },
+  vertical: {
+    viewBox: "0 0 220 220",
+    className:
+      "pointer-events-none absolute left-1/2 top-1/2 z-0 block size-[220px] -translate-x-1/2 -translate-y-1/2 lg:hidden",
+    node: { x: 110, y: 103 },
+    feederPaths: [
+      "M 12 1 C 12 42, 78 54, 98 85",
+      "M 48 1 C 48 46, 86 61, 102 84",
+      "M 82 1 C 82 49, 98 66, 106 83",
+      "M 138 1 C 138 49, 122 66, 114 83",
+      "M 172 1 C 172 46, 134 61, 118 84",
+      "M 208 1 C 208 42, 142 54, 122 85",
+    ],
+    outputPath: "M 110 123 C 110 157, 110 188, 110 219",
+    outputMarkers: [
+      { x: 110, y: 145 },
+      { x: 110, y: 165 },
+      { x: 110, y: 185 },
+    ],
+    feederGradient: { x: 110, y: 1, x2: 110, y2: 85 },
+    outputGradient: { x: 110, y: 123, x2: 110, y2: 220 },
+  },
+};
+
 function TrailNode({ x, y }: Point) {
   return (
     <g data-connector-node>
@@ -92,16 +140,25 @@ function TrailNode({ x, y }: Point) {
 
 type TrailConnectorProps = {
   orientation: ConnectorOrientation;
+  variant?: ConnectorVariant;
 };
 
-export function TrailConnector({ orientation }: TrailConnectorProps) {
-  const geometry = GEOMETRY[orientation];
-  const feederGradientId = `trail-feeder-gradient-${orientation}`;
-  const outputGradientId = `trail-output-gradient-${orientation}`;
+export function TrailConnector({
+  orientation,
+  variant = "problem",
+}: TrailConnectorProps) {
+  const geometry =
+    variant === "report"
+      ? REPORT_GEOMETRY[orientation]
+      : PROBLEM_GEOMETRY[orientation];
+  const connectorKey =
+    variant === "problem" ? orientation : `${variant}-${orientation}`;
+  const feederGradientId = `trail-feeder-gradient-${connectorKey}`;
+  const outputGradientId = `trail-output-gradient-${connectorKey}`;
 
   return (
     <svg
-      data-connector={orientation}
+      data-connector={connectorKey}
       data-node-origin={`${geometry.node.x} ${geometry.node.y}`}
       aria-hidden="true"
       focusable="false"
