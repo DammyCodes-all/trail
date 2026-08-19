@@ -286,7 +286,7 @@ export function HeroExperience() {
       <IntroOverlay />
       <p
         data-hero-anim
-        className="mb-5 font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-[#ff8a1f]"
+        className="mb-5 font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#ff8a1f]"
       >
         NO SDK · NO INSTRUMENTATION
       </p>
