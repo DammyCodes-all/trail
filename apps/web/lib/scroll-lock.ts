@@ -34,6 +34,25 @@ export const destroyScrollDriver = () => {
   initialized = false;
 };
 
+export const getScrollDriver = (): Lenis | null => driver;
+
+export const scrollToHash = (hash: string) => {
+  const id = hash.replace(/^#/, "") || "top";
+  const target = id === "top" ? (document.querySelector<HTMLElement>("#top") ?? document.documentElement) : document.getElementById(id);
+  if (!target) return;
+  const lenis = getScrollDriver();
+  if (lenis) {
+    lenis.scrollTo(target as HTMLElement, {
+      offset: 0,
+      duration: 1.1,
+    });
+    history.pushState(null, "", `#${id}`);
+  } else {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    history.pushState(null, "", `#${id}`);
+  }
+};
+
 const SCROLL_KEYS = [
   " ",
   "ArrowUp",
