@@ -54,7 +54,7 @@ export default defineConfig({
   manifest: {
     name: 'TRAIL',
     description: 'Capture a bug live, turn it into a maintainer-ready report.',
-    permissions: ['scripting', 'storage', 'tabs', 'downloads', 'unlimitedStorage', 'clipboardWrite'],
+    permissions: ['scripting', 'storage', 'tabs', 'downloads', 'unlimitedStorage', 'clipboardWrite', 'favicon'],
     host_permissions: ['<all_urls>'],
     content_security_policy: {
       extension_pages: "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline'",
