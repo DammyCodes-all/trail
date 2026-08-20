@@ -121,7 +121,7 @@ function TrailNode({ x, y, glowId }: Point & { glowId: string }) {
         rx="12"
         fill="#0d0e10"
         stroke="#ff6a00"
-        strokeOpacity="0.35"
+        strokeOpacity="0.42"
         filter={`url(#${glowId})`}
       />
       <g data-connector-logo>
@@ -178,9 +178,9 @@ export function TrailConnector({
           y2={geometry.feederGradient.y2}
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0" stopColor="#626973" stopOpacity="0.42" />
-          <stop offset="0.72" stopColor="#8b929c" stopOpacity="0.3" />
-          <stop offset="1" stopColor="#ff6a00" stopOpacity="0.72" />
+          <stop offset="0" stopColor="#9aa0a8" stopOpacity="0.62" />
+          <stop offset="0.58" stopColor="#c2c8d0" stopOpacity="0.48" />
+          <stop offset="1" stopColor="#ff6a00" stopOpacity="0.88" />
         </linearGradient>
         <linearGradient
           id={outputGradientId}
@@ -190,8 +190,8 @@ export function TrailConnector({
           y2={geometry.outputGradient.y2}
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0" stopColor="#ff6a00" stopOpacity="0.72" />
-          <stop offset="1" stopColor="#ff6a00" stopOpacity="0.22" />
+          <stop offset="0" stopColor="#ff6a00" stopOpacity="0.88" />
+          <stop offset="1" stopColor="#ff8a1f" stopOpacity="0.38" />
         </linearGradient>
         <filter
           id={glowId}
@@ -201,10 +201,10 @@ export function TrailConnector({
           height="200%"
           colorInterpolationFilters="sRGB"
         >
-          <feGaussianBlur stdDeviation="2.2" result="blur" />
+          <feGaussianBlur stdDeviation="2.6" result="blur" />
           <feColorMatrix
             type="matrix"
-            values="1 0 0 0 0  0 0.42 0 0 0  0 0 0 0 0  0 0 0 0.45 0"
+            values="1 0 0 0 0  0 0.42 0 0 0  0 0 0 0 0  0 0 0 0.55 0"
             result="coloredBlur"
           />
           <feMerge>
@@ -218,7 +218,8 @@ export function TrailConnector({
         fill="none"
         stroke={`url(#${feederGradientId})`}
         strokeLinecap="round"
-        strokeWidth="1.2"
+        strokeWidth="1.15"
+        className="opacity-70"
       >
         {geometry.feederPaths.map((path) => (
           <path
@@ -236,8 +237,8 @@ export function TrailConnector({
         stroke={`url(#${feederGradientId})`}
         strokeDasharray="6 16"
         strokeLinecap="round"
-        strokeWidth="1.7"
-        className="opacity-80 motion-reduce:opacity-0"
+        strokeWidth="2.15"
+        className="opacity-100 motion-reduce:opacity-0"
       >
         {geometry.feederPaths.map((path) => (
           <path key={`flow-${path}`} data-connector-flow d={path} />
@@ -251,7 +252,8 @@ export function TrailConnector({
         pathLength="1"
         stroke={`url(#${outputGradientId})`}
         strokeLinecap="round"
-        strokeWidth="1.2"
+        strokeWidth="1.15"
+        className="opacity-70"
       />
       <path
         data-connector-flow-layer
@@ -261,8 +263,8 @@ export function TrailConnector({
         stroke={`url(#${outputGradientId})`}
         strokeDasharray="6 16"
         strokeLinecap="round"
-        strokeWidth="1.7"
-        className="opacity-90 motion-reduce:opacity-0"
+        strokeWidth="2.15"
+        className="opacity-100 motion-reduce:opacity-0"
       />
 
       {geometry.outputMarkers.map((marker, index) => (
@@ -277,7 +279,7 @@ export function TrailConnector({
             height="3.2"
             rx="0.35"
             fill="#ff6a00"
-            opacity={0.38 + index * 0.14}
+            opacity={0.55 + index * 0.15}
             transform={`rotate(45 ${marker.x} ${marker.y})`}
           />
         </g>

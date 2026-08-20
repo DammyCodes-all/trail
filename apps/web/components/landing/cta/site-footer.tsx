@@ -1,13 +1,21 @@
+"use client";
+
 import Link from "next/link";
 import { TrailLogo } from "@/components/trail-logo";
 import { GridGlow } from "@/components/landing/hero/grid-glow";
 import { GithubStarsLogo } from "@/components/animate-ui/primitives/animate/github-stars";
 import { GITHUB_HREF, X_HREF } from "@/lib/site";
 import { XIcon } from "@/components/icons/x-icon";
+import { useSiteFooterMotion } from "./use-site-footer-motion";
 
 export function SiteFooter() {
+  const root = useSiteFooterMotion();
+
   return (
-    <footer className="relative isolate overflow-hidden border-t border-white/[0.06] bg-[#0d0f0e] px-5 py-8 sm:px-8 lg:px-10">
+    <footer
+      ref={root}
+      className="relative isolate overflow-hidden border-t border-white/[0.06] bg-[#0d0f0e] px-5 py-8 sm:px-8 lg:px-10"
+    >
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgb(255_255_255/0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.025)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_40%_at_50%_0%,black_30%,transparent_75%)]"
@@ -15,6 +23,7 @@ export function SiteFooter() {
       <GridGlow />
       <div className="relative mx-auto flex max-w-7xl flex-row items-center justify-between gap-4">
         <Link
+          data-footer-brand
           href="#top"
           className="flex items-center gap-2 rounded-md px-1 py-1 text-[#8b929c] outline-none transition-colors hover:text-[#f2f4f6] focus-visible:ring-2 focus-visible:ring-[#ff6a00]"
           aria-label="TRAIL — back to top"
@@ -30,6 +39,7 @@ export function SiteFooter() {
           className="flex items-center gap-5 font-mono text-xs text-[#626973]"
         >
           <a
+            data-footer-link
             href={GITHUB_HREF}
             target="_blank"
             rel="noreferrer"
@@ -39,6 +49,7 @@ export function SiteFooter() {
             GitHub
           </a>
           <a
+            data-footer-link
             href={X_HREF}
             target="_blank"
             rel="noreferrer"
