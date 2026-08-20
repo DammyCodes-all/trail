@@ -58,6 +58,8 @@ function pickReportUrl(events: Array<{ url?: string }>): string {
 // two near-simultaneous flushes (interval + visibilitychange) would lose increments.
 let batchChain: Promise<void> = Promise.resolve();
 let overlayVersion = Date.now();
+let startInProgress = false;
+let stopInProgress = false;
 
 const nextOverlayVersion = () =>
   (overlayVersion = Math.max(Date.now(), overlayVersion + 1));
@@ -83,43 +85,85 @@ function pushOverlayStatus(
 async function startRecording(
   tabId?: number,
 ): Promise<{ ok: boolean; error?: string }> {
-  let id = tabId;
-  if (!id) {
-    const [tab] = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-    id = tab?.id;
+  if (startInProgress || stopInProgress) {
+    return { ok: false, error: "Please wait — recording is starting." };
   }
-  if (!id)
-    return {
-      ok: false,
-      error: "Open a normal web page to record, then try again.",
-    };
-  const tab = await browser.tabs.get(id);
-  if (!tab?.url?.startsWith("http")) {
-    return {
-      ok: false,
-      error: "Open a normal web page to record, then try again.",
-    };
-  }
-  await clearEvents();
-  await setCounts(ZERO_COUNTS);
-  await setFlagCount(0);
-  const session: TrailSession = { tabId: id, startedAt: Date.now() };
-
+  startInProgress = true;
   try {
-    await registerRecorderScripts();
-    // Session must be live BEFORE the recorder is injected: the batch gate drops
-    // everything without a session, and the recorder's very first event is the
-    // rrweb full snapshot that the replay needs as its base frame.
-    await setSession(session);
-    await injectRecorderIntoPage(id);
-  } catch (err) {
-    await setSession(null);
-    await clearCounts();
-    return { ok: false, error: (err as Error).message };
-  }
+    if (await getSession()) {
+      return { ok: false, error: "Already recording." };
+    }
+    let id = tabId;
+    if (!id) {
+      const [tab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      id = tab?.id;
+    }
+    if (!id)
+      return {
+        ok: false,
+        error: "Open a normal web page to record, then try again.",
+      };
+    const tab = await browser.tabs.get(id);
+    const url = tab?.url ?? "";
+    if (!url.startsWith("http")) {
+      if (url.startsWith("file:")) {
+        return {
+          ok: false,
+          error:
+            "File pages need 'Allow access to file URLs' enabled in chrome://extensions → TRAIL → Details.",
+        };
+      }
+      try {
+        const parsed = new URL(url);
+        if (
+          parsed.hostname === "chrome.google.com" &&
+          parsed.pathname.startsWith("/webstore")
+        ) {
+          return {
+            ok: false,
+            error: "Can't record the Chrome Web Store. Open any other site.",
+          };
+        }
+      } catch {}
+      return {
+        ok: false,
+        error: "Open a normal web page to record, then try again.",
+      };
+    }
+    // http(s) but still webstore — exact host/path check for the standard case
+    try {
+      const parsed = new URL(url);
+      if (
+        parsed.hostname === "chrome.google.com" &&
+        parsed.pathname.startsWith("/webstore")
+      ) {
+        return {
+          ok: false,
+          error: "Can't record the Chrome Web Store. Open any other site.",
+        };
+      }
+    } catch {}
+    await clearEvents();
+    await setCounts(ZERO_COUNTS);
+    await setFlagCount(0);
+    const session: TrailSession = { tabId: id, startedAt: Date.now() };
+
+    try {
+      await registerRecorderScripts();
+      // Session must be live BEFORE the recorder is injected: the batch gate drops
+      // everything without a session, and the recorder's very first event is the
+      // rrweb full snapshot that the replay needs as its base frame.
+      await setSession(session);
+      await injectRecorderIntoPage(id);
+    } catch (err) {
+      await setSession(null);
+      await clearCounts();
+      await unregisterRecorderScripts().catch(() => {});
+      return { ok: false, error: (err as Error).message };
+    }
 
   // The recorder can't read chrome.storage (MAIN world), so deliver the redact
   // preference through the relay. Default to on when never set.
@@ -135,36 +179,58 @@ async function startRecording(
     .sendMessage(id, { type: MSG_START_RECORDER })
     .catch(() => {});
 
-  pushOverlayStatus(session, ZERO_COUNTS);
+    pushOverlayStatus(session, ZERO_COUNTS);
 
-  browser.action.setBadgeBackgroundColor({ color: "#ff6a00" });
-  browser.action.setBadgeText({ text: "0" });
-  return { ok: true };
+    browser.action.setBadgeBackgroundColor({ color: "#ff6a00" });
+    browser.action.setBadgeText({ text: "0" });
+    return { ok: true };
+  } finally {
+    startInProgress = false;
+  }
 }
 
 async function stopRecording(): Promise<{ ok: boolean; error?: string; seq?: number }> {
+  if (stopInProgress) return { ok: false, error: "Already stopping." };
+  if (startInProgress) return { ok: false, error: "Please wait — recording is starting." };
+  stopInProgress = true;
   const session = await getSession();
   try {
-    await unregisterRecorderScripts();
-    if (session) {
-      // Deterministic teardown: the relay stops the recorder, waits for its
-      // ack, then uploads the final tail as a `final` batch. This sendMessage
-      // resolves only once that batch is persisted, so the session can be torn
-      // down without a sleep and the tail is never lost.
-      await browser.tabs
-        .sendMessage(session.tabId, { type: MSG_STOP_RECORDER })
-        .catch(() => {});
+    try {
+      await unregisterRecorderScripts();
+      if (session) {
+        // Deterministic teardown: the relay stops the recorder, waits for its
+        // ack, then uploads the final tail as a `final` batch. This sendMessage
+        // resolves only once that batch is persisted.
+        await browser.tabs
+          .sendMessage(session.tabId, { type: MSG_STOP_RECORDER })
+          .catch(() => {});
+        // Drain concurrent non-final flushes that raced stop. Poll until
+        // batchChain is quiescent (no new batch arrived during the wait) or
+        // 600ms timeout — avoids the previous fixed 350ms delay on every stop.
+        const drainDeadline = Date.now() + 600;
+        let prevChain = batchChain;
+        // Give a brief window for the race to arrive
+        await new Promise((r) => setTimeout(r, 80));
+        while (Date.now() < drainDeadline) {
+          await prevChain.catch(() => {});
+          if (batchChain === prevChain) break;
+          prevChain = batchChain;
+          // New batch appeared while we waited — give it another 50ms to settle
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        // Ensure final batch itself is settled
+        await batchChain.catch(() => {});
+      }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
     }
-  } catch (err) {
-    return { ok: false, error: (err as Error).message };
-  }
-  // Read counts AFTER the final flush so the saved report includes the tail.
-  const counts = await getCounts();
-  await setSession(null);
-  await clearCounts();
-  await clearFlagCount();
-  if (session) pushOverlayStatus(session, ZERO_COUNTS, false);
-  browser.action.setBadgeText({ text: "" });
+    // Read counts AFTER the final flush so the saved report includes the tail.
+    const counts = await getCounts();
+    await setSession(null);
+    await clearCounts();
+    await clearFlagCount();
+    if (session) pushOverlayStatus(session, ZERO_COUNTS, false);
+    browser.action.setBadgeText({ text: "" });
 
   // Save a report entry for the popup's history list. Best-effort: never fail a
   // stop because history writing hiccuped.
@@ -191,7 +257,10 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string; seq?: num
       // history is best-effort
     }
   }
-  return { ok: true, seq };
+    return { ok: true, seq };
+  } finally {
+    stopInProgress = false;
+  }
 }
 
 async function openReviewPage(seq?: number): Promise<void> {
@@ -222,6 +291,21 @@ export default defineBackground(() => {
       // Nothing to restore if session storage is unavailable.
     }
   })();
+
+  browser.tabs.onRemoved.addListener(async (tabId) => {
+    const session = await getSession();
+    if (session?.tabId === tabId) {
+      void stopRecording().catch(() => {});
+    }
+  });
+  browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    const session = await getSession();
+    if (session?.tabId !== tabId) return;
+    const newUrl = changeInfo.url ?? tab.url ?? "";
+    if (newUrl && !newUrl.startsWith("http")) {
+      void stopRecording().catch(() => {});
+    }
+  });
 
   browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg?.type === MSG_BATCH) {
@@ -320,13 +404,29 @@ export default defineBackground(() => {
     if (msg?.type === MSG_OPEN_SHARE) {
       void (async () => {
         try {
-          // Only answer links that point at the web app's share route — the
-          // popup used to validate these; the bridge keeps the same bar.
-          // Origin exact-match, not hostname suffix: trailing-host matches
-          // would admit sibling domains like `notrail.dev` for `trail.dev`.
           const link = typeof msg.link === 'string' ? msg.link : '';
-          if (!link || !isShareLink(link) || new URL(link).origin !== WEB_ORIGIN) {
+          if (!link || !isShareLink(link)) {
             sendResponse({ ok: false, error: 'invalid share link' });
+            return;
+          }
+          // Origin allowlist: WEB_ORIGIN (build-time) plus localhost/127.0.0.1
+          // and known prod vercel origins so a localhost-built zip still opens
+          // prod links during demo, without allowing arbitrary evil.com/r/...
+          let linkOrigin: string | null = null;
+          try {
+            linkOrigin = new URL(link).origin;
+          } catch {}
+          const allowedOrigins = new Set([
+            WEB_ORIGIN,
+            "https://trail-bug.vercel.app",
+            "https://trail-roan.vercel.app",
+          ]);
+          const isAllowedOrigin =
+            !!linkOrigin &&
+            (allowedOrigins.has(linkOrigin) ||
+              /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(linkOrigin));
+          if (!isAllowedOrigin) {
+            sendResponse({ ok: false, error: 'invalid share link origin' });
             return;
           }
           await browser.tabs.create({

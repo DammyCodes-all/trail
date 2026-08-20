@@ -1,5 +1,6 @@
 "use client";
 
+import { GridGlow } from "@/components/landing/hero/grid-glow";
 import { RedactionMockup } from "./redaction-mockup";
 import { useRedactionSectionMotion } from "./use-redaction-section-motion";
 
@@ -12,9 +13,14 @@ export function RedactionSection() {
     <section
       id="privacy"
       ref={root}
-      className="relative border-t border-white/10 bg-[#0d0e10] px-5 pb-14 pt-16 sm:px-8 sm:pb-16 sm:pt-20 lg:flex lg:min-h-dvh lg:flex-col lg:justify-center lg:px-10 lg:pb-16 lg:pt-16"
+      className="relative isolate overflow-hidden border-t border-white/10 bg-[#0d0e10] px-5 pb-14 pt-16 sm:px-8 sm:pb-16 sm:pt-20 lg:flex lg:min-h-dvh lg:flex-col lg:justify-center lg:px-10 lg:pb-16 lg:pt-16"
     >
-      <div className="mx-auto max-w-5xl">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgb(255_255_255/0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.025)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_40%_at_50%_0%,black_30%,transparent_75%)]"
+      />
+      <GridGlow />
+      <div className="relative mx-auto max-w-5xl">
         <div data-copy className="text-center">
           <p
             data-copy-line

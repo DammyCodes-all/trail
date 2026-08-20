@@ -109,10 +109,11 @@ const REPORT_GEOMETRY: Record<ConnectorOrientation, ConnectorGeometry> = {
   },
 };
 
-function TrailNode({ x, y }: Point) {
+function TrailNode({ x, y, glowId }: Point & { glowId: string }) {
   return (
     <g data-connector-node>
       <rect
+        data-connector-node-rect
         x={x - 20}
         y={y - 20}
         width="40"
@@ -121,6 +122,7 @@ function TrailNode({ x, y }: Point) {
         fill="#0d0e10"
         stroke="#ff6a00"
         strokeOpacity="0.35"
+        filter={`url(#${glowId})`}
       />
       <g data-connector-logo>
         <svg
@@ -156,6 +158,8 @@ export function TrailConnector({
   const feederGradientId = `trail-feeder-gradient-${connectorKey}`;
   const outputGradientId = `trail-output-gradient-${connectorKey}`;
 
+  const glowId = `trail-glow-${connectorKey}`;
+
   return (
     <svg
       data-connector={connectorKey}
@@ -189,6 +193,25 @@ export function TrailConnector({
           <stop offset="0" stopColor="#ff6a00" stopOpacity="0.72" />
           <stop offset="1" stopColor="#ff6a00" stopOpacity="0.22" />
         </linearGradient>
+        <filter
+          id={glowId}
+          x="-50%"
+          y="-50%"
+          width="200%"
+          height="200%"
+          colorInterpolationFilters="sRGB"
+        >
+          <feGaussianBlur stdDeviation="2.2" result="blur" />
+          <feColorMatrix
+            type="matrix"
+            values="1 0 0 0 0  0 0.42 0 0 0  0 0 0 0 0  0 0 0 0.45 0"
+            result="coloredBlur"
+          />
+          <feMerge>
+            <feMergeNode in="coloredBlur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
 
       <g
@@ -213,7 +236,7 @@ export function TrailConnector({
         stroke={`url(#${feederGradientId})`}
         strokeDasharray="6 16"
         strokeLinecap="round"
-        strokeWidth="1.6"
+        strokeWidth="1.7"
         className="opacity-80 motion-reduce:opacity-0"
       >
         {geometry.feederPaths.map((path) => (
@@ -238,7 +261,7 @@ export function TrailConnector({
         stroke={`url(#${outputGradientId})`}
         strokeDasharray="6 16"
         strokeLinecap="round"
-        strokeWidth="1.6"
+        strokeWidth="1.7"
         className="opacity-90 motion-reduce:opacity-0"
       />
 
@@ -260,7 +283,7 @@ export function TrailConnector({
         </g>
       ))}
 
-      <TrailNode {...geometry.node} />
+      <TrailNode {...geometry.node} glowId={glowId} />
     </svg>
   );
 }

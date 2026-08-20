@@ -117,33 +117,134 @@ export function createAmbientController(
   duration: number,
   logoDuration = 0.6,
 ) {
+  // Livelier ambient: fast marching flow + node breathe + marker ripple + logo nudge.
+  // Loop is short (1.6s) so motion is visible; dash length is 22 (6+16) so -44 = 2 cycles seamless.
+  const cycle = 1.6;
   const loop = gsap.timeline({ paused: true, repeat: -1 });
+
+  const nodeRect = connector.root.querySelector<SVGRectElement>(
+    "[data-connector-node-rect]",
+  );
+
   loop
     .fromTo(
       connector.flowPaths,
       { strokeDashoffset: 0 },
-      { strokeDashoffset: -66, duration, ease: "none" },
+      { strokeDashoffset: -44, duration: cycle, ease: "none" },
       0,
     )
-    .fromTo(
-      connector.logo,
-      { rotation: 0 },
+    // node breathe
+    .to(
+      connector.node,
       {
-        rotation: 360,
+        scale: 1.045,
         svgOrigin: connector.origin,
-        duration: logoDuration,
+        duration: cycle * 0.32,
         ease: "power1.inOut",
       },
-      Math.max(0, duration - logoDuration - 0.2),
+      0,
+    )
+    .to(
+      connector.node,
+      {
+        scale: 1,
+        svgOrigin: connector.origin,
+        duration: cycle * 0.32,
+        ease: "power1.inOut",
+      },
+      cycle * 0.32,
+    )
+    // node glow
+    .to(
+      nodeRect,
+      {
+        // @ts-expect-error gsap attr tween
+        attr: { "stroke-opacity": 0.62 },
+        duration: cycle * 0.32,
+        ease: "power1.inOut",
+      },
+      0,
+    )
+    .to(
+      nodeRect,
+      {
+        // @ts-expect-error gsap attr tween
+        attr: { "stroke-opacity": 0.32 },
+        duration: cycle * 0.32,
+        ease: "power1.inOut",
+      },
+      cycle * 0.32,
+    )
+    // marker ripple — each diamond pops in sequence
+    .to(
+      connector.outputMarkers,
+      {
+        scale: 1.22,
+        duration: 0.28,
+        stagger: 0.07,
+        ease: "power2.out",
+        transformOrigin: "50% 50%",
+      },
+      cycle * 0.12,
+    )
+    .to(
+      connector.outputMarkers,
+      {
+        scale: 1,
+        duration: 0.34,
+        stagger: 0.07,
+        ease: "power1.inOut",
+        transformOrigin: "50% 50%",
+      },
+      cycle * 0.42,
+    )
+    // logo micro-nudge (not a full spin — feels alive without stealing focus)
+    .to(
+      connector.logo,
+      {
+        rotation: 10,
+        svgOrigin: connector.origin,
+        duration: cycle * 0.22,
+        ease: "power1.inOut",
+      },
+      cycle * 0.18,
+    )
+    .to(
+      connector.logo,
+      {
+        rotation: 0,
+        svgOrigin: connector.origin,
+        duration: cycle * 0.26,
+        ease: "power1.inOut",
+      },
+      cycle * 0.4,
     );
+
+  // Keep original slow 360 spin as an occasional accent every ~2 cycles
+  const spin = gsap.fromTo(
+    connector.logo,
+    { rotation: 0, svgOrigin: connector.origin },
+    {
+      rotation: 360,
+      svgOrigin: connector.origin,
+      duration: logoDuration,
+      ease: "power1.inOut",
+      repeat: -1,
+      repeatDelay: Math.max(1.2, duration - logoDuration),
+      paused: true,
+    },
+  );
 
   let isVisible = false;
   let isReady = false;
   const sync = () => {
-    if (isVisible && isReady) {
+    const shouldPlay = isVisible && isReady;
+    if (shouldPlay) {
       loop.play();
+      spin.play();
     } else {
       loop.pause();
+      spin.pause();
     }
   };
 

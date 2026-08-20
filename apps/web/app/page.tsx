@@ -9,6 +9,8 @@ import { SetupSection } from "@/components/landing/setup/setup-section";
 import { RedactionSection } from "@/components/landing/redaction/redaction-section";
 import { GithubSection } from "@/components/landing/github/github-section";
 import { FlagSection } from "@/components/landing/flag/flag-section";
+import { ClosingCtaSection } from "@/components/landing/cta/closing-cta-section";
+import { SiteFooter } from "@/components/landing/cta/site-footer";
 
 export const metadata: Metadata = {
   title: "TRAIL — Every bug has a trail",
@@ -18,7 +20,7 @@ export const metadata: Metadata = {
 
 export default function Home() {
   return (
-    <main className="relative isolate overflow-hidden bg-[#0d0f0e] text-[#f2f4f6]">
+    <main id="top" className="relative isolate overflow-hidden bg-[#0d0f0e] text-[#f2f4f6]">
       <GridGlow />
       <section className="relative mx-auto flex min-h-dvh w-full max-w-7xl flex-col px-5 pb-14 sm:px-8 lg:px-10">
         <div aria-hidden="true" className="hero-grid -z-10" />
@@ -46,6 +48,8 @@ export default function Home() {
       <RedactionSection />
       <GithubSection />
       <FlagSection />
+      <ClosingCtaSection />
+      <SiteFooter />
     </main>
   );
 }
