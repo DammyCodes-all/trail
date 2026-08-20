@@ -45,6 +45,35 @@ function escapeNonAscii(): {
   };
 }
 
+// Fail fast if required WXT_PUBLIC_* env is missing — share links would silently
+// point to localhost and break demo. Dev can still use .env file; CI must export vars.
+// WXT loads .env via dotenv, but process.env check here covers CI where .env is gitignored.
+function assertRequiredEnv() {
+  // Allow localhost fallback only for `wxt dev` (not for `wxt build`/`wxt zip`)
+  const isDev = process.argv.includes("dev");
+  if (isDev) return;
+  const hasDotEnv = (() => {
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const p = path.join(__dirname, ".env");
+      if (!fs.existsSync(p)) return false;
+      const c = fs.readFileSync(p, "utf8");
+      return /WXT_PUBLIC_WEB_URL/.test(c) && /WXT_PUBLIC_REPLAY_SERVER_URL/.test(c);
+    } catch {
+      return false;
+    }
+  })();
+  const hasWeb = !!process.env.WXT_PUBLIC_WEB_URL || hasDotEnv;
+  const hasReplay = !!process.env.WXT_PUBLIC_REPLAY_SERVER_URL || hasDotEnv;
+  if (!hasWeb || !hasReplay) {
+    throw new Error(
+      "Missing WXT_PUBLIC_WEB_URL / WXT_PUBLIC_REPLAY_SERVER_URL. For local dev create apps/extension/.env, for prod: WXT_PUBLIC_WEB_URL=https://trail-bug.vercel.app WXT_PUBLIC_REPLAY_SERVER_URL=https://trail-roan.vercel.app pnpm zip:prod",
+    );
+  }
+}
+assertRequiredEnv();
+
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],

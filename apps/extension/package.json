@@ -14,6 +14,7 @@
     "zip:check-env": "node scripts/check-env.mjs",
     "zip:update": "pnpm zip:check-env && tsc --noEmit && wxt zip",
     "zip:prod": "node scripts/check-env-prod.mjs && tsc --noEmit && wxt zip",
+    "build:prod": "node scripts/check-env-prod.mjs && tsc --noEmit && wxt build",
     "zip:fresh": "rm -rf .output && pnpm zip:update",
     "zip:release": "pnpm zip:fresh && ls -lh .output/*.zip",
     "compile": "tsc --noEmit",
