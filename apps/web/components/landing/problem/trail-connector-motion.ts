@@ -117,6 +117,14 @@ export function createAmbientController(
   duration: number,
   logoDuration = 0.6,
 ) {
+  // Defer spin creation to idle so first paint isn't blocked (GridGlow uses rAF + React state only).
+  const schedule = (cb: () => void) => {
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(cb, { timeout: 800 });
+    } else {
+      setTimeout(cb, 300);
+    }
+  };
   // Livelier ambient: fast marching flow + node breathe + marker ripple + logo nudge.
   // Loop is short (1.6s) so motion is visible; dash length is 22 (6+16) so -44 = 2 cycles seamless.
   const cycle = 1.6;
@@ -218,20 +226,24 @@ export function createAmbientController(
       cycle * 0.4,
     );
 
-  // Keep original slow 360 spin as an occasional accent every ~2 cycles
-  const spin = gsap.fromTo(
-    connector.logo,
-    { rotation: 0, svgOrigin: connector.origin },
-    {
-      rotation: 360,
-      svgOrigin: connector.origin,
-      duration: logoDuration,
-      ease: "power1.inOut",
-      repeat: -1,
-      repeatDelay: Math.max(1.2, duration - logoDuration),
-      paused: true,
-    },
-  );
+  // Keep original slow 360 spin as an occasional accent every ~2 cycles — deferred to idle
+  let spin: gsap.core.Tween | null = null;
+  schedule(() => {
+    spin = gsap.fromTo(
+      connector.logo,
+      { rotation: 0, svgOrigin: connector.origin },
+      {
+        rotation: 360,
+        svgOrigin: connector.origin,
+        duration: logoDuration,
+        ease: "power1.inOut",
+        repeat: -1,
+        repeatDelay: Math.max(1.2, duration - logoDuration),
+        paused: true,
+      },
+    );
+    if (isVisible && isReady) spin.play();
+  });
 
   let isVisible = false;
   let isReady = false;
@@ -239,10 +251,10 @@ export function createAmbientController(
     const shouldPlay = isVisible && isReady;
     if (shouldPlay) {
       loop.play();
-      spin.play();
+      spin?.play();
     } else {
       loop.pause();
-      spin.pause();
+      spin?.pause();
     }
   };
 
