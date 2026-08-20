@@ -12,6 +12,16 @@ import type {
   TrailReport,
 } from "./types";
 
+function pickFirstHttpUrl(events: Array<{ url?: string }>): string {
+  for (const e of events) {
+    if (e.url && /^https?:\/\//i.test(e.url)) return e.url;
+  }
+  for (const e of events) {
+    if (e.url) return e.url;
+  }
+  return "";
+}
+
 // The review's local session store: live events, saved reports, and the
 // per-report session snapshots that make a report reopenable after the next
 // recording clears the live buffer. The extension binds it to its own DB
@@ -175,7 +185,7 @@ export function createDb(dbName: string): TrailDb {
         endedAt: fallback.endedAt ?? Date.now(),
         eventCount: fallback.eventCount ?? payload.events.length,
         counts: fallback.counts ?? { ...ZERO_COUNTS },
-        url: fallback.url ?? payload.events[0]?.url ?? "",
+        url: fallback.url ?? pickFirstHttpUrl(payload.events),
         errorCount: fallback.errorCount ?? summary.errorCount,
         failedRequestCount:
           fallback.failedRequestCount ?? summary.failedRequestCount,

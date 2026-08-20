@@ -44,6 +44,16 @@ import {
 } from "@trail/review/lib/summary";
 import type { TrailCounts, TrailSession } from "@trail/review/lib/types";
 
+function pickReportUrl(events: Array<{ url?: string }>): string {
+  for (const e of events) {
+    if (e.url && /^https?:\/\//i.test(e.url)) return e.url;
+  }
+  for (const e of events) {
+    if (e.url) return e.url;
+  }
+  return "";
+}
+
 // Serializes MSG_BATCH handling: handlers share read-modify-write on counts, and
 // two near-simultaneous flushes (interval + visibilitychange) would lose increments.
 let batchChain: Promise<void> = Promise.resolve();
@@ -170,7 +180,7 @@ async function stopRecording(): Promise<{ ok: boolean; error?: string; seq?: num
         endedAt: Date.now(),
         eventCount: events.length,
         counts,
-        url: events[0]?.url ?? "",
+        url: pickReportUrl(events),
         errorCount: summary.errorCount,
         failedRequestCount: summary.failedRequestCount,
       });
