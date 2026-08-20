@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef } from "react";
 import Link from "next/link";
 import { gsap } from "gsap";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
+import { CTA_HREF, CTA_LABEL } from "@/lib/site";
 import { lockScroll, unlockScroll } from "@/lib/scroll-lock";
 import { IntroOverlay } from "./intro-overlay";
 import { ReportMockup } from "./report-mockup";
@@ -307,13 +308,9 @@ export function HeroExperience() {
         data-hero-anim
         className="mt-11 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row"
       >
-        <Link
-          href="https://drive.google.com/file/d/1MUGkkKjyWQZ37HbLISMpURe2MUDuCMT2/view?usp=drive_link"
-          target="_blank"
-          rel="noreferrer"
-        >
+        <Link href={CTA_HREF} target="_blank" rel="noreferrer" data-cta="hero">
           <AntiMetalButton
-            label="Record your first bug"
+            label={CTA_LABEL}
             accentFrom="#ff6a00"
             accentTo="#ff8a1f"
           />
