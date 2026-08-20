@@ -11,7 +11,7 @@ import {
 
 declare global {
   interface Window {
-    __trailRelay?: boolean;
+    __trailRelaySignal?: AbortSignal;
   }
 }
 
@@ -20,21 +20,56 @@ export default defineContentScript({
   runAt: 'document_start',
   world: 'ISOLATED',
   noScriptStartedPostMessage: true,
-  main() {
-    if (window.__trailRelay) return;
-    window.__trailRelay = true;
+  main(ctx) {
+    if (window.__trailRelaySignal && !window.__trailRelaySignal.aborted) return;
+    window.__trailRelaySignal = ctx.signal;
+    ctx.onInvalidated(() => {
+      window.__trailRelaySignal = undefined;
+    });
 
     let buf: unknown[] = [];
 
     // Resolver for the recorder's 'stopped' ack (stop handshake).
     let stoppedResolve: (() => void) | null = null;
 
+    // Countable ks that drive the live overlay counters. rrweb is intentionally
+    // excluded — its high-volume visual stream is throttled to the interval
+    // so the overlay doesn't spam the SW on every mouse/scroll frame.
+    const COUNTABLE = new Set([
+      "click",
+      "input",
+      "key",
+      "submit",
+      "viewport",
+      "console",
+      "net",
+      "flag",
+    ]);
+    let immediateTimer: number | undefined;
+    const scheduleImmediateFlush = () => {
+      if (immediateTimer !== undefined) return;
+      immediateTimer = window.setTimeout(() => {
+        immediateTimer = undefined;
+        flushSoon();
+      }, 50);
+    };
+    const flushSoon = () => {
+      if (!buf.length) return;
+      void browser.runtime
+        .sendMessage({ type: MSG_BATCH, batch: buf.splice(0) })
+        .catch(() => {});
+    };
+
     // MAIN world → here. Batch on a timer so we're not doing one sendMessage per event.
     addEventListener('message', (e) => {
       if (e.source !== window) return;
       const data = e.data;
       if (!data || typeof data !== 'object') return;
-      if (data[POST_MESSAGE_KEY] === true) buf.push(data.d);
+      if (data[POST_MESSAGE_KEY] === true) {
+        buf.push(data.d);
+        const k = (data.d as { k?: string })?.k;
+        if (k && COUNTABLE.has(k)) scheduleImmediateFlush();
+      }
       else if (data[POST_MESSAGE_KEY] === 'stopped') stoppedResolve?.();
       else if (data[POST_MESSAGE_KEY] === 'boot') void checkSession();
       // Presence probe: the web app's handoff gate asks "is TRAIL installed?"
@@ -66,12 +101,7 @@ export default defineContentScript({
       // unhandled rejection in a content script is noisy.
       browser.runtime.sendMessage(msg).catch(() => {});
 
-    const flush = () => {
-      if (!buf.length) return;
-      send({ type: MSG_BATCH, batch: buf.splice(0) });
-    };
-
-    const interval = setInterval(flush, 500);
+    const interval = setInterval(flushSoon, 150);
 
     // Session awareness: the recorder is registered for <all_urls>, so pages
     // OTHER than the session tab get one too. Poll the background for "is this
@@ -107,11 +137,11 @@ export default defineContentScript({
 
     // Navigation tears the page down with any un-flushed buffer. Flush on
     // pagehide so the tail of a session isn't silently lost (Risk 4).
-    addEventListener('pagehide', flush);
+    addEventListener('pagehide', flushSoon);
     addEventListener(
       'visibilitychange',
       () => {
-        if (document.visibilityState === 'hidden') flush();
+        if (document.visibilityState === 'hidden') flushSoon();
       },
       { capture: true },
     );
@@ -122,6 +152,10 @@ export default defineContentScript({
     browser.runtime.onMessage.addListener((msg) => {
       if (msg?.type === MSG_STOP_RECORDER) {
         clearInterval(interval);
+        if (immediateTimer !== undefined) {
+          clearTimeout(immediateTimer);
+          immediateTimer = undefined;
+        }
         stopPolling();
         // Deterministic stop: tell the recorder to seal, wait for its ack (with a
         // bounded fallback in case the page is being torn down), then upload the

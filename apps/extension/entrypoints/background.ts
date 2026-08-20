@@ -443,11 +443,11 @@ export default defineBackground(() => {
     }
 
     if (msg?.type === MSG_OVERLAY_STATUS) {
-      const version = nextOverlayVersion();
       void (async () => {
         try {
           const session = await getSession();
           const recording = !!session && sender.tab?.id === session.tabId;
+          const version = nextOverlayVersion();
           sendResponse({
             recording,
             counts: recording ? await getCounts() : ZERO_COUNTS,
@@ -460,7 +460,7 @@ export default defineBackground(() => {
             recording: false,
             counts: ZERO_COUNTS,
             flags: 0,
-            version,
+            version: nextOverlayVersion(),
             error: (err as Error).message,
           });
         }

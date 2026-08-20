@@ -196,12 +196,32 @@ function RecordingOverlay() {
       if (message?.type === MSG_OVERLAY_UPDATE) applyStatus(message);
     };
 
+    const handleStorage = (
+      changes: Record<string, { newValue?: unknown }>,
+      area: string,
+    ) => {
+      if (area !== "session") return;
+      if (
+        Object.prototype.hasOwnProperty.call(changes, "session") ||
+        Object.prototype.hasOwnProperty.call(changes, "counts") ||
+        Object.prototype.hasOwnProperty.call(changes, "flagCount")
+      ) {
+        void refresh();
+      }
+    };
+
     browser.runtime.onMessage.addListener(handleMessage);
+    try {
+      browser.storage.onChanged.addListener(handleStorage);
+    } catch {}
     void refresh();
-    const interval = window.setInterval(refresh, 5000);
+    const interval = window.setInterval(refresh, 1000);
     return () => {
       disposed = true;
       browser.runtime.onMessage.removeListener(handleMessage);
+      try {
+        browser.storage.onChanged.removeListener(handleStorage);
+      } catch {}
       window.clearInterval(interval);
     };
   }, []);
@@ -542,8 +562,16 @@ export default defineContentScript({
   matches: ["<all_urls>"],
   runAt: "document_idle",
   world: "ISOLATED",
-  main() {
-    if (document.getElementById("trail-recording-overlay")) return;
+  main(ctx) {
+    const win = window as unknown as { __trailOverlaySignal?: AbortSignal };
+    if (win.__trailOverlaySignal && !win.__trailOverlaySignal.aborted) return;
+    win.__trailOverlaySignal = ctx.signal;
+    ctx.onInvalidated(() => {
+      win.__trailOverlaySignal = undefined;
+      document.getElementById("trail-recording-overlay")?.remove();
+    });
+    const stale = document.getElementById("trail-recording-overlay");
+    if (stale) stale.remove();
 
     const host = document.createElement("trail-recording-overlay");
     host.id = "trail-recording-overlay";

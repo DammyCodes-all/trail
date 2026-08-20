@@ -26,6 +26,18 @@ export async function injectRecorderIntoPage(tabId: number): Promise<void> {
     world: "ISOLATED",
     files: [RELAY_JS, OVERLAY_JS],
   });
+  await browser.scripting
+    .executeScript({
+      target: { tabId },
+      world: "MAIN",
+      func: () => {
+        (window as unknown as Record<string, unknown>).__trailRecorder =
+          undefined;
+        (window as unknown as Record<string, unknown>).__trailRecorderActive =
+          undefined;
+      },
+    })
+    .catch(() => {});
   await browser.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
