@@ -1,5 +1,8 @@
-import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'wxt';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "wxt";
 
 // rrweb's bundle contains literal U+FFFE (a Unicode non-character) used in its
 // CSS byte-order-mark checks. Chrome's content-script loader uses a stricter
@@ -49,13 +52,13 @@ function escapeNonAscii(): {
 // point to localhost and break demo. Dev can still use .env file; CI must export vars.
 // WXT loads .env via dotenv, but process.env check here covers CI where .env is gitignored.
 function assertRequiredEnv() {
-  // Allow localhost fallback only for `wxt dev` (not for `wxt build`/`wxt zip`)
-  const isDev = process.argv.includes("dev");
-  if (isDev) return;
+  // Allow localhost fallback for dev/prepare only; build/zip must have env
+  const cmd = process.argv[2] ?? "";
+  const isDevOrPrepare = cmd === "dev" || cmd === "prepare" || process.argv.includes("prepare");
+  if (isDevOrPrepare) return;
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const hasDotEnv = (() => {
     try {
-      const fs = require("fs");
-      const path = require("path");
       const p = path.join(__dirname, ".env");
       if (!fs.existsSync(p)) return false;
       const c = fs.readFileSync(p, "utf8");

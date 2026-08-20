@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { TrailLogo } from "@/components/trail-logo";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
@@ -5,11 +7,15 @@ import { GridGlow } from "@/components/landing/hero/grid-glow";
 import { GithubStarsLogo } from "@/components/animate-ui/primitives/animate/github-stars";
 import { CTA_HREF, CTA_LABEL, GITHUB_HREF, X_HREF } from "@/lib/site";
 import { XIcon } from "@/components/icons/x-icon";
+import { useClosingCtaSectionMotion } from "./use-closing-cta-section-motion";
 
 export function ClosingCtaSection() {
+  const root = useClosingCtaSectionMotion();
+
   return (
     <section
       id="get-started"
+      ref={root}
       className="relative isolate overflow-hidden border-t border-white/10 bg-[#0d0f0e] px-5 py-24 sm:px-8 sm:py-32 lg:px-10 lg:py-40"
     >
       <div
@@ -19,17 +25,24 @@ export function ClosingCtaSection() {
       <GridGlow />
       <div className="relative mx-auto max-w-3xl text-center">
         <TrailLogo
+          data-cta-logo
           size={40}
           aria-hidden="true"
           className="mx-auto text-[#ff6a00]"
         />
-        <h2 className="mx-auto mt-8 max-w-2xl font-heading text-[clamp(1.75rem,5vw,3rem)] font-bold leading-[0.98] tracking-[-0.04em] text-[#f2f4f6]">
+        <h2
+          data-cta-headline
+          className="mx-auto mt-8 max-w-2xl font-heading text-[clamp(1.75rem,5vw,3rem)] font-bold leading-[0.98] tracking-[-0.04em] text-[#f2f4f6]"
+        >
           The next bug already has a trail. Go find it.
         </h2>
-        <p className="mx-auto mt-5 max-w-xl font-mono text-xs tracking-[0.08em] text-[#8b929c] sm:text-sm">
+        <p
+          data-cta-sub
+          className="mx-auto mt-5 max-w-xl font-mono text-xs tracking-[0.08em] text-[#8b929c] sm:text-sm"
+        >
           No setup. No SDK. Just open the extension.
         </p>
-        <div className="mt-10 flex justify-center">
+        <div data-cta-action className="mt-10 flex justify-center">
           <Link
             href={CTA_HREF}
             target="_blank"
@@ -44,7 +57,10 @@ export function ClosingCtaSection() {
           </Link>
         </div>
 
-        <div className="mt-8 flex items-center justify-center gap-1 font-mono text-xs text-[#626973]">
+        <div
+          data-cta-links
+          className="mt-8 flex items-center justify-center gap-1 font-mono text-xs text-[#626973]"
+        >
           <a
             href={GITHUB_HREF}
             target="_blank"
