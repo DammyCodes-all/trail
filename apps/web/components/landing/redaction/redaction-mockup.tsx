@@ -186,7 +186,7 @@ export function RedactionMockup() {
       </div>
 
       <ImageComparison
-        label="Compare the live checkout page with what Trail records"
+        label="Compare the live checkout page with what Trail records — drag to verify"
         className="border border-[#1e2124] shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
         initialInset={20}
         base={<CheckoutForm redacted={false} light />}

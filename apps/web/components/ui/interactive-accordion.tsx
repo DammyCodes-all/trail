@@ -54,7 +54,7 @@ export function InteractiveAccordion({ items, defaultOpen = null, className }: I
                   {/* Number with animated circle */}
                   <div className="relative flex items-center justify-center w-10 h-10 shrink-0">
                     <motion.div
-                      className="absolute inset-0 rounded-full bg-[#ff6a00]"
+                      className="absolute inset-0 rounded-full bg-[#f2f4f6]"
                       initial={false}
                       animate={{
                         scale: isActive ? 1 : isHovered ? 0.85 : 0,
@@ -130,7 +130,7 @@ export function InteractiveAccordion({ items, defaultOpen = null, className }: I
                 {/* Animated underline */}
                 <motion.div className="absolute bottom-0 left-0 right-0 h-px bg-white/10 origin-left" initial={false} />
                 <motion.div
-                  className="absolute bottom-0 left-0 h-px bg-[#ff6a00] origin-left"
+                  className="absolute bottom-0 left-0 h-px bg-[#f2f4f6] origin-left"
                   initial={{ scaleX: 0 }}
                   animate={{
                     scaleX: isActive ? 1 : isHovered ? 0.3 : 0,
