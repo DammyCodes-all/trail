@@ -78,7 +78,7 @@ export function FaqSection() {
           </p>
         </div>
 
-        <div data-faq-accordion className="mx-auto mt-8 max-w-3xl border border-white/10 bg-[#0d0e10]/40 p-2 sm:p-6">
+        <div data-faq-accordion className="mx-auto mt-8 max-w-3xl p-2 sm:p-2">
           <InteractiveAccordion items={ACCORDION_ITEMS} defaultOpen="1" className="w-full" />
         </div>
       </div>

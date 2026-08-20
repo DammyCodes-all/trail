@@ -16,7 +16,7 @@ export function ClosingCtaSection() {
     <section
       id="get-started"
       ref={root}
-      className="relative isolate overflow-hidden border-t border-white/10 bg-[#0d0f0e] px-5 py-24 sm:px-8 sm:py-32 lg:px-10 lg:py-40"
+      className="relative isolate overflow-hidden border-t border-white/10 bg-[#0d0f0e] px-5 py-16 sm:px-8 sm:py-24 lg:px-10 lg:py-32"
     >
       <div
         aria-hidden="true"
@@ -59,7 +59,7 @@ export function ClosingCtaSection() {
 
         <div
           data-cta-links
-          className="mt-8 flex items-center justify-center gap-1 font-mono text-xs text-[#626973]"
+          className="mt-8 flex items-center justify-center gap-1 font-mono text-xs text-[#626973]/70"
         >
           <a
             href={GITHUB_HREF}

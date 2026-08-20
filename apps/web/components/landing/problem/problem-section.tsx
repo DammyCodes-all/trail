@@ -32,7 +32,7 @@ const FACTS: Fact[] = [
     key: "duration",
     icon: Clock3,
     label: "Duration",
-    to: 55,
+    to: 42,
     suffix: "s",
     cls: "text-[#f2f4f6]",
   },
@@ -63,7 +63,7 @@ const FACTS: Fact[] = [
 ];
 
 const ROWS = [
-  { icon: Play, label: "Replay", value: "00:55" },
+  { icon: Play, label: "Replay", value: "00:42" },
   { icon: Network, label: "Network", value: "1 failed" },
   { icon: Terminal, label: "Console", value: "1 error" },
 ];
@@ -278,7 +278,7 @@ export function ProblemSection() {
                   </div>
                   <div className="mt-1 flex items-baseline justify-between font-mono text-[9px] text-[#626973]">
                     <span>00:00</span>
-                    <span>00:55</span>
+                    <span>00:42</span>
                   </div>
                 </div>
                 <div className="divide-y divide-white/10 border-t border-white/10">
