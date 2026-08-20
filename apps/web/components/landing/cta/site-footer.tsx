@@ -7,6 +7,7 @@ import { GithubStarsLogo } from "@/components/animate-ui/primitives/animate/gith
 import { GITHUB_HREF, X_HREF } from "@/lib/site";
 import { XIcon } from "@/components/icons/x-icon";
 import { useSiteFooterMotion } from "./use-site-footer-motion";
+import { scrollToHash } from "@/lib/scroll-lock";
 
 export function SiteFooter() {
   const root = useSiteFooterMotion();
@@ -22,22 +23,51 @@ export function SiteFooter() {
       />
       <GridGlow />
       <div className="relative mx-auto flex max-w-7xl flex-row items-center justify-between gap-4">
-        <Link
-          data-footer-brand
-          href="#top"
-          className="flex items-center gap-2 rounded-md px-1 py-1 text-[#8b929c] outline-none transition-colors hover:text-[#f2f4f6] focus-visible:ring-2 focus-visible:ring-[#ff6a00]"
-          aria-label="TRAIL — back to top"
-        >
-          <TrailLogo size={20} aria-hidden="true" />
-          <span className="font-heading text-xs font-medium tracking-[0.2em]">
-            TRAIL
+        <div className="flex items-center gap-4">
+          <a
+            data-footer-brand
+            href="#top"
+            onClick={(e) => {
+              e.preventDefault();
+              scrollToHash("#top");
+            }}
+            className="flex items-center gap-2 rounded-md px-1 py-1 text-[#8b929c] outline-none transition-colors hover:text-[#f2f4f6] focus-visible:ring-2 focus-visible:ring-[#ff6a00]"
+            aria-label="TRAIL — back to top"
+          >
+            <TrailLogo size={20} aria-hidden="true" />
+            <span className="font-heading text-xs font-medium tracking-[0.2em]">
+              TRAIL
+            </span>
+          </a>
+          <span className="hidden font-mono text-[10px] tracking-[0.08em] text-[#626973]/60 sm:inline">
+            © 2026
           </span>
-        </Link>
+        </div>
 
         <nav
           aria-label="Footer"
-          className="flex items-center gap-5 font-mono text-xs text-[#626973]"
+          className="flex items-center gap-1 font-mono text-xs text-[#626973] sm:gap-3"
         >
+          <a
+            href="#privacy"
+            onClick={(e) => {
+              e.preventDefault();
+              scrollToHash("#privacy");
+            }}
+            className="hidden cursor-pointer rounded-md px-2 py-1 outline-none transition-colors hover:text-[#f2f4f6] focus-visible:ring-2 focus-visible:ring-[#ff6a00] sm:inline-flex"
+          >
+            Privacy
+          </a>
+          <a
+            href="#faq"
+            onClick={(e) => {
+              e.preventDefault();
+              scrollToHash("#faq");
+            }}
+            className="hidden cursor-pointer rounded-md px-2 py-1 outline-none transition-colors hover:text-[#f2f4f6] focus-visible:ring-2 focus-visible:ring-[#ff6a00] sm:inline-flex"
+          >
+            FAQ
+          </a>
           <a
             data-footer-link
             href={GITHUB_HREF}
