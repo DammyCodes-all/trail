@@ -39,7 +39,7 @@ export function RedactionSection() {
             className="mx-auto mt-4 max-w-xl text-sm leading-6 tracking-[-0.01em] text-[#8b929c] sm:text-base sm:leading-7"
           >
             Passwords, tokens, and personal fields are masked at the moment of
-            capture — not scrubbed afterward.
+            capture — not scrubbed afterward. Never sent to Trail servers.
           </p>
         </div>
 

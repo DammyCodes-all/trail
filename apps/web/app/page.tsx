@@ -9,13 +9,28 @@ import { SetupSection } from "@/components/landing/setup/setup-section";
 import { RedactionSection } from "@/components/landing/redaction/redaction-section";
 import { GithubSection } from "@/components/landing/github/github-section";
 import { FlagSection } from "@/components/landing/flag/flag-section";
+import { FaqSection } from "@/components/landing/faq/faq-section";
 import { ClosingCtaSection } from "@/components/landing/cta/closing-cta-section";
 import { SiteFooter } from "@/components/landing/cta/site-footer";
 
 export const metadata: Metadata = {
   title: "TRAIL — Every bug has a trail",
   description:
-    "Record what happened, replay it, and turn browser bugs into evidence.",
+    "Chrome extension that records what happened, replays it, and turns browser bugs into evidence — no SDK, data stays in the browser.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "TRAIL — Every bug has a trail",
+    description:
+      "Record, replay, and report browser bugs without an SDK. Open source, GitHub-native, privacy by default.",
+    url: "/",
+    siteName: "TRAIL",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "TRAIL — Every bug has a trail",
+    description: "No SDK. Just open the extension. Trail follows the bug for you.",
+  },
 };
 
 export default function Home() {
@@ -48,8 +63,25 @@ export default function Home() {
       <RedactionSection />
       <GithubSection />
       <FlagSection />
+      <FaqSection />
       <ClosingCtaSection />
       <SiteFooter />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: "TRAIL",
+            applicationCategory: "DeveloperApplication",
+            operatingSystem: "Chrome",
+            isAccessibleForFree: true,
+            url: "https://github.com/DammyCodes-all/trail",
+            description:
+              "Chrome extension that records browser sessions and turns bugs into GitHub issues — no SDK, privacy by default.",
+          }),
+        }}
+      />
     </main>
   );
 }
