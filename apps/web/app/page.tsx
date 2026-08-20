@@ -8,6 +8,7 @@ import { ProblemSection } from "@/components/landing/problem/problem-section";
 import { SetupSection } from "@/components/landing/setup/setup-section";
 import { RedactionSection } from "@/components/landing/redaction/redaction-section";
 import { GithubSection } from "@/components/landing/github/github-section";
+import { FlagSection } from "@/components/landing/flag/flag-section";
 
 export const metadata: Metadata = {
   title: "TRAIL — Every bug has a trail",
@@ -44,6 +45,7 @@ export default function Home() {
       <SetupSection />
       <RedactionSection />
       <GithubSection />
+      <FlagSection />
     </main>
   );
 }
