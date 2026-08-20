@@ -1,6 +1,5 @@
 "use client";
 
-import { GridGlow } from "@/components/landing/hero/grid-glow";
 import { FlagMockup } from "./flag-mockup";
 import { useFlagSectionMotion } from "./use-flag-section-motion";
 
@@ -17,7 +16,6 @@ export function FlagSection() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgb(255_255_255/0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.025)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_40%_at_50%_0%,black_30%,transparent_75%)]"
       />
-      <GridGlow />
       <div className="relative mx-auto max-w-5xl">
         <div data-copy className="text-center">
           <p

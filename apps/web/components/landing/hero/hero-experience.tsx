@@ -5,7 +5,7 @@ import Link from "next/link";
 import { gsap } from "gsap";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 import { CTA_HREF, CTA_LABEL } from "@/lib/site";
-import { lockScroll, scrollToHash, unlockScroll } from "@/lib/scroll-lock";
+import { lockScroll, unlockScroll } from "@/lib/scroll-lock";
 import { IntroOverlay } from "./intro-overlay";
 import { ReportMockup } from "./report-mockup";
 
@@ -289,7 +289,7 @@ export function HeroExperience() {
         data-hero-anim
         className="mb-5 font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#ff8a1f]"
       >
-        NO SDK · NO INSTRUMENTATION
+        OPEN SOURCE · NO SDK · NO INSTRUMENTATION
       </p>
       <h1
         data-hero-anim
@@ -299,14 +299,14 @@ export function HeroExperience() {
       </h1>
       <p
         data-hero-anim
-        className="mt-6 max-w-xl text-base leading-7 tracking-[-0.01em] text-[#8b929c] sm:text-lg sm:leading-8"
+        className="mt-5 max-w-xl text-base leading-7 tracking-[-0.01em] text-[#8b929c] sm:mt-5 sm:text-lg sm:leading-8"
       >
         Stop chasing it. Trail follows it for you, click by click, error by
         error, straight into a GitHub issue.
       </p>
       <div
         data-hero-anim
-        className="mt-11 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row"
+        className="mt-6 flex w-full flex-col justify-center gap-3 sm:mt-7 sm:w-auto sm:flex-row"
       >
         <Link href={CTA_HREF} target="_blank" rel="noreferrer" data-cta="hero">
           <AntiMetalButton
@@ -316,29 +316,6 @@ export function HeroExperience() {
           />
         </Link>
       </div>
-      <p
-        data-hero-anim
-        className="mt-4 font-mono text-[10px] tracking-[0.12em] text-[#626973]"
-      >
-        <span className="text-[#8b929c]">Open source</span>
-        <span aria-hidden="true" className="mx-2 text-white/15">
-          ·
-        </span>
-        No SDK
-        <span aria-hidden="true" className="mx-2 text-white/15">
-          ·
-        </span>
-        <a
-          href="#privacy"
-          onClick={(e) => {
-            e.preventDefault();
-            scrollToHash("#privacy");
-          }}
-          className="cursor-pointer rounded-sm px-1 py-0.5 underline decoration-white/15 underline-offset-4 outline-none transition-colors hover:text-[#8b929c] hover:decoration-white/30 focus-visible:ring-2 focus-visible:ring-[#ff6a00]"
-        >
-          Data stays in browser
-        </a>
-      </p>
       <ReportMockup />
     </div>
   );

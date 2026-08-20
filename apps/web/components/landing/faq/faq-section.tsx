@@ -6,33 +6,39 @@ import { useFaqSectionMotion } from "./use-faq-section-motion";
 const FAQ_DATA = [
   {
     id: 1,
-    question: "Will you see my passwords or card numbers?",
+    question: "Isn't this just a screen recorder?",
     answer:
-      "No. They are hidden in your browser before anything is saved. Passwords and payment fields are replaced with [redacted] and never reach our servers.",
+      "A screen recording shows what happened. TRAIL captures why it happened. A video shows a click and an error. TRAIL connects that click to the console error, failed request, browser state, and steps to reproduce it.",
   },
   {
     id: 2,
-    question: "Do you need my GitHub token?",
+    question: "Does TRAIL record everything I do?",
     answer:
-      "No. Trail opens a ready to send GitHub issue in your browser. You review it and submit it yourself. The full report is also copied to your clipboard.",
+      "No. Recording starts when you choose to capture a bug and stops when you finish. TRAIL collects just enough evidence to reproduce the issue without recording your whole browsing history.",
   },
   {
     id: 3,
-    question: "What happens when I hit Share?",
+    question: "What happens when there is no console error?",
     answer:
-      "Nothing uploads until you choose Share. We create a private link like /r/abc123 for that session. Sharing the same session again reuses the link.",
+      "That is okay. A bug does not need a JavaScript exception to leave evidence. TRAIL can still capture the interaction trail, failed requests, page context, and other signals to help reproduce it.",
   },
   {
     id: 4,
-    question: "Does the AI see my replay?",
+    question: "Can it tell if the user caused the problem?",
     answer:
-      "No. It only sees a short text summary of steps and errors, not the video. If no AI key is set on the server, Trail just uses the normal report.",
+      "TRAIL can surface evidence that points toward user error, application failure, or an unclear path. It does not claim to know the root cause with certainty.",
   },
   {
     id: 5,
-    question: "Do I need to install anything on my site?",
+    question: "Can I send the report to GitHub?",
     answer:
-      "No. Just open the extension and hit Record. It works on any site with no setup. You can even flag something that just looks wrong.",
+      "Yes. TRAIL turns a captured session into a structured issue you can review and file in GitHub, with reproduction steps, console and network evidence, and the replay.",
+  },
+  {
+    id: 6,
+    question: "Does it use AI?",
+    answer:
+      "AI helps TRAIL organize and explain the evidence it captured. The underlying evidence always comes from the browser session itself. Observability first, AI second.",
   },
 ];
 

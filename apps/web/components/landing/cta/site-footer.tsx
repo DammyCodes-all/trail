@@ -39,8 +39,8 @@ export function SiteFooter() {
               TRAIL
             </span>
           </a>
-          <span className="hidden font-mono text-[10px] tracking-[0.08em] text-[#626973]/60 sm:inline">
-            © 2026
+          <span className="hidden font-mono text-xs tracking-[0.08em] text-[#626973]/70 sm:inline">
+            © 2026 TRAIL
           </span>
         </div>
 
