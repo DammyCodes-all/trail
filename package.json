@@ -7,6 +7,8 @@
   "scripts": {
     "dev:extension": "pnpm --filter trail-extension dev",
     "build:extension": "pnpm --filter trail-extension build",
+    "build:extension:zip": "pnpm --filter trail-extension zip:update",
+    "build:extension:zip:fresh": "pnpm --filter trail-extension zip:fresh",
     "verify:extension": "pnpm --filter trail-extension verify",
     "dev:replay": "pnpm --filter trail-replay-server dev",
     "dev:web": "pnpm --filter web dev",
