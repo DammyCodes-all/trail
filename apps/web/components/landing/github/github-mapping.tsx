@@ -110,7 +110,7 @@ function ReportIngredients() {
           <span className="min-w-0 truncate font-mono text-[9px] uppercase tracking-[0.14em] text-[#f2f4f6]/90">
             {item.label}
           </span>
-          <span className="ml-auto shrink-0 font-mono text-[8.5px] tabular-nums text-[#626973]">
+          <span className="ml-auto shrink-0 font-mono text-[11px] font-medium tabular-nums text-[#8b929c]">
             {item.value}
           </span>
         </li>

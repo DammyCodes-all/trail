@@ -74,13 +74,13 @@ export function FaqSection() {
             data-faq-copy
             className="mx-auto mt-3 max-w-3xl font-heading text-[clamp(1.5rem,5vw,3.25rem)] font-bold leading-[1] tracking-[-0.04em] text-[#f2f4f6]"
           >
-            Got questions? Trail has answers.
+            Questions? We&apos;ve got the trail.
           </h2>
           <p
             data-faq-copy
             className="mx-auto mt-4 max-w-xl text-sm leading-6 tracking-[-0.01em] text-[#8b929c] sm:text-base sm:leading-7"
           >
-            The bits teams ask before they hit record — answered in the same chat you already know.
+            The answers to the things developers want to know before they start capturing a bug.
           </p>
         </div>
 
