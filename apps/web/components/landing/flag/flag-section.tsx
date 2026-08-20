@@ -48,7 +48,7 @@ export function FlagSection() {
           data-payoff
           className="mt-10 text-center font-heading text-2xl font-semibold tracking-[-0.02em] text-[#f2f4f6] sm:text-3xl"
         >
-          If it looks wrong, that&apos;s reason enough.
+          If it looks wrong, flag it. No error required.
         </p>
       </div>
     </section>

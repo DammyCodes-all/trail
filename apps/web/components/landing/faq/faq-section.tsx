@@ -78,10 +78,7 @@ export function FaqSection() {
           </p>
         </div>
 
-        <div data-faq-accordion className="mx-auto mt-8 max-w-3xl rounded-lg border border-white/10 bg-[#0d0e10]/40 p-2 sm:p-6">
-          <p className="mb-2 px-2 font-mono text-[10px] tracking-[0.16em] text-[#626973] sm:px-3">
-            Answers from the docs · updated daily
-          </p>
+        <div data-faq-accordion className="mx-auto mt-8 max-w-3xl border border-white/10 bg-[#0d0e10]/40 p-2 sm:p-6">
           <InteractiveAccordion items={ACCORDION_ITEMS} defaultOpen="1" className="w-full" />
         </div>
       </div>

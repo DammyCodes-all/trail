@@ -92,9 +92,14 @@ export function FlagMockup() {
               </span>
               <span
                 data-flag-pin
-                className="grid size-5 place-items-center text-[#ff6a00]"
+                className="relative grid size-5 place-items-center text-[#ff6a00]"
                 aria-hidden="true"
               >
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 rounded-full bg-[#ff6a00]/20 motion-safe:animate-ping motion-reduce:hidden"
+                  style={{ animationDuration: "1.6s" }}
+                />
                 {FLAG_GLYPH}
               </span>
             </span>
