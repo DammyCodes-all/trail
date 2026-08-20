@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Check,
   Flag,
   ListChecks,
   Monitor,
@@ -81,31 +80,11 @@ const INGREDIENTS: Ingredient[] = [
 ];
 
 const ISSUE_SECTIONS = [
-  {
-    heading: "Steps to Reproduce",
-    preview: "1. Open acme.com · 2. Click Sign in",
-    previewClass: "text-[#8b929c]",
-  },
-  {
-    heading: "Reporter Notes",
-    preview: "@00:09 — Login button did nothing",
-    previewClass: "text-[#8b929c]",
-  },
-  {
-    heading: "Console Errors",
-    preview: "401 Unauthorized ×3",
-    previewClass: "text-[#ff4d4f]",
-  },
-  {
-    heading: "Environment",
-    preview: "Chrome 126 · macOS 14.5",
-    previewClass: "text-[#8b929c]",
-  },
-  {
-    heading: "Failed Requests",
-    preview: "POST /api/login — 500",
-    previewClass: "text-[#ff4d4f]",
-  },
+  { heading: "Steps to Reproduce", bars: ["w-full", "w-3/4"] },
+  { heading: "Reporter Notes", bars: ["w-2/3"] },
+  { heading: "Console Errors", bars: ["w-1/2"] },
+  { heading: "Environment", bars: ["w-3/5"] },
+  { heading: "Failed Requests", bars: ["w-4/5"], active: true },
 ];
 
 function ReportIngredients() {
@@ -176,27 +155,9 @@ function PrefilledIssue() {
           <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-[#626973]">
             Title
           </p>
-          <p className="mt-1 truncate rounded-sm border border-white/10 bg-[#0d0e10] px-2.5 py-1 font-mono text-[10.5px] font-semibold text-[#f2f4f6]">
+          <p className="mt-1 truncate rounded-sm border border-white/10 bg-[#0d0e10] px-2.5 py-1.5 font-mono text-xs font-semibold text-[#f2f4f6]">
             Sign in failed: 401 Unauthorized
           </p>
-        </div>
-
-        <div
-          data-issue-part
-          className="flex shrink-0 items-center gap-2 border-b border-white/10 px-4 py-1.5 font-mono text-[9px] text-[#30d158]"
-        >
-          <Check aria-hidden="true" className="size-3 shrink-0" />
-          <span className="truncate">
-            Report follows Bug report (bug.yml)
-          </span>
-        </div>
-
-        <div
-          data-issue-part
-          className="shrink-0 border-b border-white/10 px-4 py-1.5 font-mono text-[8.5px] text-[#4a9eff]"
-        >
-          &gt; <span className="font-semibold">Replay:</span> Open the captured
-          session in TRAIL
         </div>
 
         <ul
@@ -209,41 +170,34 @@ function PrefilledIssue() {
               data-issue-part
               className="flex min-h-0 flex-col justify-center border-b border-white/10 px-4 py-1"
             >
-              <p className="font-mono text-[8px] font-medium text-[#ff6a00]">
+              <p
+                className={`font-mono text-[10px] font-medium ${
+                  section.active ? "text-[#ff6a00]" : "text-[#8b929c]"
+                }`}
+              >
                 ### {section.heading}
               </p>
-              <p
-                className={`mt-0.5 truncate font-mono text-[8.5px] ${section.previewClass}`}
-              >
-                {section.preview}
-              </p>
+              <div className="mt-1.5 space-y-2">
+                {section.bars.map((width, index) => (
+                  <span
+                    key={index}
+                    aria-hidden="true"
+                    className={`block h-1 rounded-full bg-white/[0.07] ${width}`}
+                  />
+                ))}
+              </div>
             </li>
           ))}
         </ul>
 
         <div
           data-issue-part
-          className="flex shrink-0 items-center gap-2 border-b border-white/10 px-4 py-1.5"
-        >
-          <span className="font-mono text-[8px] uppercase tracking-[0.16em] text-[#626973]">
-            Labels
-          </span>
-          <span className="rounded-full border border-[#30d158]/25 bg-[#30d158]/10 px-2 py-0.5 font-mono text-[8px] text-[#30d158]">
-            bug
-          </span>
-          <span className="rounded-full border border-[#4a9eff]/25 bg-[#4a9eff]/10 px-2 py-0.5 font-mono text-[8px] text-[#4a9eff]">
-            needs-triage
-          </span>
-        </div>
-
-        <div
-          data-issue-part
           className="flex min-h-9 shrink-0 items-center justify-between gap-3 px-4 py-1.5"
         >
-          <span className="font-mono text-[8.5px] text-[#626973]">
+          <span className="font-mono text-[10px] text-[#626973]">
             Review before submitting
           </span>
-          <span className="shrink-0 rounded-sm bg-[#238636] px-2.5 py-1.5 text-[9px] font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">
+          <span className="shrink-0 rounded-sm bg-[#238636] px-2.5 py-1.5 text-[10px] font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">
             Submit new issue
           </span>
         </div>
