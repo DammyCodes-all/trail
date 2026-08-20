@@ -62,6 +62,11 @@ export const extensionLoader: ReviewLoader = {
 
     const events = await getAllEvents();
     const timestamps = events.map((event) => event.t).filter(Number.isFinite);
+    const pickUrl = (evts: typeof events) => {
+      for (const e of evts) if (e.url && /^https?:\/\//i.test(e.url)) return e.url;
+      for (const e of evts) if (e.url) return e.url;
+      return "";
+    };
     return {
       report: {
         seq: 0,
@@ -71,7 +76,7 @@ export const extensionLoader: ReviewLoader = {
         endedAt: timestamps.length ? Math.max(...timestamps) : Date.now(),
         eventCount: events.length,
         counts: countEvents(events),
-        url: events[0]?.url ?? "",
+        url: pickUrl(events),
       },
       events,
     };

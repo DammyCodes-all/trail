@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,11 +19,32 @@ import { ClipboardList, Globe, Search, Trash2 } from "lucide-react";
 const hostOf = (url: string): string | null => {
   if (!url) return null;
   try {
-    return new URL(url).host;
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.hostname || null;
   } catch {
     return null;
   }
 };
+
+const chromeFaviconHref = (pageUrl: string): string | null => {
+  if (!pageUrl) return null;
+  try {
+    const u = new URL(pageUrl);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  } catch {
+    return null;
+  }
+  // Extension pages can use the relative _favicon endpoint directly.
+  // Using browser.runtime.getURL("/_favicon/") breaks WXT's typed PublicPath,
+  // and `/_favicon/` resolves to chrome-extension://<id>/_favicon/ correctly.
+  return `/_favicon/?pageUrl=${encodeURIComponent(pageUrl)}&size=32`;
+};
+
+const googleFaviconHref = (host: string | null): string | null =>
+  host
+    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`
+    : null;
 
 // Compact relative date: the one fact worth keeping on the row is recency —
 // "which run was this one?" Duration and clock time don't help scanning.
@@ -149,22 +170,48 @@ export function HistoryList({
   );
 }
 
-function Favicon({ host }: { host: string }) {
-  const [failed, setFailed] = useState(false);
-  if (failed || !host) {
+function Favicon({ url }: { url: string }) {
+  const host = hostOf(url);
+  const chromeHref = chromeFaviconHref(url);
+  const googleHref = googleFaviconHref(host);
+  const [stage, setStage] = useState(0); // 0: chrome _favicon, 1: google s2, 2: globe
+
+  // Reset cascade when url changes (popup stays open while history updates)
+  useEffect(() => {
+    setStage(0);
+  }, [url]);
+
+  const needsGlobe =
+    !url || stage >= 2 || (!chromeHref && !googleHref);
+  if (needsGlobe) {
     return (
       <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
         <Globe className="size-3.5" aria-hidden="true" />
       </span>
     );
   }
+
+  const src = stage === 0 && chromeHref ? chromeHref : googleHref;
+  if (!src) {
+    return (
+      <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
+        <Globe className="size-3.5" aria-hidden="true" />
+      </span>
+    );
+  }
+
   return (
     <img
+      key={src}
       className="size-3.5 shrink-0 rounded-sm"
-      src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`}
+      src={src}
       alt=""
       loading="lazy"
-      onError={() => setFailed(true)}
+      referrerPolicy="no-referrer"
+      onError={() => {
+        if (stage === 0 && googleHref) setStage(1);
+        else setStage(2);
+      }}
     />
   );
 }
@@ -176,12 +223,10 @@ function ReportRow({ r }: { r: TrailReport }) {
 
   return (
     <>
-      {host && (
-        <span className="flex w-full min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Favicon host={host} />
-          <span className="min-w-0 truncate">{host}</span>
-        </span>
-      )}
+      <span className="flex w-full min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Favicon url={r.url} />
+        <span className="min-w-0 truncate">{host ?? "Unknown site"}</span>
+      </span>
       <span className="w-full min-w-0 truncate text-left text-[13px] font-medium leading-snug text-foreground">
         {r.title || "Untitled report"}
       </span>
