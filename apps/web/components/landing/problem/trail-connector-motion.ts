@@ -158,21 +158,19 @@ export function createAmbientController(
     .to(
       nodeRect,
       {
-        // @ts-expect-error gsap attr tween
         attr: { "stroke-opacity": 0.62 },
         duration: cycle * 0.32,
         ease: "power1.inOut",
-      },
+      } as gsap.TweenVars,
       0,
     )
     .to(
       nodeRect,
       {
-        // @ts-expect-error gsap attr tween
         attr: { "stroke-opacity": 0.32 },
         duration: cycle * 0.32,
         ease: "power1.inOut",
-      },
+      } as gsap.TweenVars,
       cycle * 0.32,
     )
     // marker ripple — each diamond pops in sequence
