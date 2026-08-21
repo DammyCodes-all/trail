@@ -8,6 +8,7 @@ import {
 } from "motion/react";
 import { SlidingNumber } from "@trail/review/animate-ui/primitives/texts/sliding-number";
 import {
+  FLAG_DEDUP_WINDOW_MS,
   FLAG_KEY,
   MSG_OVERLAY_STATUS,
   MSG_OVERLAY_UPDATE,
@@ -232,12 +233,33 @@ function RecordingOverlay() {
     return () => window.clearInterval(interval);
   }, [status.recording]);
 
+  // Opening the flag form starts the report-writing window; the replay
+  // collapses it (open → submit/cancel) instead of showing real-time idle.
+  // Each transition posts exactly once — the MAIN-world recorder turns the
+  // messages into captured 'flag' events with phase 'open' / 'cancel'.
+  const lastFlagRef = React.useRef<{ phase: string; t: number; note?: string } | null>(null);
+  const shouldEmitFlag = (phase: string, note?: string) => {
+    const now = Date.now();
+    const last = lastFlagRef.current;
+    if (
+      last &&
+      last.phase === phase &&
+      last.note === (note ?? "") &&
+      Math.abs(now - last.t) < FLAG_DEDUP_WINDOW_MS
+    ) {
+      return false;
+    }
+    lastFlagRef.current = { phase, t: now, note: note ?? "" };
+    return true;
+  };
+
   // When recording ends, tear down the flag UI so the next session starts clean.
   React.useEffect(() => {
     if (status.recording) return;
     setFlagOpen(false);
     setFlagToast(null);
     setFlagNote("");
+    lastFlagRef.current = null;
   }, [status.recording]);
 
   // The reporter must land in the field the instant the form opens — this
@@ -245,12 +267,8 @@ function RecordingOverlay() {
   React.useEffect(() => {
     if (flagOpen) flagNoteRef.current?.focus();
   }, [flagOpen]);
-
-  // Opening the flag form starts the report-writing window; the replay
-  // collapses it (open → submit/cancel) instead of showing real-time idle.
-  // Each transition posts exactly once — the MAIN-world recorder turns the
-  // messages into captured 'flag' events with phase 'open' / 'cancel'.
   const openFlag = () => {
+    if (!shouldEmitFlag("open")) return;
     setFlagOpen(true);
     window.postMessage(
       { [POST_MESSAGE_KEY]: FLAG_KEY, d: { phase: "open" } },
@@ -265,6 +283,7 @@ function RecordingOverlay() {
   };
 
   const submitFlag = (note: string) => {
+    if (!shouldEmitFlag("submit", note)) return;
     // Post to the page window like the relay's start/stop commands; the
     // MAIN-world recorder turns it into a captured 'flag' event.
     window.postMessage(
@@ -281,6 +300,7 @@ function RecordingOverlay() {
   };
 
   const cancelFlag = () => {
+    if (!shouldEmitFlag("cancel")) return;
     // A cancelled flag is still a report-writing window (the form was open
     // and the reporter typed in it) — close it explicitly so the replay can
     // compress it like a submitted one.

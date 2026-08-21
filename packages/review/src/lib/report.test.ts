@@ -332,7 +332,7 @@ describe("buildMarkdown", () => {
     });
 
     expect(md).toContain(
-      "> **Replay:** [Open the captured session in TRAIL](https://trail.example/r/replay-123)",
+      "> **Replay:** [Open the captured session in TRAIL for more context](https://trail.example/r/replay-123)",
     );
     expect(md).toContain(
       "<sub>Captured with [TRAIL](https://trail.example/) · [View replay](https://trail.example/r/replay-123)</sub>",
