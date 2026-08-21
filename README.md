@@ -46,15 +46,15 @@ pnpm install
 Three processes, all local:
 
 1. **The extension.** `pnpm dev:extension` builds and launches Chrome with the unpacked extension loaded. Start a report, reproduce a bug, stop. The review tab opens with the replay and timeline.
-2. **The replay server.** `pnpm dev:replay` runs on http://localhost:8898. Needed for shareable links. The extension and web viewer point at it by default, so there's nothing to configure. Recipients fetch the session from the link's own host, so both sides can run different servers.
+2. **The replay server.** `pnpm dev:replay` runs on http://localhost:8898. Needed for local shareable links. By default the extension and web viewer point at the deployed servers (`https://trail-roan.vercel.app` / `https://trail-bug.vercel.app`); set `WXT_PUBLIC_REPLAY_SERVER_URL=http://localhost:8898` / `NEXT_PUBLIC_REPLAY_SERVER_URL=http://localhost:8898` to use the local twin instead. Recipients fetch the session from the link's own host, so both sides can run different servers.
 3. **The web viewer.** `pnpm dev:web` serves the Next.js app on http://localhost:3000. It renders shared links (`/r/<id>`) inline for anyone — and hands off into the extension when it's installed.
 
-Everything runs against local storage: reports in the extension's IndexedDB, shared replays in `apps/replay-server/.data/`. No accounts, no API keys. Env vars, none needed for local dev:
+Everything runs against local storage: reports in the extension's IndexedDB, shared replays in `apps/replay-server/.data/`. No accounts, no API keys. Env vars, none needed for prod — defaults are Vercel:
 
 - `BLOB_READ_WRITE_TOKEN` flips the share server to Vercel Blob for production (blobs are public with deterministic UUID paths, so a share link is a secret link — the id is unguessable, and reads are plain GETs).
-- `WXT_PUBLIC_REPLAY_SERVER_URL` points a production extension build at the deployed server instead of the local twin (put it in `apps/extension/.env`, which is gitignored).
-- `NEXT_PUBLIC_REPLAY_SERVER_URL` does the same for the web viewer's payload fetches (put it in `apps/web/.env.local`).
-- `WXT_PUBLIC_WEB_URL` / `NEXT_PUBLIC_WEB_URL` override the web viewer's base URL (default `http://localhost:3000`) — share links point here, and the extension's handoff bridge only answers pages on this origin, so the two must agree.
+- `WXT_PUBLIC_REPLAY_SERVER_URL` overrides the replay server for local dev (put `http://localhost:8898` in `apps/extension/.env`, which is gitignored); default `https://trail-roan.vercel.app`.
+- `NEXT_PUBLIC_REPLAY_SERVER_URL` does the same for the web viewer's payload fetches (put `http://localhost:8898` in `apps/web/.env.local`); default `https://trail-roan.vercel.app`.
+- `WXT_PUBLIC_WEB_URL` / `NEXT_PUBLIC_WEB_URL` override the web viewer's base URL for local dev (default `https://trail-bug.vercel.app`, local `http://localhost:3000`) — share links point here, and the extension's handoff bridge only answers pages on this origin, so the two must agree.
 - The AI proxy keys on the replay server — `OPENROUTER_API_KEY` (report enhancements) and `GROQ_API_KEY` (title pass), each optional and independent — turn on the corresponding AI passes; without a key that pass degrades to the local deterministic digest, so the report still works either way.
 
 To check a change: `pnpm verify:extension` runs the typecheck, a production build, and a Puppeteer spike that drives a real page through the whole capture path (including sharing a session and importing it over the extension bridge from the web origin). For a manual install: `pnpm build:extension`, then load `.output/chrome-mv3` from `chrome://extensions`. Prefer a prebuilt zip? Download [trail-extension-0.0.0-chrome.zip](https://drive.google.com/file/d/1MUGkkKjyWQZ37HbLISMpURe2MUDuCMT2/view?usp=drive_link), unzip it, and load the folder as an unpacked extension. Want all three at once? `pnpm dev:all`.

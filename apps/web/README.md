@@ -4,7 +4,7 @@ The web surface of TRAIL (part of the [root monorepo](../README.md)): renders sh
 
 ## What it does
 
-- `/r/<id>` — a share link. The server component fetches the session payload from the replay server (`NEXT_PUBLIC_REPLAY_SERVER_URL`, default `http://localhost:8898`) and renders the same review UI the extension uses — replay, timeline, evidence, report, exports. The review UI itself lives in `@trail/review` (see `packages/review`).
+- `/r/<id>` — a share link. The server component fetches the session payload from the replay server (`NEXT_PUBLIC_REPLAY_SERVER_URL`, default `https://trail-roan.vercel.app`) and renders the same review UI the extension uses — replay, timeline, evidence, report, exports. The review UI itself lives in `@trail/review` (see `packages/review`).
 - **Handoff gate** — when the TRAIL extension is installed, the viewer detects it via a postMessage probe through the extension's content-script relay, shows an "Open in TRAIL" button with a 10-second countdown, and posts the share link to the extension (which opens its own review tab and saves the session to its history). No extension, or the countdown expires, and the viewer just renders the review inline. "View in browser instead" skips the handoff at any time.
 - Imports land in the viewer's **own** IndexedDB (`trail-web`, via the shared `createDb` factory in `@trail/review/lib/db`) — separate from the extension's profile history, idempotent per source link.
 

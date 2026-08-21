@@ -18,6 +18,6 @@ const hasWeb = !!process.env.WXT_PUBLIC_WEB_URL || hasDotEnv;
 const hasReplay = !!process.env.WXT_PUBLIC_REPLAY_SERVER_URL || hasDotEnv;
 if (!hasWeb || !hasReplay) {
   console.warn(
-    '⚠️  WXT_PUBLIC_WEB_URL / WXT_PUBLIC_REPLAY_SERVER_URL not set — share will point to localhost. For prod: WXT_PUBLIC_WEB_URL=https://trail-bug.vercel.app WXT_PUBLIC_REPLAY_SERVER_URL=https://trail-roan.vercel.app pnpm zip:prod (or create apps/extension/.env from .env.example)',
+    'ℹ️  WXT_PUBLIC_WEB_URL / WXT_PUBLIC_REPLAY_SERVER_URL not set — using Vercel defaults (https://trail-bug.vercel.app / https://trail-roan.vercel.app). For local dev: WXT_PUBLIC_WEB_URL=http://localhost:3000 WXT_PUBLIC_REPLAY_SERVER_URL=http://localhost:8898 (or create apps/extension/.env from .env.example)',
   );
 }

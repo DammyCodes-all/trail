@@ -48,14 +48,10 @@ function escapeNonAscii(): {
   };
 }
 
-// Fail fast if required WXT_PUBLIC_* env is missing — share links would silently
-// point to localhost and break demo. Dev can still use .env file; CI must export vars.
-// WXT loads .env via dotenv, but process.env check here covers CI where .env is gitignored.
+// Defaults now point at Vercel (see packages/review/src/lib/constants.ts).
+// Env vars are only needed to override for local dev (e.g. http://localhost:*).
+// Keep a soft notice for builds without explicit env so local-dev overrides are discoverable.
 function assertRequiredEnv() {
-  // Allow localhost fallback for dev/prepare only; build/zip must have env
-  const cmd = process.argv[2] ?? "";
-  const isDevOrPrepare = cmd === "dev" || cmd === "prepare" || process.argv.includes("prepare");
-  if (isDevOrPrepare) return;
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const hasDotEnv = (() => {
     try {
@@ -70,8 +66,8 @@ function assertRequiredEnv() {
   const hasWeb = !!process.env.WXT_PUBLIC_WEB_URL || hasDotEnv;
   const hasReplay = !!process.env.WXT_PUBLIC_REPLAY_SERVER_URL || hasDotEnv;
   if (!hasWeb || !hasReplay) {
-    throw new Error(
-      "Missing WXT_PUBLIC_WEB_URL / WXT_PUBLIC_REPLAY_SERVER_URL. For local dev create apps/extension/.env, for prod: WXT_PUBLIC_WEB_URL=https://trail-bug.vercel.app WXT_PUBLIC_REPLAY_SERVER_URL=https://trail-roan.vercel.app pnpm zip:prod",
+    console.warn(
+      "ℹ️  WXT_PUBLIC_WEB_URL / WXT_PUBLIC_REPLAY_SERVER_URL not set — using Vercel defaults (https://trail-bug.vercel.app / https://trail-roan.vercel.app). For local dev create apps/extension/.env with http://localhost:3000 / http://localhost:8898",
     );
   }
 }

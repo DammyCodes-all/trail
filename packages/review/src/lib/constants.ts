@@ -66,25 +66,27 @@ const nextPublicEnv = (key: string): string | undefined => {
   }
 };
 
-// Base URL of the replay share server (see replay-server/). Points at the local
-// twin by default; production builds override via WXT_PUBLIC_REPLAY_SERVER_URL
-// (a WXT_PUBLIC_ var, inlined at build time — see the WXT env docs) or the web
-// app's NEXT_PUBLIC_REPLAY_SERVER_URL.
+// Base URL of the replay share server (see replay-server/). Defaults to the
+// deployed Vercel instance; local dev overrides via WXT_PUBLIC_REPLAY_SERVER_URL
+// (a WXT_PUBLIC_ var, inlined at build time — see the WXT env docs), the web
+// app's NEXT_PUBLIC_REPLAY_SERVER_URL, or by setting the env to
+// http://localhost:8898.
 export const REPLAY_SERVER_URL =
   env.WXT_PUBLIC_REPLAY_SERVER_URL ??
   env.NEXT_PUBLIC_REPLAY_SERVER_URL ??
   nextPublicEnv("NEXT_PUBLIC_REPLAY_SERVER_URL") ??
-  "http://localhost:8898";
+  "https://trail-roan.vercel.app";
 
 // Base URL of the web app (see apps/web). Share links point here — opening
 // one works with or without the extension installed (the web page renders the
-// review UI and hands off to the extension when it's present). The extension
-// builds override the localhost default via WXT_PUBLIC_WEB_URL.
+// review UI and hands off to the extension when it's present). Defaults to the
+// deployed Vercel instance; local dev overrides via WXT_PUBLIC_WEB_URL or
+// NEXT_PUBLIC_WEB_URL (e.g. http://localhost:3000).
 export const WEB_URL =
   env.WXT_PUBLIC_WEB_URL ??
   env.NEXT_PUBLIC_WEB_URL ??
   nextPublicEnv("NEXT_PUBLIC_WEB_URL") ??
-  "http://localhost:3000";
+  "https://trail-bug.vercel.app";
 
 // Origin and hostname of the web app — the relay origin-gates the handoff
 // bridge on WEB_ORIGIN, and the background validates share links against

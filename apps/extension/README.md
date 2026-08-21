@@ -33,7 +33,7 @@ The review UI itself — `ReviewApp`, its components, and the pure report/timeli
 
 ## Things you'll touch
 
-- `packages/review/src/lib/constants.ts` — message keys, `REPLAY_SERVER_URL` and `WEB_URL` (both point at `http://localhost:8898` / `http://localhost:3000` by default; production builds override via `WXT_PUBLIC_REPLAY_SERVER_URL` / `WXT_PUBLIC_WEB_URL`), `chrome.storage` preference keys.
+- `packages/review/src/lib/constants.ts` — message keys, `REPLAY_SERVER_URL` and `WEB_URL` (both default to `https://trail-roan.vercel.app` / `https://trail-bug.vercel.app`; override for local dev via `WXT_PUBLIC_REPLAY_SERVER_URL` / `WXT_PUBLIC_WEB_URL` e.g. `http://localhost:8898` / `http://localhost:3000`), `chrome.storage` preference keys.
 - `wxt.config.ts` — manifest, permissions, and the `escapeNonAscii` build plugin that keeps rrweb loadable by Chrome's content-script loader.
 - `packages/review/src/lib/share.ts` — share-link shape (`/r/<id>` for the web viewer, legacy `/api/replays/<id>` still importable), presign upload, content-hash reuse.
 - `entrypoints/relay.content.ts` — the handoff bridge: a page on the web origin posts `open-share`; the relay forwards it to the background, which opens its own review tab and acks back.

@@ -39,8 +39,8 @@ function findChrome() {
   return '/usr/bin/google-chrome';
 }
 
-// The extension points at localhost:8898 by default (REPLAY_SERVER_URL). Spawn
-// the local twin; if something already listens there (e.g. pnpm dev:replay),
+// The extension defaults to the Vercel replay server (REPLAY_SERVER_URL), but
+// the verify build overrides to localhost:8898 (see package.json verify script). Spawn
 // reuse it — the health probe succeeds either way.
 async function waitForReplayServer() {
   for (let i = 0; i < 50; i++) {
