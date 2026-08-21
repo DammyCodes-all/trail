@@ -273,7 +273,36 @@ async function openReviewPage(seq?: number): Promise<void> {
   });
 }
 
+let bgRegistered = false;
+const handleTabRemoved = async (tabId: number) => {
+  const session = await getSession();
+  if (session?.tabId === tabId) {
+    void stopRecording().catch(() => {});
+  }
+};
+const handleTabUpdated = async (
+  tabId: number,
+  changeInfo: { url?: string },
+  tab: { url?: string },
+) => {
+  const session = await getSession();
+  if (session?.tabId !== tabId) return;
+  const newUrl = changeInfo.url ?? tab.url ?? "";
+  if (newUrl && !newUrl.startsWith("http")) {
+    void stopRecording().catch(() => {});
+  }
+};
+
 export default defineBackground(() => {
+  // Guard against HMR re-execution (wxt dev) adding duplicate listeners:
+  // defineBackground's callback can re-run without the SW being killed,
+  // which would otherwise double every MSG_BATCH → double addEvents.
+  const g = globalThis as unknown as { __trailBgRegistered?: boolean };
+  if (g.__trailBgRegistered) return;
+  g.__trailBgRegistered = true;
+  if (bgRegistered) return;
+  bgRegistered = true;
+
   // Rehydrate: if a session was active when the SW died, re-register the recorder
   // so future navigations keep recording. Already-open tabs still have the
   // injected recorder; Chrome wakes this SW for each batch.
@@ -295,20 +324,8 @@ export default defineBackground(() => {
     }
   })();
 
-  browser.tabs.onRemoved.addListener(async (tabId) => {
-    const session = await getSession();
-    if (session?.tabId === tabId) {
-      void stopRecording().catch(() => {});
-    }
-  });
-  browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    const session = await getSession();
-    if (session?.tabId !== tabId) return;
-    const newUrl = changeInfo.url ?? tab.url ?? "";
-    if (newUrl && !newUrl.startsWith("http")) {
-      void stopRecording().catch(() => {});
-    }
-  });
+  browser.tabs.onRemoved.addListener(handleTabRemoved);
+  browser.tabs.onUpdated.addListener(handleTabUpdated);
 
   browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg?.type === MSG_BATCH) {

@@ -40,6 +40,9 @@ const xhrResponseHeaders = (raw: string): Record<string, string> => {
 // Instrument fetch and XHR to record failed requests. Failures are report-worthy;
 // successful requests are noise and are never recorded.
 export const instrumentNetwork = (ctx: RecordContext) => {
+  const w = window as unknown as Record<string, unknown>;
+  if (w.__trailNetworkPatched) return;
+  w.__trailNetworkPatched = true;
   const { emit, isActive, pageUrl } = ctx;
 
   const origFetch = window.fetch;
@@ -189,6 +192,9 @@ export const instrumentNetwork = (ctx: RecordContext) => {
 // out by the tag check. Favicon and prefetch links are the classic
 // meaningless 404 noise and are skipped.
 export const instrumentResourceErrors = (ctx: RecordContext) => {
+  const w = window as unknown as Record<string, unknown>;
+  if (w.__trailResourceErrorPatched) return;
+  w.__trailResourceErrorPatched = true;
   const { emit, isActive, pageUrl } = ctx;
   addEventListener(
     "error",
@@ -263,6 +269,9 @@ export const instrumentResourceErrors = (ctx: RecordContext) => {
 // `instanceof WebSocket` checks (and prototype-plumbing libraries) are
 // unaffected.
 export const instrumentWebSockets = (ctx: RecordContext) => {
+  const w = window as unknown as Record<string, unknown>;
+  if (w.__trailWebSocketPatched) return;
+  w.__trailWebSocketPatched = true;
   const { emit, isActive, pageUrl } = ctx;
   const OrigWebSocket = window.WebSocket;
   if (typeof OrigWebSocket !== "function") return;

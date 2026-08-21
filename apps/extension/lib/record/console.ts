@@ -7,6 +7,9 @@ import { redactText } from "./redaction";
 // Instrument console.error/warn, uncaught errors and unhandled rejections.
 // Installed at document_start so early page errors are caught.
 export const instrumentConsole = (ctx: RecordContext) => {
+  const w = window as unknown as Record<string, unknown>;
+  if (w.__trailConsolePatched) return;
+  w.__trailConsolePatched = true;
   const { emit, isActive, pageUrl } = ctx;
 
   for (const lv of ["error", "warn"] as const) {

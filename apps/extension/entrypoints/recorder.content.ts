@@ -18,10 +18,14 @@ import type { FlagEvent, NavEvent } from "@trail/review/lib/types";
 
 declare global {
   interface Window {
-    __trailRecorder?: boolean;
+    __trailRecorder?: boolean | string;
     // Test hook: mirrors `active`, so the spike can assert a non-session page's
     // recorder gets disarmed by the relay's session check.
     __trailRecorderActive?: boolean;
+    __trailConsolePatched?: boolean;
+    __trailNetworkPatched?: boolean;
+    __trailWebSocketPatched?: boolean;
+    __trailResourceErrorPatched?: boolean;
   }
 }
 
@@ -35,8 +39,13 @@ export default defineContentScript({
   registration: "runtime",
   noScriptStartedPostMessage: true,
   main() {
-    if (window.__trailRecorder) return;
-    window.__trailRecorder = true;
+    const w = window as unknown as Record<string, unknown>;
+    if (w.__trailRecorder) return;
+    // Set synchronously before any instrumentation so a concurrent injection
+    // that races this one (e.g. registered MAIN script at document_start vs
+    // injectRecorderIntoPage) sees truthy and bails, preventing double
+    // listeners/patches.
+    w.__trailRecorder = true;
 
     let active = true;
     let autoRedact = true; // default on; relay delivers the stored preference
