@@ -1,4 +1,4 @@
-import { POST_MESSAGE_KEY, FLAG_KEY } from "@trail/review/lib/constants";
+import { POST_MESSAGE_KEY, FLAG_KEY, FLAG_DEDUP_WINDOW_MS } from "@trail/review/lib/constants";
 import type { RecordContext } from "@/lib/record/context";
 import { instrumentConsole } from "@/lib/record/console";
 import { instrumentClicks, instrumentInputs } from "@/lib/record/interactions";
@@ -65,9 +65,11 @@ export default defineContentScript({
     instrumentHovers(ctx);
     instrumentViewport(ctx);
 
+    let lastFlag: { phase: string | undefined; note: string | undefined; t: number } | null = null;
     addEventListener("message", (e) => {
       if (e.data?.[POST_MESSAGE_KEY] === "stop") {
         setActive(false);
+        lastFlag = null;
         rrweb.stop();
         // Ack so the relay knows capture is sealed and can flush the final
         // batch without racing new events.
@@ -77,6 +79,7 @@ export default defineContentScript({
         // makes re-executing recorder.js a no-op, so re-activation has to come
         // through the relay as a message.
         setActive(true);
+        lastFlag = null;
         if (!rrweb.running) rrweb.start();
       } else if (e.data?.[POST_MESSAGE_KEY] === "redact") {
         const on = e.data.value === true;
@@ -113,9 +116,19 @@ export default defineContentScript({
         const note = notes
           ? cap(d?.note || d?.expected || d?.actual || '', 240) || undefined
           : undefined;
+        const now = Date.now();
+        if (
+          lastFlag &&
+          lastFlag.phase === phase &&
+          lastFlag.note === note &&
+          Math.abs(now - lastFlag.t) < FLAG_DEDUP_WINDOW_MS
+        ) {
+          return;
+        }
+        lastFlag = { phase, note, t: now };
         const flag: FlagEvent = {
           k: 'flag',
-          t: Date.now(),
+          t: now,
           url: location.href,
           phase,
           note,

@@ -93,3 +93,7 @@ export const WEB_URL =
 // WEB_HOST before opening them.
 export const WEB_ORIGIN = new URL(WEB_URL).origin;
 export const WEB_HOST = new URL(WEB_URL).hostname;
+
+// How long to coalesce duplicate flag submits (overlay Enter+form double,
+// relay flush, etc.). Shared by overlay, recorder (MAIN), and background.
+export const FLAG_DEDUP_WINDOW_MS = 800;

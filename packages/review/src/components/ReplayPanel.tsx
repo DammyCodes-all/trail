@@ -30,6 +30,7 @@ export const ReplayPanel = forwardRef<
     onToggleExpandWindow?: (index: number) => void;
     onCurrentTimeChange: (timeOffset: number) => void;
     onPlayingChange?: (playing: boolean) => void;
+    onReady?: () => void;
   }
 >(function ReplayPanel(
   {
@@ -41,6 +42,7 @@ export const ReplayPanel = forwardRef<
     onToggleExpandWindow,
     onCurrentTimeChange,
     onPlayingChange,
+    onReady,
   },
   forwardedRef,
 ) {
@@ -56,6 +58,10 @@ export const ReplayPanel = forwardRef<
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const pendingSeekRef = useRef<number | null>(null);
+  const pendingPlayRef = useRef(false);
+  const seekRafRef = useRef(0);
 
   const onPlayingChangeRef = useRef(onPlayingChange);
   onPlayingChangeRef.current = onPlayingChange;
@@ -66,20 +72,52 @@ export const ReplayPanel = forwardRef<
   useImperativeHandle(
     forwardedRef,
     () => ({
-      seek: (timeOffset, play = false) =>
-        replayRef.current?.seek(timeOffset, play),
+      seek: (timeOffset, play = false) => {
+        if (!isReady) {
+          pendingSeekRef.current = timeOffset;
+          pendingPlayRef.current = play;
+          return;
+        }
+        // Coalesce rapid timeline clicks: rAF lets React paint the
+        // optimistic highlight before the heavy sync goto blocks.
+        pendingSeekRef.current = timeOffset;
+        pendingPlayRef.current = play;
+        if (seekRafRef.current) cancelAnimationFrame(seekRafRef.current);
+        seekRafRef.current = requestAnimationFrame(() => {
+          seekRafRef.current = 0;
+          const t = pendingSeekRef.current;
+          const p = pendingPlayRef.current;
+          pendingSeekRef.current = null;
+          pendingPlayRef.current = false;
+          if (t !== null) replayRef.current?.seek(t, p);
+        });
+      },
       play: () => replayRef.current?.play(),
       pause: () => replayRef.current?.pause(),
       setSpeed: (nextSpeed) => replayRef.current?.setSpeed(nextSpeed),
     }),
-    [],
+    [isReady],
   );
 
   useEffect(() => {
     setDuration(eventDuration);
     setIsPlaying(false);
     setSpeed(1);
-  }, [eventDuration]);
+    if (!events.length) {
+      setIsReady(true);
+    } else {
+      setIsReady(false);
+    }
+    // Don't clobber a user-initiated seek queued while !isReady — the
+    // imperative handle's pendingSeek would be lost and the timeline click
+    // would appear to hang until the 300ms fallback.
+    if (pendingSeekRef.current === null) {
+      pendingPlayRef.current = false;
+    }
+    if (seekRafRef.current) cancelAnimationFrame(seekRafRef.current);
+  }, [eventDuration, events]);
+
+  useEffect(() => () => cancelAnimationFrame(seekRafRef.current), []);
 
   // The events list is replaced when a report-writing window is expanded or
   // collapsed, which remounts the player (rrweb-player can't re-time an
@@ -89,8 +127,14 @@ export const ReplayPanel = forwardRef<
   const currentTimeRef = useRef(currentTime);
   currentTimeRef.current = currentTime;
   useEffect(() => {
+    if (!isReady) {
+      if (pendingSeekRef.current !== null) return;
+      pendingSeekRef.current = currentTimeRef.current;
+      pendingPlayRef.current = false;
+      return;
+    }
     replayRef.current?.seek(currentTimeRef.current, false);
-  }, [events]);
+  }, [events, isReady]);
 
   // The report-writing window under the current playback position, if any:
   // show a "skipped" marker instead of silently playing through dead air.
@@ -141,7 +185,21 @@ export const ReplayPanel = forwardRef<
 
   const seek = (nextTime: number) => {
     onCurrentTimeChange(nextTime);
-    replayRef.current?.seek(nextTime, false);
+    if (!isReady) {
+      pendingSeekRef.current = nextTime;
+      pendingPlayRef.current = false;
+      return;
+    }
+    // Defer goto by rAF so the time label paints before sync rebuild.
+    pendingSeekRef.current = nextTime;
+    pendingPlayRef.current = false;
+    if (seekRafRef.current) cancelAnimationFrame(seekRafRef.current);
+    seekRafRef.current = requestAnimationFrame(() => {
+      seekRafRef.current = 0;
+      const t = pendingSeekRef.current;
+      pendingSeekRef.current = null;
+      if (t !== null) replayRef.current?.seek(t, false);
+    });
   };
 
   const finishSeek = () => {
@@ -193,6 +251,23 @@ export const ReplayPanel = forwardRef<
               onCurrentTimeChange={onCurrentTimeChange}
               onDurationChange={setDuration}
               onPlayingChange={setIsPlaying}
+              onReady={() => {
+                setIsReady(true);
+                onReady?.();
+                // Flush any seek that was coalesced while the player was
+                // still building its initial snapshot.
+                if (pendingSeekRef.current !== null) {
+                  const t = pendingSeekRef.current;
+                  const p = pendingPlayRef.current;
+                  pendingSeekRef.current = null;
+                  pendingPlayRef.current = false;
+                  if (seekRafRef.current) cancelAnimationFrame(seekRafRef.current);
+                  seekRafRef.current = requestAnimationFrame(() => {
+                    seekRafRef.current = 0;
+                    replayRef.current?.seek(t, p);
+                  });
+                }
+              }}
             />
             {activeSpanIndex >= 0 ? (
               <SkippedWindowChip
