@@ -12,7 +12,7 @@ TRAIL does the remembering for you. No SDK, no app instrumentation, no account. 
 
 ## Demo
 
-![Demo](demo.gif) <!-- replace: a GIF or screenshot of recording a bug, the review screen, and the prefilled GitHub issue -->
+> **Demo:** Recording a bug → review screen (replay + timeline) → prefilled GitHub issue. Add a GIF/screenshot as `demo.gif` before submission — placeholder image removed to avoid a broken link in review. Run `pnpm dev:all` and record a session locally to capture it.
 
 ## What TRAIL does
 
@@ -35,7 +35,7 @@ TRAIL does the remembering for you. No SDK, no app instrumentation, no account. 
 
 ## Getting started
 
-You need pnpm 11+ and Node 20.9+. The repo pins pnpm via `devEngines`, so it installs the right version automatically. Chrome or Firefox for the extension.
+You need pnpm 11+ and Node 20.9+. The repo pins pnpm via `devEngines`, so it installs the right version automatically. Chrome for the extension (Firefox planned).
 
 ```sh
 git clone <repo>
@@ -48,16 +48,16 @@ Three processes, all local:
 1. **The extension.** `pnpm dev:extension` builds and launches Chrome with the unpacked extension loaded. Start a report, reproduce a bug, stop. The review tab opens with the replay and timeline.
 2. **The replay server.** `pnpm dev:replay` runs on http://localhost:8898. Needed for local shareable links. By default the extension and web viewer point at the deployed servers (`https://trail-roan.vercel.app` / `https://trail-bug.vercel.app`); set `WXT_PUBLIC_REPLAY_SERVER_URL=http://localhost:8898` / `NEXT_PUBLIC_REPLAY_SERVER_URL=http://localhost:8898` to use the local twin instead. Recipients fetch the session from the link's own host, so both sides can run different servers.
 3. **The web viewer.** `pnpm dev:web` serves the Next.js app on http://localhost:3000. It renders shared links (`/r/<id>`) inline for anyone — and hands off into the extension when it's installed.
+4. **All three at once.** `pnpm dev:all` runs extension, replay server, and web viewer together.
 
-Everything runs against local storage: reports in the extension's IndexedDB, shared replays in `apps/replay-server/.data/`. No accounts, no API keys. Env vars, none needed for prod — defaults are Vercel:
+Env vars, none needed for prod — defaults are Vercel:
 
 - `BLOB_READ_WRITE_TOKEN` flips the share server to Vercel Blob for production (blobs are public with deterministic UUID paths, so a share link is a secret link — the id is unguessable, and reads are plain GETs).
-- `WXT_PUBLIC_REPLAY_SERVER_URL` overrides the replay server for local dev (put `http://localhost:8898` in `apps/extension/.env`, which is gitignored); default `https://trail-roan.vercel.app`.
-- `NEXT_PUBLIC_REPLAY_SERVER_URL` does the same for the web viewer's payload fetches (put `http://localhost:8898` in `apps/web/.env.local`); default `https://trail-roan.vercel.app`.
+- `WXT_PUBLIC_REPLAY_SERVER_URL` / `NEXT_PUBLIC_REPLAY_SERVER_URL` override the replay server for local dev — extension reads `WXT_PUBLIC_REPLAY_SERVER_URL` from `apps/extension/.env` (gitignored), web viewer reads `NEXT_PUBLIC_REPLAY_SERVER_URL` from `apps/web/.env.local`; default `https://trail-roan.vercel.app` for both. They do the same thing for the two surfaces.
 - `WXT_PUBLIC_WEB_URL` / `NEXT_PUBLIC_WEB_URL` override the web viewer's base URL for local dev (default `https://trail-bug.vercel.app`, local `http://localhost:3000`) — share links point here, and the extension's handoff bridge only answers pages on this origin, so the two must agree.
 - The AI proxy keys on the replay server — `OPENROUTER_API_KEY` (report enhancements) and `GROQ_API_KEY` (title pass), each optional and independent — turn on the corresponding AI passes; without a key that pass degrades to the local deterministic digest, so the report still works either way.
 
-To check a change: `pnpm verify:extension` runs the typecheck, a production build, and a Puppeteer spike that drives a real page through the whole capture path (including sharing a session and importing it over the extension bridge from the web origin). For a manual install: `pnpm build:extension`, then load `.output/chrome-mv3` from `chrome://extensions`. Prefer a prebuilt zip? Download [trail-extension-0.0.0-chrome.zip](https://drive.google.com/file/d/1MUGkkKjyWQZ37HbLISMpURe2MUDuCMT2/view?usp=drive_link), unzip it, and load the folder as an unpacked extension. Want all three at once? `pnpm dev:all`.
+To check a change: `pnpm verify:extension` runs the typecheck, a production build, and a Puppeteer spike that drives a real page through the whole capture path (including sharing a session and importing it over the extension bridge from the web origin). For a manual install: `pnpm build:extension`, then load `.output/chrome-mv3` from `chrome://extensions`. Prefer a prebuilt zip? Download [trail-extension-0.0.0-chrome.zip](https://drive.google.com/file/d/1MUGkkKjyWQZ37HbLISMpURe2MUDuCMT2/view?usp=drive_link), unzip it, and load the folder as an unpacked extension.
 
 ## How it works
 
@@ -113,7 +113,7 @@ packages/tokens       @trail/tokens — design tokens as CSS
 
 ## License
 
-TBD.
+MIT — TBD post-hackathon (no LICENSE file yet).
 
 ## Contact
 
