@@ -41,6 +41,8 @@ export function TimelineCard({
   onSeek,
   isPlaying = false,
   replayToWall,
+  isPlayerReady = true,
+  isSeeking = false,
 }: {
   steps: TimelineStep[];
   t0: number;
@@ -52,7 +54,24 @@ export function TimelineCard({
   // uncompressed; when report-writing windows are compressed, the player
   // time must be mapped back so the active-row highlight stays correct.
   replayToWall?: (offset: number) => number;
+  isPlayerReady?: boolean;
+  isSeeking?: boolean;
 }) {
+  // Defensive: isSeeking is cleared only via a 120 ms timeout in app.tsx.
+  // If the player never fires onReady (error/empty), the prop can stay true
+  // indefinitely and leave aria-busy/data-seeking stuck. Mirror it locally
+  // and auto-clear when the player becomes ready.
+  const [effectiveSeeking, setEffectiveSeeking] = useState(isSeeking);
+  useEffect(() => {
+    setEffectiveSeeking(isSeeking);
+  }, [isSeeking]);
+  useEffect(() => {
+    if (!effectiveSeeking) return;
+    if (!isPlayerReady) return;
+    const id = window.setTimeout(() => setEffectiveSeeking(false), 180);
+    return () => window.clearTimeout(id);
+  }, [isPlayerReady, effectiveSeeking]);
+  const isSeekingEffective = effectiveSeeking;
   const [filter, setFilter] = useState<FilterMode>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
@@ -226,9 +245,12 @@ export function TimelineCard({
     rowEls.current[index] = el;
   };
 
+  const hasEvents = steps.length > 0;
   return (
     <section
       ref={cardRef}
+      aria-busy={hasEvents && (isSeekingEffective || !isPlayerReady) ? true : undefined}
+      data-seeking={isSeekingEffective && hasEvents ? "" : undefined}
       className="min-w-0 border-b border-border py-8 sm:py-10 lg:border-b-0"
     >
       <header className="mb-4 flex flex-wrap items-center justify-between gap-4">

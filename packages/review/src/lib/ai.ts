@@ -160,8 +160,10 @@ export function buildSessionDigest(
   // the numbers match the evidence the model actually sees — and match the
   // title digest's numbers exactly (single source, countKeySignals).
   const { foldedErrors, failedRequests } = countKeySignals(events);
-  // 'open' events start the report-writing window, not a flagged moment.
-  const flagCount = events.filter((e) => e.k === 'flag' && e.phase !== 'open').length;
+  // 'open'/'cancel' are window edges, not flagged moments.
+  const flagCount = events.filter(
+    (e) => e.k === 'flag' && e.phase !== 'open' && e.phase !== 'cancel',
+  ).length;
   const stats = `${flagCount} flagged moments · ${foldedErrors} console errors · ${failedRequests} failed requests in ${formatDuration(facts.durationMs)}`;
 
   // Reporter flags: the user's own words, offset like the timeline so the
@@ -171,7 +173,7 @@ export function buildSessionDigest(
   const flags = events
     .filter(
       (e): e is Extract<StoredEvent, { k: 'flag' }> =>
-        e.k === 'flag' && e.phase !== 'open',
+        e.k === 'flag' && e.phase !== 'open' && e.phase !== 'cancel',
     )
     .slice(-MAX_FLAGS)
     .map((e) => ({
@@ -284,14 +286,16 @@ export function buildTitleDigest(
     }));
 
   // All flags, never sliced: they are the reporter's own account and the
-  // strongest title signal. The budget trims them last. Opens (window start,
-  // no notes) don't count as flagged moments but still ride along trimmed.
+  // strongest title signal. The budget trims them last. Opens/cancels (window
+  // edges, no notes) don't count as flagged moments but still ride along trimmed.
   const t0 = events[0]?.t ?? 0;
-  const flagCount = events.filter((e) => e.k === 'flag' && e.phase !== 'open').length;
+  const flagCount = events.filter(
+    (e) => e.k === 'flag' && e.phase !== 'open' && e.phase !== 'cancel',
+  ).length;
   const flags = events
     .filter(
       (e): e is Extract<StoredEvent, { k: 'flag' }> =>
-        e.k === 'flag' && e.phase !== 'open',
+        e.k === 'flag' && e.phase !== 'open' && e.phase !== 'cancel',
     )
     .map((e) => ({
       at: formatElapsedTime(e.t - t0),

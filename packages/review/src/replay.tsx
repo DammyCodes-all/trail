@@ -23,6 +23,7 @@ interface ReplayPlayerProps {
   onCurrentTimeChange?: (timeOffset: number) => void;
   onDurationChange?: (duration: number) => void;
   onPlayingChange?: (playing: boolean) => void;
+  onReady?: () => void;
 }
 
 type PlayerInstance = Player & {
@@ -40,6 +41,7 @@ export const ReplayPlayer = forwardRef<
     onCurrentTimeChange,
     onDurationChange,
     onPlayingChange,
+    onReady,
   },
   forwardedRef,
 ) {
@@ -49,6 +51,7 @@ export const ReplayPlayer = forwardRef<
     onCurrentTimeChange,
     onDurationChange,
     onPlayingChange,
+    onReady,
   });
   // Position and play state tracked inside the player: a rebuild (speed
   // change) must resume exactly where the old instance was.
@@ -59,6 +62,7 @@ export const ReplayPlayer = forwardRef<
     onCurrentTimeChange,
     onDurationChange,
     onPlayingChange,
+    onReady,
   };
 
   // At high speed the replayer executes every due event in one burst per
@@ -142,6 +146,22 @@ export const ReplayPlayer = forwardRef<
       wasPlayingRef.current = false;
       callbackRef.current.onPlayingChange?.(false);
     });
+    // Signal readiness after the first full-snapshot rebuild completes.
+    // The replayer emits `fullsnapshot-rebuilded` (rrweb Replayer:
+    // ReplayerEvents.FullsnapshotRebuilded = "fullsnapshot-rebuilded" in
+    // rrweb-player 2.1.1 dist/rrweb-player.js) after its async
+    // `setTimeout(1)` initial rebuild — gating timeline clicks until then
+    // prevents racing two heavy rebuilds (mount snapshot 0 vs seek target).
+    // Fallback timer covers edge cases where the event fires before we
+    // attach or where there is no FullSnapshot.
+    let readyFired = false;
+    const fireReady = () => {
+      if (readyFired) return;
+      readyFired = true;
+      callbackRef.current.onReady?.();
+    };
+    player.addEventListener("fullsnapshot-rebuilded", fireReady);
+    const readyTimer = window.setTimeout(fireReady, 300);
 
     const metadata = player.getMetaData();
     callbackRef.current.onDurationChange?.(metadata.totalTime);
@@ -187,8 +207,11 @@ export const ReplayPlayer = forwardRef<
 
     // Test hook: proves the Svelte replay engine actually mounted.
     (window as unknown as Record<string, unknown>).__trailPlayerReady = true;
+    // If the fullsnapshot event already fired synchronously, `readyFired`
+    // ensures we still signal; otherwise the timer above will fire.
 
     return () => {
+      window.clearTimeout(readyTimer);
       resizeObserver.disconnect();
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       cancelAnimationFrame(frame);

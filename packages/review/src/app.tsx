@@ -53,6 +53,7 @@ import {
 } from "./lib/exports";
 import { countEvents } from "./lib/summary";
 import { getStorageArea } from "./lib/storage";
+import { scheduleIdle } from "./lib/utils";
 import type {
   StoredEvent,
   TrailCounts,
@@ -263,9 +264,12 @@ export function ReviewApp({
       setIsPlayerReady(true);
       setIsSeeking(false);
       pendingSeekRef.current = null;
+      if (seekingTimeoutRef.current) window.clearTimeout(seekingTimeoutRef.current);
       return;
     }
     setIsPlayerReady(false);
+    setIsSeeking(false);
+    if (seekingTimeoutRef.current) window.clearTimeout(seekingTimeoutRef.current);
   }, [replayEvents]);
 
   const counts: TrailCounts = useMemo(() => countEvents(events), [events]);
@@ -575,6 +579,16 @@ export function ReviewApp({
     seekingTimeoutRef.current = window.setTimeout(() => setIsSeeking(false), 120);
   }, [isPlayerReady]);
 
+  // Defensive: if a seek was started while !isPlayerReady but no pendingSeek
+  // was queued (or the player never fires onReady and falls back), ensure
+  // the seeking UI doesn't stay stuck.
+  useEffect(() => {
+    if (!isPlayerReady || !isSeeking) return;
+    if (pendingSeekRef.current !== null) return;
+    if (seekingTimeoutRef.current) window.clearTimeout(seekingTimeoutRef.current);
+    seekingTimeoutRef.current = window.setTimeout(() => setIsSeeking(false), 120);
+  }, [isPlayerReady, isSeeking]);
+
   const handleReplayTimeChange = useCallback((timeOffset: number) => {
     setCurrentReplayTime(timeOffset);
   }, []);
@@ -602,6 +616,10 @@ export function ReviewApp({
   // the first timeline seek isn't contending with a multi-MB JSON.stringify
   // on the main thread. Effects that need it already guard `!stableShareInput`.
   const [stableShareInput, setStableShareInput] = useState("");
+  const stableShareInputRef = useRef(stableShareInput);
+  useEffect(() => {
+    stableShareInputRef.current = stableShareInput;
+  }, [stableShareInput]);
   useEffect(() => {
     if (!events.length) {
       setStableShareInput("");
@@ -612,28 +630,10 @@ export function ReviewApp({
       const json = stableShareJson({ v: 2, report: shareReportBase, events });
       if (!cancelled) setStableShareInput(json);
     };
-    const ric = (
-      window as unknown as {
-        requestIdleCallback?: (
-          cb: () => void,
-          opts?: { timeout: number },
-        ) => number;
-        cancelIdleCallback?: (id: number) => void;
-      }
-    ).requestIdleCallback;
-    if (ric) {
-      const id = ric(compute, { timeout: 1000 });
-      return () => {
-        cancelled = true;
-        (
-          window as unknown as { cancelIdleCallback?: (id: number) => void }
-        ).cancelIdleCallback?.(id);
-      };
-    }
-    const id = window.setTimeout(compute, 0);
+    const cancel = scheduleIdle(compute, { timeout: 1000 });
     return () => {
       cancelled = true;
-      window.clearTimeout(id);
+      cancel();
     };
   }, [shareReportBase, events]);
   const shareInput = useMemo(
@@ -645,6 +645,22 @@ export function ReviewApp({
     }),
     [stableShareInput, displayTitle, shareReportBase, events],
   );
+  const shareInputRef = useRef(shareInput);
+  useEffect(() => {
+    shareInputRef.current = shareInput;
+  }, [shareInput]);
+  const shareReportBaseRef = useRef(shareReportBase);
+  useEffect(() => {
+    shareReportBaseRef.current = shareReportBase;
+  }, [shareReportBase]);
+  const eventsRef = useRef(events);
+  useEffect(() => {
+    eventsRef.current = events;
+  }, [events]);
+  const displayTitleRef = useRef(displayTitle);
+  useEffect(() => {
+    displayTitleRef.current = displayTitle;
+  }, [displayTitle]);
   // Automatic sharing must not depend on the editable/AI title: a title change
   // while an upload is in flight must not cancel the promise's ready transition.
   const autoShareInput = useMemo(
@@ -872,23 +888,27 @@ export function ReviewApp({
       // If idle hasn't computed stableShareInput yet, yield to paint the
       // "Preparing" state before doing the multi-MB JSON.stringify, so the
       // fallback doesn't reintroduce the first-seek jank it was meant to fix.
-      let effective = shareInput;
-      if (!stableShareInput) {
+      let effective = shareInputRef.current;
+      if (!stableShareInputRef.current) {
         await new Promise<void>((resolve) => {
-          const ric = (window as unknown as { requestIdleCallback?: (cb: () => void) => void })
-            .requestIdleCallback;
-          if (ric) ric(() => resolve());
-          else setTimeout(() => resolve(), 0);
+          scheduleIdle(() => resolve());
         });
-        // Re-check after yield — idle may have filled it in the meantime.
-        effective = stableShareInput
-          ? shareInput
-          : {
-              stableJson: stableShareJson({ v: 2, report: shareReportBase, events }),
-              title: displayTitle,
-              base: shareReportBase,
-              events,
-            };
+        // Re-check via ref — the closure's stableShareInput/shareInput are stale
+        // after the await (idle may have filled stableShareInput in the meantime).
+        if (stableShareInputRef.current) {
+          effective = shareInputRef.current;
+        } else {
+          effective = {
+            stableJson: stableShareJson({
+              v: 2,
+              report: shareReportBaseRef.current,
+              events: eventsRef.current,
+            }),
+            title: displayTitleRef.current,
+            base: shareReportBaseRef.current,
+            events: eventsRef.current,
+          };
+        }
       }
       const result = await ensureShareLink(effective, (phase) => {
         setReplayStatus(phase);
