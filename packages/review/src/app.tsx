@@ -166,6 +166,10 @@ export function ReviewApp({
   const [currentReplayTime, setCurrentReplayTime] = useState(0);
   const [replayPlaying, setReplayPlaying] = useState(false);
   const replayRef = useRef<ReplayPlayerHandle>(null);
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const pendingSeekRef = useRef<number | null>(null);
+  const seekingTimeoutRef = useRef<number | null>(null);
   // Report-writing windows the reviewer chose to watch at 1x instead of the
   // compressed budget. Lives here (not in ReplayPanel) because the time map —
   // and therefore seeking and the timeline highlight — depends on it.
@@ -249,6 +253,20 @@ export function ReviewApp({
       replayMap ? compressFlagWindows(rrwebEvents, replayMap) : rrwebEvents,
     [rrwebEvents, replayMap],
   );
+
+  // The player remounts when the compressed event list identity changes
+  // (window expand/collapse). Reset readiness so the next seek gates until
+  // the new instance's first snapshot has built. Empty replay has no player
+  // — treat as ready so UI doesn't stay busy.
+  useEffect(() => {
+    if (!replayEvents.length) {
+      setIsPlayerReady(true);
+      setIsSeeking(false);
+      pendingSeekRef.current = null;
+      return;
+    }
+    setIsPlayerReady(false);
+  }, [replayEvents]);
 
   const counts: TrailCounts = useMemo(() => countEvents(events), [events]);
   // Submitted flags only — 'open'/'cancel' are report-writing window edges,
@@ -518,11 +536,44 @@ export function ReviewApp({
       const offset = replayMap
         ? replayMap.wallToReplay(timestamp)
         : Math.max(0, timestamp - replayT0);
+      // Optimistic highlight: paint active row before the heavy rrweb goto
+      // blocks the main thread. The Panel handles rAF deferral so the
+      // highlight commits before the sync iframe rebuild.
       setCurrentReplayTime(offset);
+      if (seekingTimeoutRef.current) window.clearTimeout(seekingTimeoutRef.current);
+      setIsSeeking(true);
+      // Gate the heavy goto until the player has completed its initial
+      // fullsnapshot rebuild — otherwise we race two heavy rebuilds (mount
+      // snapshot 0 vs seek target) and the first click appears to hang.
+      if (!isPlayerReady) {
+        pendingSeekRef.current = offset;
+        return;
+      }
+      pendingSeekRef.current = null;
       replayRef.current?.seek(offset, false);
+      seekingTimeoutRef.current = window.setTimeout(() => setIsSeeking(false), 120);
     },
-    [replayT0, replayMap],
+    [replayT0, replayMap, isPlayerReady],
   );
+
+  useEffect(
+    () => () => {
+      if (seekingTimeoutRef.current) window.clearTimeout(seekingTimeoutRef.current);
+    },
+    [],
+  );
+  // If the player becomes ready while a seek is pending (user clicked
+  // before the initial rebuild finished), flush the coalesced pending
+  // seek. This effect is intentionally separate from the onReady
+  // callback so it also covers the `replayEvents` remount path.
+  useEffect(() => {
+    if (!isPlayerReady || pendingSeekRef.current === null) return;
+    const target = pendingSeekRef.current;
+    pendingSeekRef.current = null;
+    replayRef.current?.seek(target, false);
+    if (seekingTimeoutRef.current) window.clearTimeout(seekingTimeoutRef.current);
+    seekingTimeoutRef.current = window.setTimeout(() => setIsSeeking(false), 120);
+  }, [isPlayerReady]);
 
   const handleReplayTimeChange = useCallback((timeOffset: number) => {
     setCurrentReplayTime(timeOffset);
@@ -547,14 +598,44 @@ export function ReviewApp({
     }),
     [report, events, counts],
   );
-  // The hash input stringifies the whole session, so it's memoized per events
-  // reference — a per-click serialization would be wasteful on cache hits too.
-  // stableShareJson excludes the title (editable) and the memoized base never
-  // contains it, so renaming a session doesn't change its hash.
-  const stableShareInput = useMemo(
-    () => stableShareJson({ v: 2, report: shareReportBase, events }),
-    [shareReportBase, events],
-  );
+  // The hash input stringifies the whole session — defer it to idle time so
+  // the first timeline seek isn't contending with a multi-MB JSON.stringify
+  // on the main thread. Effects that need it already guard `!stableShareInput`.
+  const [stableShareInput, setStableShareInput] = useState("");
+  useEffect(() => {
+    if (!events.length) {
+      setStableShareInput("");
+      return;
+    }
+    let cancelled = false;
+    const compute = () => {
+      const json = stableShareJson({ v: 2, report: shareReportBase, events });
+      if (!cancelled) setStableShareInput(json);
+    };
+    const ric = (
+      window as unknown as {
+        requestIdleCallback?: (
+          cb: () => void,
+          opts?: { timeout: number },
+        ) => number;
+        cancelIdleCallback?: (id: number) => void;
+      }
+    ).requestIdleCallback;
+    if (ric) {
+      const id = ric(compute, { timeout: 1000 });
+      return () => {
+        cancelled = true;
+        (
+          window as unknown as { cancelIdleCallback?: (id: number) => void }
+        ).cancelIdleCallback?.(id);
+      };
+    }
+    const id = window.setTimeout(compute, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
+  }, [shareReportBase, events]);
   const shareInput = useMemo(
     () => ({
       stableJson: stableShareInput,
@@ -638,6 +719,7 @@ export function ReviewApp({
   // serialization the share flow uses.
   useEffect(() => {
     if (loading || !events.length) return;
+    if (!stableShareInput) return;
     if (!issueDialogOpen) return;
     const repoNorm = normalizeRepo(repo);
     if (!repoNorm) return;
@@ -718,6 +800,7 @@ export function ReviewApp({
   // any failure (off, server without a key, network) keeps it.
   useEffect(() => {
     if (loading || !events.length) return;
+    if (!stableShareInput) return;
     if (!aiEnabled) {
       setTitleAIState("disabled");
       return;
@@ -786,7 +869,28 @@ export function ReviewApp({
     setReplayStatus("preparing");
     setReplayError("");
     const upload = async () => {
-      const result = await ensureShareLink(shareInput, (phase) => {
+      // If idle hasn't computed stableShareInput yet, yield to paint the
+      // "Preparing" state before doing the multi-MB JSON.stringify, so the
+      // fallback doesn't reintroduce the first-seek jank it was meant to fix.
+      let effective = shareInput;
+      if (!stableShareInput) {
+        await new Promise<void>((resolve) => {
+          const ric = (window as unknown as { requestIdleCallback?: (cb: () => void) => void })
+            .requestIdleCallback;
+          if (ric) ric(() => resolve());
+          else setTimeout(() => resolve(), 0);
+        });
+        // Re-check after yield — idle may have filled it in the meantime.
+        effective = stableShareInput
+          ? shareInput
+          : {
+              stableJson: stableShareJson({ v: 2, report: shareReportBase, events }),
+              title: displayTitle,
+              base: shareReportBase,
+              events,
+            };
+      }
+      const result = await ensureShareLink(effective, (phase) => {
         setReplayStatus(phase);
       });
       replayLinkRef.current = result.link;
@@ -873,6 +977,7 @@ export function ReviewApp({
               onToggleExpandWindow={toggleExpandedWindow}
               onCurrentTimeChange={handleReplayTimeChange}
               onPlayingChange={setReplayPlaying}
+              onReady={() => setIsPlayerReady(true)}
             />
           </div>
           <div className="min-w-0">
@@ -884,6 +989,8 @@ export function ReviewApp({
               currentTime={currentReplayTime}
               onSeek={seekReplay}
               isPlaying={replayPlaying}
+              isPlayerReady={isPlayerReady}
+              isSeeking={isSeeking}
             />
           </div>
         </div>

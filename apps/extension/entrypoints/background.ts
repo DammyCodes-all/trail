@@ -60,6 +60,7 @@ let batchChain: Promise<void> = Promise.resolve();
 let overlayVersion = Date.now();
 let startInProgress = false;
 let stopInProgress = false;
+let lastFlagSeen: { note: string; t: number } | null = null;
 
 const nextOverlayVersion = () =>
   (overlayVersion = Math.max(Date.now(), overlayVersion + 1));
@@ -147,6 +148,7 @@ async function startRecording(
       }
     } catch {}
     await clearEvents();
+    lastFlagSeen = null;
     await setCounts(ZERO_COUNTS);
     await setFlagCount(0);
     const session: TrailSession = { tabId: id, startedAt: Date.now() };
@@ -323,9 +325,36 @@ export default defineBackground(() => {
             if (msg.final === true) sendResponse({ ok: false });
             return;
           }
-          await addEvents(msg.batch);
+          // Dedupe duplicate flag submits (e.g. overlay double-post on Enter+form submit)
+          // that would otherwise count one user flag as two. Keeps first of same-note
+          // flags within 800ms (covers immediate+form double) and across batches.
+          const rawBatch = msg.batch as Array<{ k: string; phase?: string; note?: string; t?: number }>;
+          const seenInBatch = new Map<string, number>();
+          const dedupedBatch: typeof rawBatch = [];
+          for (const e of rawBatch) {
+            if (e.k !== "flag" || e.phase !== "submit") {
+              dedupedBatch.push(e);
+              continue;
+            }
+            const key = e.note ?? "";
+            const now = typeof e.t === "number" ? e.t : Date.now();
+            const lastInBatch = seenInBatch.get(key);
+            const isDupInBatch =
+              lastInBatch !== undefined && now - lastInBatch >= 0 && now - lastInBatch < 800;
+            const isDupAcrossBatch =
+              !!lastFlagSeen &&
+              lastFlagSeen.note === key &&
+              now - lastFlagSeen.t >= 0 &&
+              now - lastFlagSeen.t < 800;
+            if (isDupInBatch || isDupAcrossBatch) continue;
+            seenInBatch.set(key, now);
+            lastFlagSeen = { note: key, t: now };
+            dedupedBatch.push(e);
+          }
+          const batchToStore = dedupedBatch as unknown[];
+          await addEvents(batchToStore as unknown as Parameters<typeof addEvents>[0]);
           const counts = await getCounts();
-          const added = countEvents(msg.batch as Array<{ k: string }>);
+          const added = countEvents(batchToStore as Array<{ k: string }>);
           counts.click += added.click;
           counts.input += added.input;
           counts.key += added.key;
@@ -335,7 +364,7 @@ export default defineBackground(() => {
           counts.net += added.net;
           const countsChanged = totalCounts(added) > 0;
           await setCounts(counts);
-          const addedFlags = (msg.batch as Array<{ k: string; phase?: string }>).filter(
+          const addedFlags = (batchToStore as Array<{ k: string; phase?: string }>).filter(
             // Only submits are flags to the reporter — an 'open'/'cancel' is a
             // window edge of the report-writing window, not a flagged moment.
             (e) => e.k === "flag" && e.phase !== "open" && e.phase !== "cancel",
