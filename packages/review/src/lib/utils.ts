@@ -7,14 +7,14 @@ export function cn(...inputs: ClassValue[]) {
 
 export function scheduleIdle(
   cb: () => void,
-  opts?: { timeout?: number },
+  opts?: { timeout: number },
 ): () => void {
   const w = window as unknown as {
     requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
     cancelIdleCallback?: (id: number) => void;
   };
   if (w.requestIdleCallback) {
-    const id = w.requestIdleCallback(cb, opts);
+    const id = opts ? w.requestIdleCallback(cb, opts) : w.requestIdleCallback(cb);
     return () => w.cancelIdleCallback?.(id);
   }
   const id = window.setTimeout(cb, 0);
