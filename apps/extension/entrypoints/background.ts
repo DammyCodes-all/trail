@@ -1,4 +1,5 @@
 import {
+  FLAG_DEDUP_WINDOW_MS,
   MSG_BATCH,
   MSG_OPEN_SHARE,
   MSG_OVERLAY_STATUS,
@@ -42,7 +43,7 @@ import {
   totalCounts,
   ZERO_COUNTS,
 } from "@trail/review/lib/summary";
-import type { TrailCounts, TrailSession } from "@trail/review/lib/types";
+import type { StoredEvent, TrailCounts, TrailSession } from "@trail/review/lib/types";
 
 function pickReportUrl(events: Array<{ url?: string }>): string {
   for (const e of events) {
@@ -340,19 +341,18 @@ export default defineBackground(() => {
             const now = typeof e.t === "number" ? e.t : Date.now();
             const lastInBatch = seenInBatch.get(key);
             const isDupInBatch =
-              lastInBatch !== undefined && now - lastInBatch >= 0 && now - lastInBatch < 800;
+              lastInBatch !== undefined && Math.abs(now - lastInBatch) < FLAG_DEDUP_WINDOW_MS;
             const isDupAcrossBatch =
               !!lastFlagSeen &&
               lastFlagSeen.note === key &&
-              now - lastFlagSeen.t >= 0 &&
-              now - lastFlagSeen.t < 800;
+              Math.abs(now - lastFlagSeen.t) < FLAG_DEDUP_WINDOW_MS;
             if (isDupInBatch || isDupAcrossBatch) continue;
             seenInBatch.set(key, now);
             lastFlagSeen = { note: key, t: now };
             dedupedBatch.push(e);
           }
-          const batchToStore = dedupedBatch as unknown[];
-          await addEvents(batchToStore as unknown as Parameters<typeof addEvents>[0]);
+          const batchToStore = dedupedBatch as unknown as StoredEvent[];
+          await addEvents(batchToStore);
           const counts = await getCounts();
           const added = countEvents(batchToStore as Array<{ k: string }>);
           counts.click += added.click;
