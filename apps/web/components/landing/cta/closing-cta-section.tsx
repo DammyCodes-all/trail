@@ -45,8 +45,6 @@ export function ClosingCtaSection() {
         <div data-cta-action className="mt-10 flex justify-center">
           <Link
             href={CTA_HREF}
-            target="_blank"
-            rel="noreferrer"
             data-cta="closing"
           >
             <AntiMetalButton
