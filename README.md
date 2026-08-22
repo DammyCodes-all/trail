@@ -12,7 +12,9 @@ TRAIL does the remembering for you. No SDK, no app instrumentation, no account. 
 
 ## Demo
 
-> **Demo:** Recording a bug → review screen (replay + timeline) → prefilled GitHub issue. Add a GIF/screenshot as `demo.gif` before submission — placeholder image removed to avoid a broken link in review. Run `pnpm dev:all` and record a session locally to capture it.
+Watch the demo: [TRAIL — record a bug, ship the report](https://www.youtube.com/watch?v=wIj8MRXuOsg)
+
+> Recording a bug → review screen (replay + timeline) → prefilled GitHub issue.
 
 ## What TRAIL does
 
