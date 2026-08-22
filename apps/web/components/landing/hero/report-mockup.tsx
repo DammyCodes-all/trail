@@ -1,7 +1,6 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { gsap } from "gsap";
 import {
   ChevronDown,
@@ -24,6 +23,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { TrailLogo } from "@/components/trail-logo";
+import { Safari } from "@/components/ui/safari";
 import type { LucideIcon } from "lucide-react";
 
 /**
@@ -219,21 +219,6 @@ const FACT_TONE = { warn: "text-[#ffb020]", error: "text-[#ff4d4f]" } as const s
   FactTone,
   string
 >;
-
-function BrowserChrome() {
-  return (
-    <div className="flex h-8 items-end gap-0.5 bg-[#0d0e10] px-3 pt-1">
-      <span className="flex h-6 items-center gap-1.5 rounded-t-lg bg-[#141618] px-2.5 font-mono text-[9px] text-[#8b929c]">
-        <Globe2 className="size-2.5 shrink-0" />
-        acme.com
-      </span>
-      <span className="flex h-6 items-center gap-1.5 rounded-t-lg bg-[#08090a] px-2.5 font-mono text-[9.5px] text-[#f2f4f6] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-        <TrailLogo size={10} color="#ff6a00" aria-hidden="true" />
-        Trail report
-      </span>
-    </div>
-  );
-}
 
 export function ReportMockup() {
   const root = useRef<HTMLDivElement>(null);
@@ -561,11 +546,11 @@ export function ReportMockup() {
       className="relative mx-auto mt-12 w-full max-w-5xl text-left sm:mt-14"
     >
       <div className="hidden lg:block">
-        <div
+        <Safari
+          url="acme.com"
           data-mock-shell
           className="overflow-hidden rounded-lg border border-white/10 bg-[#0d0e10] shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
         >
-          <BrowserChrome />
 
         <div className="bg-[#08090a]">
           <div className="px-4 sm:px-6 lg:px-8">
@@ -938,23 +923,17 @@ export function ReportMockup() {
               box-shadow: 0 0 0 1px rgba(255, 106, 0, 0.35);
             }
           `}</style>
-          </div>
+          </Safari>
         </div>
       </div>
 
       <div className="lg:hidden">
-        <div className="overflow-hidden rounded-lg border border-white/10 bg-[#0d0e10] shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
-          <BrowserChrome />
-          <Image
-            src="/trail-report-UI.png"
-            alt="Trail session report"
-            width={1135}
-            height={682}
-            priority
-            sizes="100vw"
-            className="h-auto w-full bg-[#08090a]"
-          />
-        </div>
+        <Safari
+          url="acme.com"
+          src="/trail-report-UI.png"
+          aria-label="Trail session report"
+          className="h-auto w-full drop-shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+        />
       </div>
     </div>
   );
