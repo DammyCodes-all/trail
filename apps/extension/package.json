@@ -2,7 +2,7 @@
   "name": "trail-extension",
   "description": "TRAIL: capture a bug live, turn it into a maintainer-ready GitHub issue.",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",

@@ -547,16 +547,8 @@ export function ReportMockup() {
     >
       <div className="hidden lg:block">
         <Safari
-          url="acme.com"
+          url="trail replay"
           data-mock-shell
-          tabs={[
-            { label: "acme.com", icon: <Globe2 className="size-2.5 shrink-0" /> },
-            {
-              label: "Trail report",
-              icon: <TrailLogo size={10} color="#ff6a00" aria-hidden="true" />,
-              active: true,
-            },
-          ]}
           className="overflow-hidden rounded-lg border border-white/10 bg-[#0d0e10] shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
         >
 

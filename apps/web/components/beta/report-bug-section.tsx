@@ -5,11 +5,11 @@ export function ReportBugSection() {
   return (
     <section
       id="report-a-bug"
-      className="relative border-t border-white/10 bg-[#0d0f0e] px-5 py-16 sm:px-8 sm:py-20"
+      className="relative isolate border-t border-white/10 bg-[#0d0f0e] px-5 py-16 sm:px-8 sm:py-20"
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgb(255_255_255/0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.025)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,black_30%,transparent_75%)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgb(255_255_255/0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.025)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_40%_at_50%_0%,black_30%,transparent_75%)]"
       />
       <div className="mx-auto max-w-2xl rounded-lg border border-white/10 bg-[#151719] p-8 text-center shadow-[0_16px_48px_rgba(0,0,0,0.28)] sm:p-10">
         <Bug className="mx-auto size-7 text-[#ff6a00]" aria-hidden="true" />
