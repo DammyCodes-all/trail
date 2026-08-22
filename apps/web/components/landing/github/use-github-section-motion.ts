@@ -214,7 +214,7 @@ export function useGithubSectionMotion() {
             return;
           }
 
-          const ambient = createAmbientController(connector, 2.6, 0.5);
+          const ambient = createAmbientController(connector);
           setPillsStart(pills, 32);
           setConnectorStart(connector);
           setCardStart(card, parts);
@@ -267,7 +267,7 @@ export function useGithubSectionMotion() {
             return;
           }
 
-          const ambient = createAmbientController(connector, 2.8, 0.5);
+          const ambient = createAmbientController(connector);
           setPillsStart(pills, 24);
           setConnectorStart(connector);
           gsap.set(card, {

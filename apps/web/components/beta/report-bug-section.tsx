@@ -12,7 +12,7 @@ export function ReportBugSection() {
         className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgb(255_255_255/0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.025)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_40%_at_50%_0%,black_30%,transparent_75%)]"
       />
       <div className="relative mx-auto max-w-2xl text-center">
-        <span className="mx-auto flex size-12 items-center justify-center rounded-full border border-[#ff6a00]/30 bg-[#ff6a00]/10">
+        <span className="mx-auto flex size-12 items-center justify-center">
           <Bug className="size-5 text-[#ff6a00]" aria-hidden="true" />
         </span>
         <h2 className="mt-6 font-heading text-3xl font-bold leading-[1.05] tracking-[-0.02em] text-[#f2f4f6] sm:text-[2.25rem]">

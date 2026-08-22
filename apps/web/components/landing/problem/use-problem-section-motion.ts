@@ -204,7 +204,7 @@ export function useProblemSectionMotion() {
             return;
           }
 
-          const ambient = createAmbientController(connector, 2.4);
+          const ambient = createAmbientController(connector);
           setConnectorStart(connector);
           setReplayStart(evidence);
 
@@ -400,7 +400,7 @@ export function useProblemSectionMotion() {
             return;
           }
 
-          const ambient = createAmbientController(connector, 2.8);
+          const ambient = createAmbientController(connector);
           setConnectorStart(connector);
           setReplayStart(evidence);
 
