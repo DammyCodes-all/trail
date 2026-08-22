@@ -45,7 +45,7 @@ export function useInstallSectionMotion() {
                 {
                   autoAlpha: 1,
                   y: 0,
-                  duration: 0.5,
+                  duration: 0.6,
                   stagger: 0.07,
                   ease: "power2.out",
                 },
@@ -57,7 +57,7 @@ export function useInstallSectionMotion() {
               .timeline({ paused: true })
               .to(
                 copyRow,
-                { autoAlpha: 1, y: 0, duration: 0.45, ease: "power2.out" },
+                { autoAlpha: 1, y: 0, duration: 0.55, ease: "power2.out" },
                 0,
               )
           : null;
@@ -77,7 +77,7 @@ export function useInstallSectionMotion() {
 
         const headTrigger = ScrollTrigger.create({
           trigger: el,
-          start: "top 80%",
+          start: "top 72%",
           once: true,
           onEnter: playHead,
         });
@@ -85,7 +85,7 @@ export function useInstallSectionMotion() {
 
         const copyTrigger = ScrollTrigger.create({
           trigger: copyRow ?? el,
-          start: "top 82%",
+          start: "top 74%",
           once: true,
           onEnter: playCopyRow,
         });

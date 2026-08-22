@@ -51,7 +51,7 @@ function ExtensionsCard() {
         data-beta-hero="mockup"
         className="overflow-hidden rounded-xl border border-white/10 bg-[#101214] shadow-[0_24px_64px_rgba(0,0,0,0.4)]"
       >
-        <div className="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.02] px-5 py-3.5">
+        <div className="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.02] px-4 py-3 sm:px-5 sm:py-3.5">
           <span className="text-sm font-medium text-[#c6cbd2]">Extensions</span>
           <span className="flex items-center gap-2.5">
             <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8b929c]">
@@ -65,18 +65,18 @@ function ExtensionsCard() {
             </span>
           </span>
         </div>
-        <div className="border-b border-white/[0.06] px-5 py-3">
+        <div className="border-b border-white/[0.06] px-4 py-3 sm:px-5">
           <span className="inline-flex cursor-default items-center gap-2 rounded-md border border-dashed border-[#ff6a00]/50 bg-[#ff6a00]/[0.08] px-3 py-1.5 font-mono text-[11px] font-medium text-[#ff8a1f]">
             <FolderOpen className="size-3.5" aria-hidden="true" />
             Load unpacked
           </span>
-          <span className="ml-3 font-mono text-[10px] uppercase tracking-[0.14em] text-[#626973]">
+          <span className="ml-3 hidden font-mono text-[10px] uppercase tracking-[0.14em] text-[#626973] sm:inline">
             TRAIL goes here
           </span>
         </div>
-        <div className="p-5">
-          <div className="flex items-center gap-4 rounded-lg border border-white/[0.08] bg-[#151719] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <span className="grid size-12 shrink-0 place-items-center rounded-lg border border-[#ff6a00]/30 bg-[radial-gradient(120%_120%_at_50%_0%,rgba(255,106,0,0.18),rgba(255,106,0,0.04))] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+        <div className="p-3.5 sm:p-5">
+          <div className="flex items-center gap-3 rounded-lg border border-white/[0.08] bg-[#151719] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-4 sm:p-4">
+            <span className="grid size-11 shrink-0 place-items-center rounded-lg border border-[#ff6a00]/30 bg-[radial-gradient(120%_120%_at_50%_0%,rgba(255,106,0,0.18),rgba(255,106,0,0.04))] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:size-12">
               <TrailLogo size={24} aria-hidden="true" className="text-[#ff6a00]" />
             </span>
             <div className="min-w-0 flex-1">
@@ -86,7 +86,7 @@ function ExtensionsCard() {
                   Beta
                 </span>
               </p>
-              <p className="mt-0.5 truncate text-xs leading-5 text-[#8b929c]">
+              <p className="mt-0.5 text-xs leading-5 text-[#8b929c]">
                 {BETA_VERSION} · Turns bug repros into GitHub issues
               </p>
             </div>
