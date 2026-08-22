@@ -916,6 +916,7 @@ export function ReportMockup() {
             All data is captured automatically by Trail.
           </p>
           </div>
+          </div>
 
           <style>{`
             .mock-row-card.mock-active {
@@ -925,7 +926,6 @@ export function ReportMockup() {
           `}</style>
           </Safari>
         </div>
-      </div>
 
       <div className="lg:hidden">
         <Safari
