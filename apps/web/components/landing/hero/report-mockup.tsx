@@ -549,18 +549,16 @@ export function ReportMockup() {
         <Safari
           url="acme.com"
           data-mock-shell
+          tabs={[
+            { label: "acme.com", icon: <Globe2 className="size-2.5 shrink-0" /> },
+            {
+              label: "Trail report",
+              icon: <TrailLogo size={10} color="#ff6a00" aria-hidden="true" />,
+              active: true,
+            },
+          ]}
           className="overflow-hidden rounded-lg border border-white/10 bg-[#0d0e10] shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
         >
-        <div className="flex items-end gap-0.5 bg-[#262626] px-3">
-          <span className="flex h-6 items-center gap-1.5 rounded-t-md bg-[#141618] px-2.5 font-mono text-[9px] text-[#8b929c]">
-            <Globe2 className="size-2.5 shrink-0" />
-            acme.com
-          </span>
-          <span className="flex h-6 items-center gap-1.5 rounded-t-md bg-[#08090a] px-2.5 font-mono text-[9.5px] text-[#f2f4f6]">
-            <TrailLogo size={10} color="#ff6a00" aria-hidden="true" />
-            Trail replay
-          </span>
-        </div>
 
         <div className="bg-[#08090a]">
           <div className="px-4 sm:px-6 lg:px-8">

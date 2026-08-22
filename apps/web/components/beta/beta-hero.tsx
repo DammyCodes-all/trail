@@ -160,7 +160,7 @@ export function BetaHero() {
 
       <footer
         data-beta-hero
-        className="mx-auto mt-16 flex w-full max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#626973] sm:mt-20 lg:mt-24"
+        className="mx-auto mt-16 hidden w-full max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#626973] sm:flex sm:mt-20 lg:mt-24"
       >
         <span className="text-[#8b929c]">{BETA_VERSION}</span>
         <span aria-hidden="true" className="text-white/20">

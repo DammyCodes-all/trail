@@ -4,7 +4,6 @@ import { TrailLogo } from "@/components/trail-logo";
 import { NavGithubLink } from "@/components/landing/nav-github-link";
 import { SiteFooter } from "@/components/landing/cta/site-footer";
 import { BetaHero } from "@/components/beta/beta-hero";
-import { BetaFeatures } from "@/components/beta/beta-features";
 import { ReportBugSection } from "@/components/beta/report-bug-section";
 import HowItWorks from "@/components/ui/how-it-works";
 import { CopyCommand } from "@/components/beta/copy-command";
@@ -62,9 +61,13 @@ export default function BetaPage() {
       <section
         id="install"
         aria-label="How to install the beta"
-        className="border-t border-white/[0.06] bg-[#0d0e10]"
+        className="relative isolate overflow-hidden border-t border-white/[0.06] bg-[#0d0e10]"
       >
-        <div className="mx-auto max-w-6xl px-5 pt-14 sm:px-8 sm:pt-16">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgb(255_255_255/0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.025)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_40%_at_50%_0%,black_30%,transparent_75%)]"
+        />
+        <div className="mx-auto max-w-6xl px-5 pt-14 sm:px-8 sm:pt-16 lg:px-10">
           <p className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#ff6a00]">
             Install in four steps
           </p>
@@ -73,7 +76,7 @@ export default function BetaPage() {
           </h2>
         </div>
         <HowItWorks />
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-3 px-5 pb-16 sm:px-8 sm:pb-20">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-3 px-5 pb-16 sm:px-8 sm:pb-20 lg:px-10">
           <span className="font-mono text-xs tracking-[0.05em] text-[#8b929c]">
             Paste this into your address bar:
           </span>
@@ -81,7 +84,6 @@ export default function BetaPage() {
         </div>
       </section>
 
-      <BetaFeatures />
       <ReportBugSection />
       <SiteFooter />
     </main>

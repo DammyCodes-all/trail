@@ -32,18 +32,19 @@ const Card = ({
   number,
   title,
   description,
-  rotate,
+  tilt,
   className,
 }: {
   number: string;
   title: string;
   description: string;
-  rotate?: string;
+  tilt?: number;
   className?: string;
 }) => (
   <div
     data-hiw-card
-    className={`relative w-full max-w-[360px] md:absolute md:w-[280px] ${rotate} ${className ?? ""}`}
+    style={tilt ? { rotate: `${tilt}deg` } : undefined}
+    className={`relative w-full max-w-[360px] md:absolute md:w-[280px] ${className ?? ""}`}
   >
     <div className="rounded-lg border border-white/10 bg-[#151719] p-2 shadow-[0_16px_48px_rgba(0,0,0,0.28)]">
       <Pin className="mx-auto mb-5 h-8 w-8 text-[#ff6a00]" />
@@ -61,10 +62,11 @@ const Card = ({
       </div>
     </div>
     <style>{`
-      [data-hiw-card] { transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1); }
-      [data-hiw-card]:hover { z-index: 30; }
+      /* Scale lives on its own CSS property so it composes with the card's
+         resting rotate and any GSAP-written transform without clobbering. */
+      [data-hiw-card] { transition: scale 0.3s cubic-bezier(0.23, 1, 0.32, 1); }
       @media (hover: hover) and (pointer: fine) {
-        [data-hiw-card]:hover { transform: scale(1.04); }
+        [data-hiw-card]:hover { scale: 1.04; z-index: 30; }
       }
       @media (prefers-reduced-motion: reduce) {
         [data-hiw-card] { transition: none; }
@@ -87,7 +89,7 @@ type CardPlacement = {
   top: number;
   side: "left" | "right";
   offset: number;
-  rotate: string;
+  tilt: number;
 };
 
 const CARD_PLACEMENTS: CardPlacement[] = [
@@ -96,28 +98,28 @@ const CARD_PLACEMENTS: CardPlacement[] = [
     top: 0,
     side: "left",
     offset: 12,
-    rotate: "-rotate-3",
+    tilt: -3,
   },
   {
     className: "md:top-[200px] md:right-[10%]",
     top: 200,
     side: "right",
     offset: 10,
-    rotate: "rotate-4",
+    tilt: 4,
   },
   {
     className: "md:top-[400px] md:left-[12%]",
     top: 400,
     side: "left",
     offset: 12,
-    rotate: "rotate-2",
+    tilt: 2,
   },
   {
     className: "md:top-[600px] md:right-[8%]",
     top: 600,
     side: "right",
     offset: 8,
-    rotate: "-rotate-4",
+    tilt: -4,
   },
 ];
 
@@ -170,6 +172,46 @@ const DEFAULT_FEATURES: Step[] = [
   },
 ];
 
+/**
+ * Mobile variant of the connector: a gentle centered wiggle through the
+ * stacked cards. The viewBox stretches with the stage, so anchors sit at
+ * proportional heights and distortion stays harmless.
+ */
+const MOBILE_PATH =
+  "M 500 40 C 620 130, 380 230, 500 330 C 620 430, 380 530, 500 630 C 610 720, 420 800, 500 860";
+
+function ConnectorFlowLayer({
+  d,
+  reduceMotion,
+  className,
+}: {
+  d: string;
+  reduceMotion: boolean | null;
+  className?: string;
+}) {
+  return (
+    <m.path
+      d={d}
+      fill="none"
+      stroke="currentColor"
+      className={className ? `text-white/55 motion-reduce:opacity-0 ${className}` : "text-white/55 motion-reduce:opacity-0"}
+      strokeWidth="2.5"
+      strokeDasharray="6 16"
+      strokeLinecap="round"
+      vectorEffect="non-scaling-stroke"
+      initial={{ strokeDashoffset: 0 }}
+      animate={
+        reduceMotion ? { strokeDashoffset: 0 } : { strokeDashoffset: -44 }
+      }
+      transition={
+        reduceMotion
+          ? { duration: 0 }
+          : { duration: 1.6, repeat: Infinity, ease: "linear" }
+      }
+    />
+  );
+}
+
 // Stage height by step count, matching the reference component's mapping.
 function stageHeight(count: number): number {
   if (count <= 1) return 400;
@@ -199,7 +241,7 @@ export default function HowItWorks({
       <div
         ref={root}
         data-hiw-root
-        className={`relative max-md:pb-10 max-md:pt-10 px-8 sm:py-16 ${className ?? ""}`}
+        className={`relative max-md:pb-10 max-md:pt-10 px-5 sm:px-8 lg:px-10 sm:py-16 ${className ?? ""}`}
       >
         <div className="relative z-10 mx-auto max-w-6xl">
           <div
@@ -211,8 +253,9 @@ export default function HowItWorks({
                 aria-hidden="true"
                 viewBox={`0 0 ${STAGE_WIDTH} ${height}`}
                 preserveAspectRatio="none"
-                className="pointer-events-none absolute left-0 top-0 z-0 hidden size-full md:block text-neutral-300 dark:text-neutral-500"
+                className="pointer-events-none absolute left-0 top-0 z-0 size-full text-neutral-300 dark:text-neutral-500"
               >
+                {/* Desktop: zig-zag through the scattered cards. */}
                 <path
                   d={pathD}
                   fill="none"
@@ -220,16 +263,13 @@ export default function HowItWorks({
                   strokeWidth="1.15"
                   strokeLinecap="round"
                   vectorEffect="non-scaling-stroke"
-                  className="opacity-50"
+                  className="hidden opacity-50 md:block"
                 />
-                {/* Flow layer, same anatomy as the problem-section connector
-                    but in the reference component's neutral palette:
-                    dasharray "6 16", offset -44 (two seamless cycles), 1.6s. */}
                 <m.path
                   d={pathD}
                   fill="none"
                   stroke="currentColor"
-                  className="text-white/55 motion-reduce:opacity-0"
+                  className="hidden text-white/55 motion-reduce:opacity-0 md:block"
                   strokeWidth="2.5"
                   strokeDasharray="6 16"
                   strokeLinecap="round"
@@ -246,6 +286,22 @@ export default function HowItWorks({
                       : { duration: 1.6, repeat: Infinity, ease: "linear" }
                   }
                 />
+
+                {/* Mobile: centered wiggle through the stacked cards. */}
+                <path
+                  d={MOBILE_PATH}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.15"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                  className="opacity-50 md:hidden"
+                />
+                <ConnectorFlowLayer
+                  d={MOBILE_PATH}
+                  reduceMotion={reduceMotion}
+                  className="md:hidden"
+                />
               </svg>
             )}
 
@@ -257,7 +313,7 @@ export default function HowItWorks({
                   number={`0${index + 1}`}
                   title={step.title}
                   description={step.description}
-                  rotate={placement.rotate}
+                  tilt={placement.tilt}
                   className={placement.className}
                 />
               );

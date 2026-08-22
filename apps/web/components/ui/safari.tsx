@@ -1,5 +1,11 @@
 import type { HTMLAttributes, ReactNode, SVGProps } from "react";
 
+export interface SafariTab {
+  label: string;
+  icon?: ReactNode;
+  active?: boolean;
+}
+
 export interface SafariProps extends SVGProps<SVGSVGElement> {
   url?: string;
   src?: string;
@@ -10,6 +16,8 @@ export interface SafariProps extends SVGProps<SVGSVGElement> {
    * screenshot image. Used where live/animated content sits inside the window.
    */
   children?: ReactNode;
+  /** Optional tab row rendered into the chrome above the toolbar (frame mode). */
+  tabs?: SafariTab[];
 }
 
 /**
@@ -17,15 +25,36 @@ export interface SafariProps extends SVGProps<SVGSVGElement> {
  * reload / share / tab icons). Sliced from the full-frame artwork above so
  * frame mode can compose chrome + arbitrary content at natural height.
  */
-function SafariChrome({ url }: { url?: string }) {
+function SafariChrome({ url, tabs }: { url?: string; tabs?: SafariTab[] }) {
   return (
-    <svg
-      viewBox="0 0 1203 52"
-      className="block h-auto w-full"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
+    <>
+      {tabs?.length ? (
+        <div
+          className="flex items-end gap-1 bg-[#E5E5E5] px-2 pt-1.5 dark:bg-[#404040]"
+          aria-hidden="true"
+        >
+          {tabs.map((tab) => (
+            <span
+              key={tab.label}
+              className={`flex h-6 items-center gap-1.5 rounded-t-md px-2.5 font-mono text-[9.5px] ${
+                tab.active
+                  ? "bg-white text-neutral-600 dark:bg-[#262626] dark:text-[#f2f4f6]"
+                  : "bg-neutral-300 text-neutral-400 dark:bg-[#141618] dark:text-[#8b929c]"
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <svg
+        viewBox="0 0 1203 52"
+        className="block h-auto w-full"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
       <path
         fillRule="evenodd"
         clipRule="evenodd"
@@ -104,7 +133,8 @@ function SafariChrome({ url }: { url?: string }) {
           fill="#A3A3A3"
         />
       </g>
-    </svg>
+      </svg>
+    </>
   );
 }
 
@@ -114,6 +144,7 @@ export function Safari({
   width = 1203,
   height = 753,
   children,
+  tabs,
   ...props
 }: SafariProps) {
   if (children) {
@@ -123,7 +154,7 @@ export function Safari({
     const { ref: _svgRef, ...divProps } = props;
     return (
       <div {...(divProps as HTMLAttributes<HTMLDivElement>)}>
-        <SafariChrome url={url} />
+        <SafariChrome url={url} tabs={tabs} />
         {children}
       </div>
     );
