@@ -39,7 +39,7 @@ export function useReportBugMotion() {
           gsap.set(icon, { autoAlpha: 0, y: 16 });
           tl.to(
             icon,
-            { autoAlpha: 1, y: 0, duration: 0.4, ease: "power2.out" },
+            { autoAlpha: 1, y: 0, duration: 0.5, ease: "power2.out" },
             0,
           );
         }
@@ -50,7 +50,7 @@ export function useReportBugMotion() {
             {
               autoAlpha: 1,
               y: 0,
-              duration: 0.45,
+              duration: 0.55,
               stagger: 0.06,
               ease: "power2.out",
             },
@@ -61,7 +61,7 @@ export function useReportBugMotion() {
           gsap.set(cta, { autoAlpha: 0, y: 16 });
           tl.to(
             cta,
-            { autoAlpha: 1, y: 0, duration: 0.45, ease: "power2.out" },
+            { autoAlpha: 1, y: 0, duration: 0.55, ease: "power2.out" },
             lines.length ? 0.24 : 0.12,
           );
         }
@@ -75,7 +75,7 @@ export function useReportBugMotion() {
 
         const scrollTrigger = ScrollTrigger.create({
           trigger: el,
-          start: "top 78%",
+          start: "top 70%",
           once: true,
           onEnter: play,
         });

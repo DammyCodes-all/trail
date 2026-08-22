@@ -40,14 +40,14 @@ export function useHowItWorksMotion() {
             gsap.to(card, {
               autoAlpha: 1,
               y: 0,
-              duration: 0.5,
+              duration: 0.6,
               ease: "power2.out",
             });
           };
 
           const scrollTrigger = ScrollTrigger.create({
             trigger: card,
-            start: "top 78%",
+            start: "top 70%",
             once: true,
             onEnter: play,
           });

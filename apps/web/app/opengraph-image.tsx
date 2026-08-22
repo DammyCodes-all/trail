@@ -9,15 +9,13 @@ export default function OpengraphImage() {
   return new ImageResponse(
     <div
       style={{
-        width: "100%",
-        height: "100%",
+        width: 1200,
+        height: 630,
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
         padding: 64,
         backgroundColor: "#0d0f0e",
-        backgroundImage:
-          "linear-gradient(to right, rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.035) 1px, transparent 1px)",
       }}
     >
       <div
@@ -54,12 +52,13 @@ export default function OpengraphImage() {
           fontSize: 72,
           fontWeight: 800,
           lineHeight: 0.95,
-          letterSpacing: "-0.04em",
           color: "#f2f4f6",
           maxWidth: 720,
+          display: "flex",
         }}
       >
-        Every bug leaves a <span style={{ color: "#ff6a00" }}>trail.</span>
+        <span>Every bug leaves a&nbsp;</span>
+        <span style={{ color: "#ff6a00" }}>trail.</span>
       </div>
       <div
         style={{
