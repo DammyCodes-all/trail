@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "TRAIL — Every bug leaves a trail";
+export const alt = "TRAIL — Every bug has a trail";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -19,12 +19,12 @@ export default function OpengraphImage() {
           position: "relative",
           flexDirection: "column",
           justifyContent: "center",
-          padding: 64,
+          padding: "48 72 48 72",
           backgroundColor: "#0d0f0e",
           overflow: "hidden",
         }}
       >
-        {/* Subtle grid — SVG pattern (Satori-safe, no CSS backgroundImage) */}
+        {/* Subtle grid — SVG pattern with radial fade (Satori-safe) */}
         <svg
           width={1200}
           height={630}
@@ -34,40 +34,38 @@ export default function OpengraphImage() {
           <defs>
             <pattern
               id="trail-grid"
-              width={24}
-              height={24}
+              width={28}
+              height={28}
               patternUnits="userSpaceOnUse"
             >
               <path
-                d="M 24 0 L 0 0 0 24"
+                d="M 28 0 L 0 0 0 28"
                 fill="none"
                 stroke="white"
-                strokeOpacity={0.04}
+                strokeOpacity={0.06}
                 strokeWidth={1}
               />
             </pattern>
-            <radialGradient id="grid-fade" cx="50%" cy="44%" r="70%">
-              <stop offset="35%" stopColor="white" stopOpacity={1} />
+            <radialGradient id="grid-fade" cx="50%" cy="45%" r="75%">
+              <stop offset="40%" stopColor="white" stopOpacity={1} />
               <stop offset="100%" stopColor="white" stopOpacity={0} />
             </radialGradient>
             <mask id="grid-mask">
               <rect width={1200} height={630} fill="url(#grid-fade)" />
             </mask>
+            {/* diffuse amber glow */}
+            <radialGradient id="amber-glow" cx="30%" cy="50%" r="45%">
+              <stop offset="0%" stopColor="#ff6a00" stopOpacity={0.11} />
+              <stop offset="60%" stopColor="#ff6a00" stopOpacity={0.04} />
+              <stop offset="100%" stopColor="#ff6a00" stopOpacity={0} />
+            </radialGradient>
           </defs>
+          <rect width={1200} height={630} fill="url(#amber-glow)" />
           <rect
             width={1200}
             height={630}
             fill="url(#trail-grid)"
             mask="url(#grid-mask)"
-          />
-          {/* Soft amber glow behind headline */}
-          <ellipse
-            cx={420}
-            cy={300}
-            rx={380}
-            ry={220}
-            fill="#ff6a00"
-            opacity={0.06}
           />
         </svg>
 
@@ -77,18 +75,9 @@ export default function OpengraphImage() {
             display: "flex",
             alignItems: "center",
             gap: 12,
-            fontFamily: "monospace",
-            fontSize: 13,
-            letterSpacing: "0.2em",
-            color: "#ff6a00",
           }}
         >
-          <svg
-            width={28}
-            height={28}
-            viewBox="0 0 1146 1047"
-            style={{ flexShrink: 0 }}
-          >
+          <svg width={36} height={36} viewBox="0 0 1146 1047">
             <path
               d={LOGO_PATH}
               fill="#ff6a00"
@@ -97,17 +86,27 @@ export default function OpengraphImage() {
               strokeLinejoin="round"
             />
           </svg>
-          TRAIL
+          <span
+            style={{
+              fontFamily: "monospace",
+              fontSize: 14,
+              letterSpacing: "0.22em",
+              color: "#ff6a00",
+              fontWeight: 600,
+            }}
+          >
+            TRAIL
+          </span>
         </div>
 
         <div
           style={{
-            marginTop: 32,
-            fontSize: 72,
+            marginTop: 28,
+            fontSize: 88,
             fontWeight: 800,
-            lineHeight: 0.95,
+            lineHeight: 0.92,
             color: "#f2f4f6",
-            maxWidth: 720,
+            maxWidth: 760,
             display: "flex",
             flexWrap: "wrap",
           }}
@@ -118,11 +117,11 @@ export default function OpengraphImage() {
 
         <div
           style={{
-            marginTop: 24,
-            fontSize: 18,
-            lineHeight: 1.6,
+            marginTop: 20,
+            fontSize: 20,
+            lineHeight: 1.5,
             color: "#8b929c",
-            maxWidth: 560,
+            maxWidth: 580,
           }}
         >
           Record, replay, and report browser bugs — no SDK. Data stays in the
@@ -131,18 +130,19 @@ export default function OpengraphImage() {
 
         <div
           style={{
-            marginTop: 28,
+            marginTop: 32,
             display: "flex",
-            gap: 12,
+            gap: 14,
             fontFamily: "monospace",
-            fontSize: 12,
+            fontSize: 12.5,
             color: "#626973",
+            letterSpacing: "0.02em",
           }}
         >
           <span>Open source</span>
-          <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+          <span style={{ color: "rgba(255,255,255,0.18)" }}>·</span>
           <span>GitHub-native</span>
-          <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+          <span style={{ color: "rgba(255,255,255,0.18)" }}>·</span>
           <span>Privacy by default</span>
         </div>
       </div>
