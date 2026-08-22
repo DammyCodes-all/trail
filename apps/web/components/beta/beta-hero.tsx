@@ -20,6 +20,7 @@ function ExtensionsCard() {
       {/* Directional hint: flow arrives from the download side. */}
       <svg
         aria-hidden="true"
+        data-hero-arrow
         viewBox="0 0 84 12"
         className="absolute right-full top-[74px] mr-3 hidden h-3 w-[84px] lg:block"
       >
@@ -47,7 +48,7 @@ function ExtensionsCard() {
         <path d="M 74 1.5 L 82 6 L 74 10.5 Z" fill="#ff6a00" fillOpacity="0.8" />
       </svg>
       <div
-        data-beta-hero
+        data-beta-hero="mockup"
         className="overflow-hidden rounded-xl border border-white/10 bg-[#101214] shadow-[0_24px_64px_rgba(0,0,0,0.4)]"
       >
         <div className="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.02] px-5 py-3.5">
@@ -119,25 +120,25 @@ export function BetaHero() {
       <div className="mx-auto grid max-w-6xl items-center gap-10 sm:grid-cols-2 sm:gap-8">
         <div className="max-w-xl">
           <p
-            data-beta-hero
+            data-beta-hero="eyebrow"
             className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#ff6a00]"
           >
             Public Beta
           </p>
           <h1
-            data-beta-hero
+            data-beta-hero="headline"
             className="mt-4 font-heading text-4xl font-bold leading-[1.04] tracking-[-0.03em] text-[#f2f4f6] sm:text-[3rem]"
           >
             Install the beta.
           </h1>
           <p
-            data-beta-hero
+            data-beta-hero="sub"
             className="mt-4 max-w-md text-sm leading-6 text-[#8b929c] sm:text-base sm:leading-7"
           >
             Load it unpacked, reproduce a bug, and TRAIL turns the session
             into a GitHub issue. No account, no SDK.
           </p>
-          <div data-beta-hero className="mt-7">
+          <div data-beta-hero="cta" className="mt-7">
             <Link
               href={BETA_DOWNLOAD_HREF}
               target="_blank"
@@ -159,7 +160,7 @@ export function BetaHero() {
       </div>
 
       <footer
-        data-beta-hero
+        data-beta-hero="meta"
         className="mx-auto mt-16 hidden w-full max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#626973] sm:flex sm:mt-20 lg:mt-24"
       >
         <span className="text-[#8b929c]">{BETA_VERSION}</span>
