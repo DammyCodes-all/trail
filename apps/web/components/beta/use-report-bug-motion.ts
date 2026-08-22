@@ -36,7 +36,7 @@ export function useReportBugMotion() {
         const tl = gsap.timeline({ paused: true });
 
         if (icon) {
-          gsap.set(icon, { autoAlpha: 0, y: 10 });
+          gsap.set(icon, { autoAlpha: 0, y: 16 });
           tl.to(
             icon,
             { autoAlpha: 1, y: 0, duration: 0.4, ease: "power2.out" },
@@ -44,25 +44,25 @@ export function useReportBugMotion() {
           );
         }
         if (lines.length) {
-          gsap.set(lines, { autoAlpha: 0, y: 12 });
+          gsap.set(lines, { autoAlpha: 0, y: 18 });
           tl.to(
             lines,
             {
               autoAlpha: 1,
               y: 0,
               duration: 0.45,
-              stagger: 0.07,
+              stagger: 0.06,
               ease: "power2.out",
             },
-            0.15,
+            0.12,
           );
         }
         if (cta) {
-          gsap.set(cta, { autoAlpha: 0, y: 10 });
+          gsap.set(cta, { autoAlpha: 0, y: 16 });
           tl.to(
             cta,
             { autoAlpha: 1, y: 0, duration: 0.45, ease: "power2.out" },
-            lines.length ? 0.32 : 0.15,
+            lines.length ? 0.24 : 0.12,
           );
         }
 
@@ -75,7 +75,7 @@ export function useReportBugMotion() {
 
         const scrollTrigger = ScrollTrigger.create({
           trigger: el,
-          start: "top 88%",
+          start: "top 78%",
           once: true,
           onEnter: play,
         });

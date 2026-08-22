@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = "https://trail.dev";
+  const base = "https://trail-bug.vercel.app";
   return [
     {
       url: `${base}/`,

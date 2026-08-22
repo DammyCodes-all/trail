@@ -3,7 +3,7 @@ import "./globals.css";
 import { SmoothScroll } from "@/components/smooth-scroll";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://trail.dev"),
+  metadataBase: new URL("https://trail-bug.vercel.app"),
   title: "TRAIL — shared replay",
   description: "Review a session shared with TRAIL.",
   icons: {

@@ -34,8 +34,8 @@ export function useInstallSectionMotion() {
 
         if (!heads.length && !copyRow) return;
 
-        if (heads.length) gsap.set(heads, { autoAlpha: 0, y: 14 });
-        if (copyRow) gsap.set(copyRow, { autoAlpha: 0, y: 10 });
+        if (heads.length) gsap.set(heads, { autoAlpha: 0, y: 22 });
+        if (copyRow) gsap.set(copyRow, { autoAlpha: 0, y: 18 });
 
         const headTimeline = heads.length
           ? gsap
@@ -46,7 +46,7 @@ export function useInstallSectionMotion() {
                   autoAlpha: 1,
                   y: 0,
                   duration: 0.5,
-                  stagger: 0.08,
+                  stagger: 0.07,
                   ease: "power2.out",
                 },
                 0,
@@ -77,7 +77,7 @@ export function useInstallSectionMotion() {
 
         const headTrigger = ScrollTrigger.create({
           trigger: el,
-          start: "top 85%",
+          start: "top 80%",
           once: true,
           onEnter: playHead,
         });
@@ -85,7 +85,7 @@ export function useInstallSectionMotion() {
 
         const copyTrigger = ScrollTrigger.create({
           trigger: copyRow ?? el,
-          start: "top 90%",
+          start: "top 82%",
           once: true,
           onEnter: playCopyRow,
         });

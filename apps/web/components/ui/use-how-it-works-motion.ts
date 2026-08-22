@@ -7,9 +7,11 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 gsap.registerPlugin(ScrollTrigger);
 
 /**
- * Motion for the /beta install-trail stage. GSAP owns the card entrances
- * (short staggered rise, once per visit). The connector line is owned by
- * Framer Motion inside how-it-works.tsx — one owner per element.
+ * Motion for the /beta install-trail stage. GSAP owns the card entrances:
+ * each card rises individually when it scrolls into view (per-card trigger,
+ * once per visit) so stacked mobile layouts don't wait on offscreen siblings.
+ * The connector line is owned by Framer Motion inside how-it-works.tsx —
+ * one owner per element.
  *
  * Reduced motion / no JS: these sets live inside the no-preference branch,
  * so the static render keeps every card visible.
@@ -28,35 +30,29 @@ export function useHowItWorksMotion() {
         const cards = gsap.utils.toArray<HTMLElement>("[data-hiw-card]", el);
         if (!cards.length) return;
 
-        gsap.set(cards, { autoAlpha: 0, y: 16 });
+        for (const card of cards) {
+          gsap.set(card, { autoAlpha: 0, y: 24 });
 
-        const timeline = gsap.timeline({ paused: true });
-        timeline.to(
-          cards,
-          {
-            autoAlpha: 1,
-            y: 0,
-            duration: 0.45,
-            stagger: 0.08,
-            ease: "power2.out",
-          },
-          0,
-        );
+          let played = false;
+          const play = () => {
+            if (played) return;
+            played = true;
+            gsap.to(card, {
+              autoAlpha: 1,
+              y: 0,
+              duration: 0.5,
+              ease: "power2.out",
+            });
+          };
 
-        let hasPlayed = false;
-        const play = () => {
-          if (hasPlayed) return;
-          hasPlayed = true;
-          timeline.play(0);
-        };
-
-        const scrollTrigger = ScrollTrigger.create({
-          trigger: el,
-          start: "top 82%",
-          once: true,
-          onEnter: play,
-        });
-        if (scrollTrigger.isActive || scrollTrigger.progress > 0) play();
+          const scrollTrigger = ScrollTrigger.create({
+            trigger: card,
+            start: "top 78%",
+            once: true,
+            onEnter: play,
+          });
+          if (scrollTrigger.isActive || scrollTrigger.progress > 0) play();
+        }
       }, el);
       return () => context.revert();
     });
