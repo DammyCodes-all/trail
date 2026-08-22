@@ -51,12 +51,6 @@ export default function Home() {
             </span>
           </Link>
           <nav className="flex items-center gap-1 sm:gap-3" aria-label="Primary navigation">
-            <Link
-              href="/beta"
-              className="inline-flex items-center rounded-md border border-[#ff6a00]/40 bg-[#ff6a00]/10 px-3 py-2 font-mono text-xs font-medium uppercase tracking-[0.12em] text-[#ff8a1f] outline-none transition-colors hover:border-[#ff6a00]/70 hover:bg-[#ff6a00]/[0.16] focus-visible:ring-2 focus-visible:ring-[#ff6a00]"
-            >
-              Public Beta
-            </Link>
             <NavGithubLink />
           </nav>
         </header>
