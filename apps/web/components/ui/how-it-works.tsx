@@ -96,28 +96,28 @@ const CARD_PLACEMENTS: CardPlacement[] = [
     top: 0,
     side: "left",
     offset: 12,
-    rotate: "-rotate-2",
+    rotate: "-rotate-3",
   },
   {
     className: "md:top-[200px] md:right-[10%]",
     top: 200,
     side: "right",
     offset: 10,
-    rotate: "rotate-3",
+    rotate: "rotate-4",
   },
   {
     className: "md:top-[400px] md:left-[12%]",
     top: 400,
     side: "left",
     offset: 12,
-    rotate: "rotate-1",
+    rotate: "rotate-2",
   },
   {
     className: "md:top-[600px] md:right-[8%]",
     top: 600,
     side: "right",
     offset: 8,
-    rotate: "-rotate-3",
+    rotate: "-rotate-4",
   },
 ];
 

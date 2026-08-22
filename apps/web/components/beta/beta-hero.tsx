@@ -112,7 +112,7 @@ export function BetaHero() {
   return (
     <section
       ref={root}
-      className="relative isolate overflow-hidden px-5 pb-24 pt-14 sm:px-8 sm:pb-28 sm:pt-20 lg:flex lg:min-h-[calc(100dvh-6rem)] lg:items-center lg:px-10"
+      className="relative isolate overflow-hidden px-5 pb-24 pt-14 sm:px-8 sm:pb-28 sm:pt-20 lg:flex lg:min-h-[calc(100dvh-6rem)] lg:flex-col lg:items-center lg:justify-center lg:px-10"
     >
       <div aria-hidden="true" className="hero-grid -z-10" />
       <GridGlow />
@@ -160,7 +160,7 @@ export function BetaHero() {
 
       <footer
         data-beta-hero
-        className="mx-auto mt-16 flex max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-2 border-t border-white/[0.06] pt-5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#626973] sm:mt-20 lg:mt-24"
+        className="mx-auto mt-16 flex w-full max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#626973] sm:mt-20 lg:mt-24"
       >
         <span className="text-[#8b929c]">{BETA_VERSION}</span>
         <span aria-hidden="true" className="text-white/20">
