@@ -308,7 +308,7 @@ export function HeroExperience() {
         data-hero-anim
         className="mt-6 flex w-full flex-col justify-center gap-3 sm:mt-7 sm:w-auto sm:flex-row"
       >
-        <Link href={CTA_HREF} target="_blank" rel="noreferrer" data-cta="hero">
+        <Link href={CTA_HREF} data-cta="hero">
           <AntiMetalButton
             label={CTA_LABEL}
             accentFrom="#ff6a00"
