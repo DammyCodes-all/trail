@@ -109,9 +109,21 @@ const REPORT_GEOMETRY: Record<ConnectorOrientation, ConnectorGeometry> = {
   },
 };
 
-function TrailNode({ x, y, glowId }: Point & { glowId: string }) {
+function TrailNode({
+  x,
+  y,
+  glowId,
+  tileId,
+}: Point & { glowId: string; tileId: string }) {
   return (
     <g data-connector-node>
+      <defs>
+        {/* Same tile treatment as the beta hero logo badge, in SVG form. */}
+        <radialGradient id={tileId} cx="50%" cy="0%" r="120%">
+          <stop offset="0" stopColor="#ff6a00" stopOpacity="0.18" />
+          <stop offset="1" stopColor="#ff6a00" stopOpacity="0.04" />
+        </radialGradient>
+      </defs>
       <rect
         data-connector-node-rect
         x={x - 20}
@@ -119,7 +131,7 @@ function TrailNode({ x, y, glowId }: Point & { glowId: string }) {
         width="40"
         height="40"
         rx="12"
-        fill="#0d0e10"
+        fill={`url(#${tileId})`}
         stroke="#ff6a00"
         strokeOpacity="0.42"
         filter={`url(#${glowId})`}
@@ -285,7 +297,11 @@ export function TrailConnector({
         </g>
       ))}
 
-      <TrailNode {...geometry.node} glowId={glowId} />
+      <TrailNode
+        {...geometry.node}
+        glowId={glowId}
+        tileId={`trail-node-tile-${connectorKey}`}
+      />
     </svg>
   );
 }

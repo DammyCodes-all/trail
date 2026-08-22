@@ -74,12 +74,12 @@ function ExtensionsCard() {
           </span>
         </div>
         <div className="p-5">
-          <div className="flex items-center gap-3.5 rounded-lg border border-[#ff6a00]/25 bg-[#ff6a00]/[0.05] p-4">
-            <span className="grid size-11 shrink-0 place-items-center rounded-lg border border-[#ff6a00]/30 bg-[#0d0e10]">
-              <TrailLogo size={22} aria-hidden="true" className="text-[#ff6a00]" />
+          <div className="flex items-center gap-4 rounded-lg border border-white/[0.08] bg-[#151719] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <span className="grid size-12 shrink-0 place-items-center rounded-lg border border-[#ff6a00]/30 bg-[radial-gradient(120%_120%_at_50%_0%,rgba(255,106,0,0.18),rgba(255,106,0,0.04))] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <TrailLogo size={24} aria-hidden="true" className="text-[#ff6a00]" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-2 font-heading text-sm font-semibold text-[#f2f4f6]">
+              <p className="flex items-center gap-2 font-heading text-sm font-semibold tracking-normal text-[#f2f4f6]">
                 TRAIL
                 <span className="rounded border border-[#ff6a00]/40 bg-[#ff6a00]/10 px-1.5 py-px font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-[#ff8a1f]">
                   Beta
@@ -89,7 +89,7 @@ function ExtensionsCard() {
                 {BETA_VERSION} · Turns bug repros into GitHub issues
               </p>
             </div>
-            <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-[#8b929c]">
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-[#8b929c]">
               <span
                 aria-hidden="true"
                 className="inline-block size-1.5 rounded-full bg-[#37d67a]"

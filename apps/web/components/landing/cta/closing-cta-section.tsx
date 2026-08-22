@@ -24,12 +24,16 @@ export function ClosingCtaSection() {
       />
       <GridGlow />
       <div className="relative mx-auto max-w-3xl text-center">
-        <TrailLogo
+        <div
           data-cta-logo
-          size={40}
           aria-hidden="true"
-          className="mx-auto text-[#ff6a00]"
-        />
+          className="mx-auto grid size-16 place-items-center rounded-lg border border-[#ff6a00]/30 bg-[radial-gradient(120%_120%_at_50%_0%,rgba(255,106,0,0.18),rgba(255,106,0,0.04))] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+        >
+          <TrailLogo
+            size={36}
+            className="text-[#ff6a00]"
+          />
+        </div>
         <h2
           data-cta-headline
           className="mx-auto mt-8 max-w-2xl font-heading text-[clamp(1.75rem,5vw,3rem)] font-bold leading-[0.98] tracking-[-0.04em] text-[#f2f4f6]"
