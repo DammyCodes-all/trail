@@ -131,10 +131,18 @@ function TrailNode({
         width="40"
         height="40"
         rx="12"
-        fill={`url(#${tileId})`}
+        fill="#0d0e10"
         stroke="#ff6a00"
         strokeOpacity="0.42"
         filter={`url(#${glowId})`}
+      />
+      <rect
+        x={x - 20}
+        y={y - 20}
+        width="40"
+        height="40"
+        rx="12"
+        fill={`url(#${tileId})`}
       />
       <g data-connector-logo>
         <svg
