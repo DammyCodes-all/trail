@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { TrailLogo } from "@/components/trail-logo";
 import { GridGlow } from "@/components/landing/hero/grid-glow";
 import { GithubStarsLogo } from "@/components/animate-ui/primitives/animate/github-stars";
@@ -11,6 +12,11 @@ import { scrollToHash } from "@/lib/scroll-lock";
 
 export function SiteFooter() {
   const root = useSiteFooterMotion();
+  // Hash links are written as absolute paths so they resolve from any route
+  // (e.g. /beta). On the landing page we intercept them for smooth scrolling;
+  // elsewhere the browser navigates natively.
+  const pathname = usePathname();
+  const onLanding = pathname === "/";
 
   return (
     <footer
@@ -24,10 +30,11 @@ export function SiteFooter() {
       <GridGlow />
       <div className="relative mx-auto flex max-w-7xl flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <a
+          <Link
             data-footer-brand
-            href="#top"
+            href="/"
             onClick={(e) => {
+              if (!onLanding) return;
               e.preventDefault();
               scrollToHash("#top");
             }}
@@ -38,7 +45,7 @@ export function SiteFooter() {
             <span className="font-heading text-xs font-medium tracking-[0.2em]">
               TRAIL
             </span>
-          </a>
+          </Link>
           <span className="hidden font-mono text-xs tracking-[0.08em] text-[#626973]/70 sm:inline">
             © 2026 TRAIL
           </span>
@@ -48,26 +55,34 @@ export function SiteFooter() {
           aria-label="Footer"
           className="flex items-center gap-1 font-mono text-xs text-[#626973] sm:gap-3"
         >
-          <a
-            href="#privacy"
+          <Link
+            href="/beta"
+            className="inline-flex rounded-md px-2 py-1 outline-none transition-colors hover:text-[#f2f4f6] focus-visible:ring-2 focus-visible:ring-[#ff6a00]"
+          >
+            Beta
+          </Link>
+          <Link
+            href="/#privacy"
             onClick={(e) => {
+              if (!onLanding) return;
               e.preventDefault();
               scrollToHash("#privacy");
             }}
             className="hidden cursor-pointer rounded-md px-2 py-1 outline-none transition-colors hover:text-[#f2f4f6] focus-visible:ring-2 focus-visible:ring-[#ff6a00] sm:inline-flex"
           >
             Privacy
-          </a>
-          <a
-            href="#faq"
+          </Link>
+          <Link
+            href="/#faq"
             onClick={(e) => {
+              if (!onLanding) return;
               e.preventDefault();
               scrollToHash("#faq");
             }}
             className="hidden cursor-pointer rounded-md px-2 py-1 outline-none transition-colors hover:text-[#f2f4f6] focus-visible:ring-2 focus-visible:ring-[#ff6a00] sm:inline-flex"
           >
             FAQ
-          </a>
+          </Link>
           <a
             data-footer-link
             href={GITHUB_HREF}
