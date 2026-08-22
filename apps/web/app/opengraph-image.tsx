@@ -1,13 +1,13 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "TRAIL — Every bug has a trail";
+export const alt = "TRAIL — Every bug leaves a trail";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const LOGO_PATH =
-  "M441.5 42.98C451.37 43.9 461.23 47.46 470.95 49.51C489.85 53.5 509.25 56.3 528.5 57.9C565.19 60.97 602.85 61.1 639.36 55.66C661.03 52.43 682.15 47.63 703.5 42.8C704.73 48.23 703.02 54.89 702.28 60.53C701.14 69.12 700.48 77.85 700.05 86.5C698.64 114.88 699.47 143.29 702.93 171.5C707.38 207.64 714.89 243.22 724.22 278.41C727.53 290.86 731.32 303.15 735.17 315.44C736.99 321.26 740.02 327.45 740.54 333.5C717.76 338.37 693.93 339.44 670.78 341.46C616.36 346.23 562.07 347.35 507.5 344.12C487.11 342.91 466.82 341.22 446.5 339.1C433.28 337.72 417.87 336.73 405.08 333.5C405.52 328.95 407.47 324.8 408.91 320.45C411.92 311.38 414.97 302.17 417.48 292.95C425.87 262.11 433.67 231.05 438.87 199.48C444.09 167.74 447.7 134.73 446.68 102.5C446.27 89.48 445.24 76.46 443.93 63.5C443.25 56.73 441.53 49.74 441.5 42.98ZM153.5 254.18C168.57 260.87 182.75 269.73 197.71 276.77C229.05 291.53 262.05 304.08 295.62 312.77C318.16 318.6 340.77 323.76 363.73 327.61C372.29 329.05 380.91 330.68 389.51 331.79C394.26 332.41 399.67 332.42 403.98 334.5C399.03 352.56 391.7 370.13 385.2 387.67C367.86 434.45 348.3 480.06 328.27 525.75C320.05 544.51 311.21 563.17 301.9 581.41C298.76 587.58 293.8 600.61 289.5 605.13C273.38 594.31 256.47 584.58 239.76 574.71C206.41 555.04 171.66 536.92 135.43 523.11C115.69 515.58 95.75 509.18 75.64 502.75C67.39 500.11 58.5 498.79 50.5 495.5C86.42 444.55 112.83 395.67 132.8 336.37C138.74 318.71 143.61 300.55 147.71 282.38C149.81 273.07 150.64 263.26 153.5 254.18ZM992.5 254.14C995.08 263.66 996.35 273.58 998.4 283.24C1000.12 291.33 1002.39 299.31 1004.28 307.36C1007.43 320.7 1012.01 333.89 1016.71 346.74C1022.47 362.48 1028.08 378.16 1035.12 393.4C1044.07 412.78 1053.9 432.16 1065.11 450.36C1070.54 459.17 1076.26 467.86 1082.04 476.44C1086.28 482.74 1091.3 488.79 1094.86 495.5C1080.53 500.4 1065.32 502.98 1050.79 507.38C1027.03 514.57 1003.9 523.64 981.2 533.67C957.27 544.25 933.45 556.87 911.25 570.74C893.04 582.11 875.15 594.41 856.5 605.05C851.63 600.81 847.73 589.72 844.82 583.66C837.36 568.12 830.03 552.51 822.49 537.01C802.08 495.06 783.92 451.45 767.79 407.68C761.4 390.36 754.61 373.17 748.79 355.64C746.46 348.61 743.25 341.74 741.7 334.5C745.85 332.62 750.95 332.65 755.5 332.01C764.52 330.76 773.52 329.33 782.49 327.86C805.42 324.11 828.01 318.9 850.46 312.91C883.67 304.03 916.62 292.06 947.64 277.18C957.25 272.57 966.86 267.78 976.28 262.77C981.66 259.9 986.91 256.55 992.5 254.14ZM290.5 605.73C330.92 621.59 372.21 633.27 415.5 637.8C431.43 639.46 447.49 640.29 463.5 640.59C470.9 640.73 479.31 639.29 486.5 640.76C487.26 646.61 487.09 652.6 487.29 658.5C487.77 672.83 487.97 687.17 488.37 701.5C489.19 731.5 490.36 761.5 490.96 791.5C491.24 805.17 491.7 818.83 492.2 832.5C492.38 837.47 493.97 847.58 492.45 852.03C491.12 855.96 482.66 861.98 479.49 864.98C469.9 874.05 460.91 883.76 451.55 893.05C448.52 896.05 446.05 899.53 443.11 902.61C427.29 919.18 412.43 936.69 397.94 954.43C391.3 962.56 385.34 972.28 377.5 979.23C367.1 967.2 357.35 954.67 346.48 943.02C316.94 911.36 283.39 881.57 245.9 859.59C228.42 849.34 210.75 839.49 192.14 831.42C181.69 826.89 168.37 823.94 158.71 818.5C173.1 799.69 187.49 780.99 201.32 761.79C219.13 737.06 234.09 710 249.01 683.49C258.92 665.88 267.99 647.83 277.51 630.01C281.4 622.73 284.94 611.53 290.5 605.73ZM855.5 605.71C860.26 612.9 863.54 621.38 867.44 629.07C872.25 638.55 877.36 647.87 882.13 657.37C895.12 683.27 909.94 708.7 925.21 733.29C937.25 752.68 950 771.61 963.48 790.02C968.66 797.1 974.14 804.02 979.52 810.95C982.22 814.42 985.23 817.66 987.37 821.5C976.83 827.27 965.09 831.5 954.19 836.66C936.5 845.05 919.36 854.93 902.7 865.2C852.74 896.03 807.6 935.54 768.5 979.21C763.23 976 759.53 969.62 755.76 964.73C750.72 958.17 745.23 951.92 740.03 945.49C722.79 924.21 704.42 903.8 685.27 884.23C678.04 876.85 671 869.1 663.25 862.26C661.1 860.36 654.05 854.71 653.29 852.28C651.9 847.79 653.32 838.45 653.45 833.5C653.83 819.17 654.66 804.83 654.93 790.5C655.54 758.16 656.71 725.84 657.66 693.5C658.18 676.14 657.33 658.13 659.5 640.91C666.35 639.28 676.21 640.81 683.5 640.71C698.51 640.51 713.55 639.2 728.5 637.94C757.71 635.49 786.81 629.22 814.68 620.24C828.28 615.86 842.57 611.83 855.5 605.71Z";
-
+// Satori-safe OG: only flex, backgroundColor, single backgroundImage values.
+// No <svg><pattern>/<mask>/<radialGradient> and no mega-path — those crash resvg
+// with "Offset is outside the bounds of the DataView".
 export default function OpengraphImage() {
   return new ImageResponse(
     (
@@ -16,99 +16,53 @@ export default function OpengraphImage() {
           width: 1200,
           height: 630,
           display: "flex",
-          position: "relative",
           flexDirection: "column",
           justifyContent: "center",
-          padding: "48 72 48 72",
+          padding: 64,
           backgroundColor: "#0d0f0e",
-          overflow: "hidden",
         }}
       >
-        {/* Subtle grid — SVG pattern with radial fade (Satori-safe) */}
-        <svg
-          width={1200}
-          height={630}
-          viewBox="0 0 1200 630"
-          style={{ position: "absolute", top: 0, left: 0 }}
-        >
-          <defs>
-            <pattern
-              id="trail-grid"
-              width={28}
-              height={28}
-              patternUnits="userSpaceOnUse"
-            >
-              <path
-                d="M 28 0 L 0 0 0 28"
-                fill="none"
-                stroke="white"
-                strokeOpacity={0.06}
-                strokeWidth={1}
-              />
-            </pattern>
-            <radialGradient id="grid-fade" cx="50%" cy="45%" r="75%">
-              <stop offset="40%" stopColor="white" stopOpacity={1} />
-              <stop offset="100%" stopColor="white" stopOpacity={0} />
-            </radialGradient>
-            <mask id="grid-mask">
-              <rect width={1200} height={630} fill="url(#grid-fade)" />
-            </mask>
-            {/* diffuse amber glow */}
-            <radialGradient id="amber-glow" cx="30%" cy="50%" r="45%">
-              <stop offset="0%" stopColor="#ff6a00" stopOpacity={0.11} />
-              <stop offset="60%" stopColor="#ff6a00" stopOpacity={0.04} />
-              <stop offset="100%" stopColor="#ff6a00" stopOpacity={0} />
-            </radialGradient>
-          </defs>
-          <rect width={1200} height={630} fill="url(#amber-glow)" />
-          <rect
-            width={1200}
-            height={630}
-            fill="url(#trail-grid)"
-            mask="url(#grid-mask)"
-          />
-        </svg>
-
-        {/* Eyebrow: TRAIL pinwheel + wordmark */}
+        {/* Eyebrow */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 12,
+            fontSize: 13,
+            letterSpacing: "0.2em",
+            color: "#ff6a00",
           }}
         >
-          <svg width={36} height={36} viewBox="0 0 1146 1047">
-            <path
-              d={LOGO_PATH}
-              fill="#ff6a00"
-              stroke="#ff6a00"
-              strokeWidth={0.25}
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span
+          <div
             style={{
-              fontFamily: "monospace",
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              backgroundColor: "#ff6a00",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#0d0f0e",
+              fontWeight: 700,
               fontSize: 14,
-              letterSpacing: "0.22em",
-              color: "#ff6a00",
-              fontWeight: 600,
             }}
           >
-            TRAIL
-          </span>
+            ◆
+          </div>
+          TRAIL
         </div>
 
+        {/* Headline — split into two flex spans for orange word (no negative letterSpacing) */}
         <div
           style={{
-            marginTop: 28,
-            fontSize: 88,
+            display: "flex",
+            flexWrap: "wrap",
+            marginTop: 32,
+            fontSize: 76,
             fontWeight: 800,
             lineHeight: 0.92,
             color: "#f2f4f6",
             maxWidth: 760,
-            display: "flex",
-            flexWrap: "wrap",
           }}
         >
           <span>Every bug leaves a&nbsp;</span>
@@ -118,7 +72,7 @@ export default function OpengraphImage() {
         <div
           style={{
             marginTop: 20,
-            fontSize: 20,
+            fontSize: 19,
             lineHeight: 1.5,
             color: "#8b929c",
             maxWidth: 580,
@@ -133,10 +87,8 @@ export default function OpengraphImage() {
             marginTop: 32,
             display: "flex",
             gap: 14,
-            fontFamily: "monospace",
-            fontSize: 12.5,
+            fontSize: 12,
             color: "#626973",
-            letterSpacing: "0.02em",
           }}
         >
           <span>Open source</span>
