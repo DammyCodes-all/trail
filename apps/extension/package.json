@@ -20,6 +20,7 @@
     "compile": "tsc --noEmit",
     "test": "vitest run",
     "test:page": "node spike/test-page.mjs",
+    "test:lifecycle": "wxt build && node spike/verify-recording-lifecycle.mjs",
     "verify": "tsc --noEmit && WXT_PUBLIC_REPLAY_SERVER_URL=http://localhost:8898 WXT_PUBLIC_WEB_URL=http://localhost:3000 wxt build && node spike/verify.mjs",
     "postinstall": "wxt prepare"
   },

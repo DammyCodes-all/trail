@@ -4,6 +4,7 @@ import type { ScriptPublicPath } from "wxt/utils/inject-script";
 const RECORDER_JS = "/content-scripts/recorder.js" as ScriptPublicPath;
 const RELAY_JS = "/content-scripts/relay.js" as ScriptPublicPath;
 const OVERLAY_JS = "/content-scripts/recording-overlay.js" as ScriptPublicPath;
+const RELAY_MARKER = "data-trail-extension-relay";
 
 // registerContentScripts covers FUTURE navigations; executeScript covers the
 // page that's already open. You need both — that pair is the whole trick.
@@ -33,26 +34,54 @@ export async function registerRecorderScripts(): Promise<void> {
 }
 
 export async function injectRecorderIntoPage(tabId: number): Promise<void> {
-  await browser.scripting.executeScript({
-    target: { tabId },
-    world: "ISOLATED",
-    files: [RELAY_JS, OVERLAY_JS],
-  });
+  // The relay is also manifest-injected. Probe its shared DOM marker before
+  // covering an already-open page with executeScript, or listeners accumulate.
+  const relayReady = await browser.scripting
+    .executeScript({
+      target: { tabId },
+      world: "ISOLATED",
+      func: (marker) => document.documentElement?.hasAttribute(marker) === true,
+      args: [RELAY_MARKER],
+    })
+    .then((results) => results?.[0]?.result === true)
+    .catch(() => false);
+  if (!relayReady) {
+    await browser.scripting.executeScript({
+      target: { tabId },
+      world: "ISOLATED",
+      files: [RELAY_JS],
+    });
+  }
+
+  const overlayReady = await browser.scripting
+    .executeScript({
+      target: { tabId },
+      world: "ISOLATED",
+      func: () => !!document.getElementById("trail-recording-overlay"),
+    })
+    .then((results) => results?.[0]?.result === true)
+    .catch(() => false);
+  if (!overlayReady) {
+    await browser.scripting.executeScript({
+      target: { tabId },
+      world: "ISOLATED",
+      files: [OVERLAY_JS],
+    });
+  }
+
   // Do not blindly clear __trailRecorder — that defeats the guard in
-  // recorder.content.ts:38 and creates a second set of listeners/patches if
-  // a recorder is already live (e.g. Stop→Start re-arm via MSG_START_RECORDER,
-  // or a navigation that already received the registered MAIN script). Probe
-  // first and skip the MAIN inject when a recorder is already present.
-  let hasRecorder = false;
-  try {
-    const res = await browser.scripting.executeScript({
+  // recorder.content.ts and creates a second set of listeners/patches if a
+  // recorder is already live. Probe first and skip the MAIN inject when present.
+  const hasRecorder = await browser.scripting
+    .executeScript({
       target: { tabId },
       world: "MAIN",
       func: () => !!(window as unknown as Record<string, unknown>).__trailRecorder,
-    });
-    hasRecorder = !!(res?.[0] && (res[0] as { result?: unknown }).result === true);
-  } catch {}
+    })
+    .then((results) => results?.[0]?.result === true)
+    .catch(() => false);
   if (hasRecorder) return;
+
   await browser.scripting.executeScript({
     target: { tabId },
     world: "MAIN",

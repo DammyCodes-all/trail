@@ -9,6 +9,8 @@ import {
   WEB_ORIGIN,
 } from '@trail/review/lib/constants';
 
+const RELAY_MARKER = 'data-trail-extension-relay';
+
 declare global {
   interface Window {
     __trailRelaySignal?: AbortSignal;
@@ -21,6 +23,11 @@ export default defineContentScript({
   world: 'ISOLATED',
   noScriptStartedPostMessage: true,
   main(ctx) {
+    // Static and executeScript injections can have separate JS globals even in
+    // the ISOLATED world. A DOM marker is shared, so only one relay owns events.
+    const markerTarget = document.documentElement;
+    if (markerTarget?.hasAttribute(RELAY_MARKER)) return;
+    markerTarget?.setAttribute(RELAY_MARKER, '');
     if (window.__trailRelaySignal && !window.__trailRelaySignal.aborted) return;
     window.__trailRelaySignal = ctx.signal;
     ctx.onInvalidated(() => {
@@ -101,7 +108,17 @@ export default defineContentScript({
       // unhandled rejection in a content script is noisy.
       browser.runtime.sendMessage(msg).catch(() => {});
 
-    const interval = setInterval(flushSoon, 150);
+    let flushInterval: number | undefined;
+    const startFlushLoop = () => {
+      if (flushInterval !== undefined) return;
+      flushInterval = window.setInterval(flushSoon, 150);
+    };
+    const stopFlushLoop = () => {
+      if (flushInterval === undefined) return;
+      window.clearInterval(flushInterval);
+      flushInterval = undefined;
+    };
+    startFlushLoop();
 
     // Session awareness: the recorder is registered for <all_urls>, so pages
     // OTHER than the session tab get one too. Poll the background for "is this
@@ -151,7 +168,7 @@ export default defineContentScript({
     // the recorder can't read chrome.storage on its own.
     browser.runtime.onMessage.addListener((msg) => {
       if (msg?.type === MSG_STOP_RECORDER) {
-        clearInterval(interval);
+        stopFlushLoop();
         if (immediateTimer !== undefined) {
           clearTimeout(immediateTimer);
           immediateTimer = undefined;
@@ -175,6 +192,7 @@ export default defineContentScript({
           return send({ type: MSG_BATCH, batch: buf.splice(0), final: true });
         });
       } else if (msg?.type === MSG_START_RECORDER) {
+        startFlushLoop();
         startPolling();
         window.postMessage({ [POST_MESSAGE_KEY]: 'start' }, '*');
       } else if (msg?.type === MSG_REDACT) {
